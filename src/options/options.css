@@ -1,0 +1,334 @@
+/* Standalone styling: extension pages get none of Royal Road's theme variables,
+   so this file carries its own light/dark tokens. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --border: #d9dde3;
+  --text: #1d2129;
+  --muted: #667085;
+  --primary: #3b6fd4;
+  --on-primary: #ffffff;
+  --danger: #b3261e;
+  --ok: #1f7a3d;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16181c;
+    --surface: #1e2126;
+    --border: #343941;
+    --text: #e6e8ec;
+    --muted: #98a0ad;
+    --primary: #6b9bff;
+    --on-primary: #10141c;
+    --danger: #f2857c;
+    --ok: #6cd08d;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 2rem 1rem 4rem;
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+.page {
+  max-width: 46rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+/*
+ * The three generated boxes sit in a plain wrapper, so they need the page's own
+ * rhythm applied to them too, or they run together while the Backup box below
+ * gets a gap.
+ *
+ * `gap` on the flex parent reaches direct children only, which is exactly what
+ * is wanted here: the hidden-fiction manager lives one level deeper, inside the
+ * Fiction lists box, so it cannot pick this up and keeps its group spacing.
+ *
+ * The between-box gap has to stay clearly larger than the between-group gap
+ * inside a box (1.25rem), or the hierarchy reads flat.
+ */
+#sections {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.page__head h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.4rem;
+}
+
+.muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.card {
+  padding: 1.1rem 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+}
+
+.card h2 {
+  margin: 0 0 0.85rem;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.card__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.85rem;
+}
+
+.card__head h2 {
+  margin: 0;
+}
+
+.card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+/* --- settings rows ------------------------------------------------------- */
+
+.row {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.row--stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  align-items: stretch;
+  cursor: default;
+}
+
+.row--disabled {
+  opacity: 0.5;
+}
+
+.row__inline {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.row__unit {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.card__blurb {
+  margin: -0.35rem 0 0.6rem;
+}
+
+.input--num {
+  width: 7rem;
+}
+
+select.input {
+  max-width: 18rem;
+}
+
+.row input[type='checkbox'] {
+  flex: none;
+  width: 1.05rem;
+  height: 1.05rem;
+  margin: 0.18rem 0 0;
+  accent-color: var(--primary);
+}
+
+.row__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.row__title {
+  font-weight: 550;
+}
+
+.row__note {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+
+/* --- controls ------------------------------------------------------------ */
+
+.btn {
+  padding: 0.4rem 0.8rem;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  cursor: pointer;
+}
+
+.btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.btn--danger:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.btn--small {
+  padding: 0.25rem 0.55rem;
+  font-size: 0.8125rem;
+}
+
+.input {
+  padding: 0.35rem 0.55rem;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+}
+
+.status {
+  min-height: 1.2rem;
+  margin: 0.6rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.status--ok {
+  color: var(--ok);
+}
+
+.status--error {
+  color: var(--danger);
+}
+
+/* --- hidden fiction list ------------------------------------------------- */
+
+.hidden-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 26rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.hidden-item {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+  padding: 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+}
+
+.hidden-item__cover {
+  flex: none;
+  width: 2.6rem;
+  height: 3.9rem;
+  object-fit: cover;
+  background: var(--bg);
+  border-radius: 0.2rem;
+}
+
+.hidden-item__body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.hidden-item__title {
+  display: block;
+  overflow: hidden;
+  color: inherit;
+  font-weight: 550;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hidden-item__title:hover {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.hidden-item__meta {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.input--area {
+  width: 100%;
+  min-height: 5rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+/* --- groups within a box -------------------------------------------------- */
+
+.group + .group {
+  margin-top: 1.25rem;
+}
+
+.group__title {
+  margin: 0 0 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.group > .row:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+/* The hidden-fiction manager sits inside the Fiction lists box, so it drops the
+   card chrome it would otherwise carry and reads as one more group. */
+#hidden-section.card {
+  padding: 0;
+  margin-top: 1.25rem;
+  background: none;
+  border: 0;
+  border-radius: 0;
+}

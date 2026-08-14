@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UI Improvements for Royal Road</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="page__head">
+        <h1>UI Improvements for Royal Road</h1>
+        <p class="muted">
+          Works on the redesigned Royal Road only. On the old layout the extension does nothing.
+        </p>
+      </header>
+
+      <!-- Settings sections are generated from the schema; see settings-ui.js. -->
+      <div id="sections"></div>
+
+      <section class="card" id="hidden-section" aria-labelledby="hidden-heading">
+        <div class="card__head">
+          <h3 class="group__title" id="hidden-heading">Hidden fictions (<span id="hidden-count">0</span>)</h3>
+          <div class="card__actions">
+            <input
+              type="search"
+              id="hidden-search"
+              class="input"
+              placeholder="Filter by title…"
+              aria-label="Filter hidden fictions by title"
+            />
+            <button type="button" id="unhide-all" class="btn btn--danger">Unhide all</button>
+          </div>
+        </div>
+        <p id="hidden-empty" class="muted">
+          Nothing hidden yet. Use the &minus; button on any fiction card on Royal Road.
+        </p>
+        <ul id="hidden-list" class="hidden-list"></ul>
+      </section>
+
+      <section class="card" aria-labelledby="backup-heading">
+        <h2 id="backup-heading">Backup</h2>
+        <p class="muted">
+          Everything is stored on this device. The extension never sends your settings or your
+          hidden list anywhere. Export to move them to another browser or profile.
+        </p>
+        <div class="card__actions">
+          <button type="button" id="export" class="btn">Export JSON</button>
+          <button type="button" id="import" class="btn">Import JSON…</button>
+          <button type="button" id="reset" class="btn btn--danger">Reset settings</button>
+          <input type="file" id="import-file" accept="application/json,.json" hidden />
+        </div>
+        <p id="backup-status" class="status" role="status"></p>
+      </section>
+    </main>
+
+    <script src="../common/browser.js"></script>
+    <script src="../common/selectors.js"></script>
+    <script src="../common/schema.js"></script>
+    <script src="../common/model.js"></script>
+    <script src="../common/filters.js"></script>
+    <script src="../common/store.js"></script>
+    <script src="settings-ui.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>

@@ -1,0 +1,301 @@
+/*
+ * Comment threads.
+ *
+ * The visual half is CSS because Royal Road already puts `data-depth`,
+ * `data-parent-id` and `data-has-replies` on every comment: the information is
+ * there, it just is not drawn. That also means it applies for free to comment
+ * pages fetched later, with no observer involved. Collapsing and the
+ * low-content fold live in features/comments.js, since those need to read text
+ * or add a control.
+ *
+ * Deliberately restrained: the problem is that a root comment and a reply look
+ * identical, so the fix is a separator and a thread line, not a redesign.
+ *
+ * The thread colour is a custom property so it can be themed from settings
+ * without generating a stylesheet: it falls back to Royal Road's own accent.
+ */
+
+html.rrx-comments {
+  --rrx-thread: var(--rrx-thread-color, var(--color-primary, currentColor));
+}
+
+/* ==========================================================================
+   Where one conversation ends and the next begins
+   ========================================================================== */
+
+/*
+ * The divider between conversations.
+ *
+ * Drawn as a pseudo-element tinted with `currentColor` and faded with
+ * `opacity`, rather than a border colour built with `color-mix()`.
+ *
+ * `color-mix()` is all-or-nothing: if any part of it fails to resolve, the
+ * whole declaration is invalid and the browser drops it, so the line simply
+ * does not exist and the setting looks like it only adds blank space. That
+ * makes it a poor thing to hang a visible feature on when the inputs are Royal
+ * Road's own theme tokens, which differ across a dozen themes and are defined
+ * through `:where()` chains.
+ *
+ * `currentColor` needs no token at all. It is the comment's own text colour, so
+ * it is legible against the comment's own background on every theme, including
+ * the ones that ship later. `opacity` on a pseudo-element cannot be invalidated
+ * by anything.
+ */
+html.rrx-comments.rrx-comment-rules [data-comment-id][data-depth='0'] {
+  position: relative;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1.25rem;
+}
+
+html.rrx-comments.rrx-comment-rules [data-comment-id][data-depth='0']::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 1px;
+  background: currentColor;
+  opacity: var(--rrx-divider, 0.16);
+  pointer-events: none;
+}
+
+/*
+ * Nothing to separate from, on the genuinely last comment only.
+ *
+ * NOT `[data-depth='0']:last-child`. Royal Road wraps each top-level comment in
+ * its own `[data-rr-paginate-item]`, one comment per wrapper, so every comment
+ * is the last child of something and that selector suppresses the divider on
+ * all of them. The wrapper is what has siblings, so the wrapper is what has a
+ * last one.
+ */
+html.rrx-comments.rrx-comment-rules
+  [data-rr-paginate-item]:last-child
+  [data-comment-id][data-depth='0']::after {
+  display: none;
+}
+
+/* ==========================================================================
+   Reply chains
+   --------------------------------------------------------------------------
+   Royal Road holds a chain in two different containers depending on how deep it
+   has got. Down to depth 2 the replies sit in `.comment-replies`. Past that it
+   switches to `[data-rr-deep-replies]`, which starts out `hidden` behind a
+   "N more replies" button. Both are styled here, or a thread would grow its
+   line for two levels and then lose it exactly where the nesting gets hard to
+   follow and the line is most wanted.
+   ========================================================================== */
+
+html.rrx-comments .comment-replies,
+html.rrx-comments [data-rr-deep-replies] {
+  margin-top: 0.5rem;
+  margin-left: 0.5rem;
+  padding-left: 1rem;
+  /* Two declarations on purpose. The first always resolves; the second refines
+     it and is simply ignored if `color-mix()` or the theme token behind it does
+     not resolve, which leaves a visible line rather than none at all. */
+  border-left: 2px solid var(--rrx-thread);
+  border-left-color: color-mix(in srgb, var(--rrx-thread) 45%, transparent);
+}
+
+html.rrx-comments .comment-replies > [data-comment-id],
+html.rrx-comments [data-rr-deep-replies] > [data-comment-id] {
+  position: relative;
+  margin-bottom: 0.85rem;
+}
+
+html.rrx-comments .comment-replies > [data-comment-id]:last-child,
+html.rrx-comments [data-rr-deep-replies] > [data-comment-id]:last-child {
+  margin-bottom: 0;
+}
+
+/* A short tick where each reply meets its parent's line, so a run of replies
+   reads as a list rather than one block of text. */
+html.rrx-comments .comment-replies > [data-comment-id]::before,
+html.rrx-comments [data-rr-deep-replies] > [data-comment-id]::before {
+  content: '';
+  position: absolute;
+  top: 1.05em;
+  left: -1rem;
+  width: 0.7rem;
+  height: 2px;
+  background: var(--rrx-thread);
+  background: color-mix(in srgb, var(--rrx-thread) 45%, transparent);
+}
+
+/* Royal Road indents each level with an inline `margin-left`, and because the
+   levels nest, those margins accumulate. Ours would accumulate on top. Past
+   depth 2 that adds up fast, so beyond the first couple of levels we contribute
+   the line and the tick but no further indent of our own. */
+html.rrx-comments [data-rr-deep-replies] {
+  margin-left: 0;
+  padding-left: 0.75rem;
+}
+
+/* ==========================================================================
+   Collapsing a thread
+   --------------------------------------------------------------------------
+   The gutter the button sits in is ours to provide. There is none to borrow: a
+   top-level comment has `margin-left: 0` and sits flush against the edge of the
+   comment column, and the two accordion wrappers around the comment list are
+   `overflow: hidden` with only 16px of padding, so anything hung outside the
+   comment on a negative offset is clipped away.
+
+   The padding goes on the comment's own body row rather than on the comment,
+   because a comment's replies are a *sibling* of that row. Padding the comment
+   itself would push its whole chain right, once per level, and a deep thread
+   would walk off the page.
+
+   It is reserved on every comment, not only the ones with replies, so comments
+   in the same thread still line up with one another.
+   ========================================================================== */
+
+html.rrx-comments.rrx-comment-collapsible [data-comment-id] > .wrap-anywhere > :first-child {
+  padding-left: 1.45rem;
+}
+
+/* Collapsed, the button also carries the reply count, so it needs more room
+   than the bare glyph does. Widening the gutter is free here: the chain below
+   is hidden, so this row is the only thing left to move.
+
+   `.rrx-comment-collapsible` is repeated for specificity, not for matching. The
+   rule above is four classes and this one would be three, so without it the
+   narrow gutter wins in exactly the case this exists for: a collapsed thread,
+   which only happens when the collapse feature is on. */
+html.rrx-comments.rrx-comment-collapsible
+  .rrx-thread-collapsed
+  > .wrap-anywhere
+  > :first-child {
+  padding-left: 2.9rem;
+}
+
+html.rrx-comments [data-comment-id]:has(> .rrx-thread-toggle) {
+  position: relative;
+}
+
+.rrx-thread-toggle {
+  position: absolute;
+  top: 0.55rem;
+  left: 0.1rem;
+  z-index: 2;
+  min-width: 1.1rem;
+  /* Bounded, so a thread with a four-digit reply count cannot push the button
+     out of the gutter it was given. */
+  max-width: 2.6rem;
+  height: 1.1rem;
+  padding: 0 0.2rem;
+  overflow: hidden;
+  white-space: nowrap;
+  font: inherit;
+  font-size: 0.6875rem;
+  line-height: 1;
+  color: var(--color-on-surface-muted, #8a8a8a);
+  background: var(--color-surface, #111);
+  border: 1px solid var(--rrx-thread, #4f8ef7);
+  border-color: color-mix(in srgb, var(--rrx-thread, #4f8ef7) 35%, transparent);
+  border-radius: 0.25rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, color 0.12s ease;
+}
+
+/* Out of the way until wanted, but always reachable by keyboard. */
+html.rrx-comments [data-comment-id]:hover > .rrx-thread-toggle,
+.rrx-thread-toggle:focus-visible,
+.rrx-thread-collapsed > .rrx-thread-toggle {
+  opacity: 1;
+}
+
+.rrx-thread-toggle:hover {
+  color: var(--color-on-surface-strong, #eaeaea);
+}
+
+/* Descendant, not child: the replies sit a level below their comment, and
+   collapsing a thread should take the whole chain under it. Both containers,
+   and the "N more replies" button too: with the chain collapsed, a button
+   offering to expand part of it is an invitation to a confusing half-state. */
+.rrx-thread-collapsed .comment-replies,
+.rrx-thread-collapsed [data-rr-deep-replies],
+.rrx-thread-collapsed [data-rr-comment-expand-deep] {
+  display: none !important;
+}
+
+/* ==========================================================================
+   Low-content comments
+   --------------------------------------------------------------------------
+   Folded to a single dimmed line rather than removed by default: it is still a
+   real person saying a real thing, and a mis-classification should cost nothing.
+   Hiding outright is available for readers who would rather not see them.
+
+   A comment with replies is treated differently from one without. Collapsing
+   the whole element would take the conversation hanging off it down too, so
+   these rules reach past the comment to its own body and leave
+   `.comment-replies` visible. The structure they rely on is:
+
+       [data-comment-id]
+         > a            (the permalink anchor)
+         > div          (the wrapper)
+             > div      (the comment's own body)
+             > .comment-replies
+
+   Skipping these comments entirely would make every rule silently conditional
+   on whether anyone happened to reply.
+   ========================================================================== */
+
+/* --- no replies: the whole comment folds or goes ---
+   "Has replies" means either container. Testing only `.comment-replies` would
+   read a deep comment as childless and hide it outright, taking a chain of
+   answers with it. */
+
+.rrx-comment-thanks:not(:has(.comment-replies, [data-rr-deep-replies])) {
+  max-height: 1.6rem;
+  overflow: hidden;
+  opacity: 0.4;
+  transition: max-height 0.15s ease, opacity 0.15s ease;
+}
+
+.rrx-comment-thanks:not(:has(.comment-replies, [data-rr-deep-replies])):hover,
+.rrx-comment-thanks:not(:has(.comment-replies, [data-rr-deep-replies])):focus-within {
+  max-height: 40rem;
+  opacity: 1;
+}
+
+/* Hiding only ever reaches a comment with no replies: comments.js softens it
+   to folding otherwise, so a chain is never left answering nothing. The guard
+   stays as a belt-and-braces against that ever changing. */
+.rrx-comment-thanks-hidden:not(:has(.comment-replies, [data-rr-deep-replies])) {
+  display: none !important;
+}
+
+/* --- with replies: only the comment's own body ---
+   The inner `:not()` has to spare whichever child *holds* the replies, not just
+   a child that is the replies: a deep chain hangs off an unremarkable wrapper
+   div that sits alongside the body row, so it is excluded by what it contains
+   rather than by what it is. */
+
+.rrx-comment-thanks:has(.comment-replies, [data-rr-deep-replies])
+  > :not(.rrx-thread-toggle)
+  > :not(.comment-replies):not(:has([data-rr-deep-replies])) {
+  max-height: 1.6rem;
+  overflow: hidden;
+  opacity: 0.4;
+  transition: max-height 0.15s ease, opacity 0.15s ease;
+}
+
+.rrx-comment-thanks:has(.comment-replies, [data-rr-deep-replies]):hover
+  > :not(.rrx-thread-toggle)
+  > :not(.comment-replies):not(:has([data-rr-deep-replies])),
+.rrx-comment-thanks:has(.comment-replies, [data-rr-deep-replies]):focus-within
+  > :not(.rrx-thread-toggle)
+  > :not(.comment-replies):not(:has([data-rr-deep-replies])) {
+  max-height: 40rem;
+  opacity: 1;
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  .rrx-thread-toggle,
+  .rrx-comment-thanks {
+    transition: none;
+  }
+}
+

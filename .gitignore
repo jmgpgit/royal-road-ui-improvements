@@ -1,0 +1,23 @@
+node_modules/
+web-ext-artifacts/
+dist/
+*.log
+
+# Captured Royal Road HTML: several megabytes, and re-derivable at any time.
+# test/fixtures/README.md documents how to capture each one. The selector and
+# DOM suites skip themselves with a named reason when these are absent.
+#
+# Ignored by directory rather than by extension, so a capture saved under a new
+# name or a new subdirectory is still covered. A raw capture straight from the
+# site carries a live __RequestVerificationToken; the committed README explains
+# how to strip them, but nothing in here is meant to be committed at all.
+test/fixtures/**
+!test/fixtures/README.md
+
+# Local editor and agent state
+.claude/settings.local.json
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

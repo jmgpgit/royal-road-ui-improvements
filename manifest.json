@@ -1,0 +1,101 @@
+{
+  "manifest_version": 3,
+  "name": "UI Improvements for Royal Road",
+  "version": "1.0.0",
+  "minimum_chrome_version": "121",
+  "description": "Filter and re-lay-out Royal Road fiction lists, hide fictions for good, and improve chapter typography and comments.",
+  "homepage_url": "https://github.com/jmgpgit/royal-road-ui-improvements",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "royal-road-ui-improvements@jmgpgit.github.io",
+      "strict_min_version": "121.0",
+      "data_collection_permissions": {
+        "required": [
+          "none"
+        ]
+      }
+    }
+  },
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "*://www.royalroad.com/*"
+  ],
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "96": "icons/icon-96.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "UI Improvements for Royal Road",
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png"
+    }
+  },
+  "options_ui": {
+    "page": "src/options/options.html",
+    "open_in_tab": true
+  },
+  "background": {
+    "scripts": [
+      "src/background/background.js"
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://www.royalroad.com/*"
+      ],
+      "run_at": "document_start",
+      "all_frames": false,
+      "css": [
+        "src/content/inject.css",
+        "src/content/inject-list.css",
+        "src/content/inject-views.css",
+        "src/content/inject-reader.css",
+        "src/content/inject-comments.css"
+      ],
+      "js": [
+        "src/common/browser.js",
+        "src/common/selectors.js",
+        "src/common/schema.js",
+        "src/common/model.js",
+        "src/common/filters.js",
+        "src/common/css.js",
+        "src/content/boot.js"
+      ]
+    },
+    {
+      "matches": [
+        "*://www.royalroad.com/*"
+      ],
+      "run_at": "document_end",
+      "all_frames": false,
+      "js": [
+        "src/common/store.js",
+        "src/common/cards.js",
+        "src/content/ui.js",
+        "src/content/tags.js",
+        "src/content/pager.js",
+        "src/content/panel.js",
+        "src/content/features/expand-all.js",
+        "src/content/features/hover-expand.js",
+        "src/content/features/hide-fictions.js",
+        "src/content/features/list-filters.js",
+        "src/content/features/list-loadmore.js",
+        "src/content/features/view-modes.js",
+        "src/content/features/clean-titles.js",
+        "src/content/features/author-notes.js",
+        "src/content/features/comments.js",
+        "src/content/features/fiction-page.js",
+        "src/content/main.js"
+      ]
+    }
+  ]
+}

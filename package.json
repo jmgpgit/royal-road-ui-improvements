@@ -1,0 +1,44 @@
+{
+  "name": "royal-road-ui-improvements",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Browser extension adding optional UI improvements to the redesigned royalroad.com.",
+  "license": "MPL-2.0",
+  "scripts": {
+    "test": "node --test",
+    "lint": "web-ext lint --source-dir dist/firefox",
+    "start": "web-ext run",
+    "build": "node tools/build.mjs",
+    "icons": "node tools/icons.mjs",
+    "package": "npm run build && web-ext build --source-dir dist/firefox --overwrite-dest --filename {name}-{version}-firefox.zip && web-ext build --source-dir dist/chrome  --overwrite-dest --filename {name}-{version}-chrome.zip"
+  },
+  "devDependencies": {
+    "jsdom": "^30.0.1",
+    "web-ext": "^8.3.0"
+  },
+  "webExt": {
+    "sourceDir": ".",
+    "ignoreFiles": [
+      "test",
+      "test/**",
+      "tools",
+      "tools/**",
+      "dist",
+      "dist/**",
+      "package.json",
+      "package-lock.json",
+      "node_modules/**",
+      "web-ext-artifacts/**",
+      "*.md",
+      ".gitignore"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jmgpgit/royal-road-ui-improvements.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jmgpgit/royal-road-ui-improvements/issues"
+  },
+  "homepage": "https://github.com/jmgpgit/royal-road-ui-improvements"
+}

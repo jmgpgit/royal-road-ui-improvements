@@ -1,0 +1,119 @@
+/*
+ * Chapter reader overrides: the typography Royal Road's own Reading Preferences
+ * do not offer.
+ *
+ * Royal Road drives its reader by putting classes on the chapter container and
+ * styling them in extras-*.css:
+ *
+ *     .width-70 .chapter-content              { max-width: 70% }
+ *     .chapter.font-size-14 .chapter-content p { font-size: 14px }
+ *     .chapter.font-family-arial .chapter-content { font-family: Arial, … }
+ *
+ * So its settings are per-property, and these rules layer on top of whichever
+ * ones the reader has chosen rather than replacing them. Everything here is
+ * gated behind both `reader.enabled` and its own setting, so an override that is
+ * not set contributes nothing.
+ */
+
+/* Line height. Genuinely absent from Royal Road: its "paragraph spacing" is the
+   gap *between* paragraphs, not the leading within one. */
+html.rrx-line-height .chapter-content p,
+html.rrx-line-height .chapter-content li,
+html.rrx-line-height .author-note p {
+  line-height: var(--rrx-line-height) !important;
+}
+
+/* Justification. Hyphenation rides along by default because justified text
+   without it opens rivers of whitespace at these column widths. */
+html.rrx-justify .chapter-content p,
+html.rrx-justify .chapter-content li {
+  text-align: justify !important;
+  text-justify: inter-word;
+}
+
+html.rrx-hyphens .chapter-content p,
+html.rrx-hyphens .chapter-content li {
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+/* Text colour. Authors colour their own text inline, so this has to reach
+   descendants too: pair it with Royal Road's own "strip font colour" if the
+   author has been especially creative. */
+html.rrx-text-color .chapter-content,
+html.rrx-text-color .chapter-content *:not(a):not(a *) {
+  color: var(--rrx-text-color) !important;
+}
+
+/* Font. Local families only: Royal Road's CSP blocks font files loaded from an
+   injected stylesheet, so a webfont here would silently fall back and look like
+   a bug. */
+html.rrx-font .chapter-content,
+html.rrx-font .chapter-content * {
+  font-family: var(--rrx-font) !important;
+}
+
+/* Reading width past Royal Road's ceiling.
+   Two layers have to give: `.width-100` is 100% *of* #chapter-page-container,
+   which is a Tailwind `.container` and therefore capped itself. Overriding only
+   one of them does nothing. */
+html.rrx-wide #chapter-page-container {
+  max-width: var(--rrx-reader-max) !important;
+}
+
+html.rrx-wide .chapter-content {
+  max-width: 100% !important;
+}
+
+/* The chapter nav and author notes sit in their own containers at the same
+   level, so they widen with the prose rather than staying pinned narrow. */
+html.rrx-wide .chapter-inner,
+html.rrx-wide .author-note-card {
+  max-width: 100% !important;
+}
+
+/* ==========================================================================
+   Chapter furniture
+   --------------------------------------------------------------------------
+   Author notes, the About-author panel and the "SUPPORT «title»" block are all
+   hidden by author-notes.js rather than here. Each needs something CSS cannot
+   do: read a note's links, or climb from the author card to the section that
+   holds its heading. These rules only style the result.
+   ========================================================================== */
+
+/* A way back into the extension's settings from where a reader actually looks
+   for them: Royal Road's own Reading Preferences dialog. */
+.rrx-prefs-link {
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem 1.5rem 1rem;
+}
+
+.rrx-note-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.35rem 0;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8125rem;
+  font-family: var(--font-sans, inherit);
+  color: var(--color-on-surface-muted, #8a8a8a);
+  background: color-mix(in srgb, var(--color-on-surface, #888) 10%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--color-on-surface, #888) 30%, transparent);
+  border-radius: 9999px;
+  cursor: pointer;
+}
+
+.rrx-note-chip:hover {
+  color: var(--color-on-surface-strong, #eaeaea);
+  border-color: color-mix(in srgb, var(--color-on-surface, #888) 55%, transparent);
+}
+
+.rrx-note-chip:focus-visible {
+  outline: 2px solid var(--color-primary, #4f8ef7);
+  outline-offset: 2px;
+}
+
+.rrx-note-hidden {
+  display: none !important;
+}

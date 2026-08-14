@@ -1,0 +1,272 @@
+/*
+ * Filtering and the filter panel.
+ *
+ * Like every stylesheet here, each rule is anchored to an `rrx-` name we control
+ * or a `data-rr-` hook that exists only in the redesign, so the file is inert
+ * until a setting turns it on.
+ */
+
+/* ==========================================================================
+   Filtered-out cards
+   --------------------------------------------------------------------------
+   A separate class from hiding: a fiction can be hidden (permanently, by id) or
+   filtered (transiently, by its numbers), and the two must not clobber each
+   other's state.
+   ========================================================================== */
+
+.fiction-card-expanded.rrx-filtered {
+  display: none !important;
+}
+
+/* Filters are JavaScript - they need parsed numbers off each card - so they
+   cannot run before first paint. Hold the list back until the first pass, using
+   `visibility` so the page does not reflow when it appears. boot.js only sets
+   this when a filter is actually active, and list-filters.js clears it on the
+   first pass or after a 1s watchdog, whichever comes first.
+
+   Scoped to `rrx-page-list` as well, because `.fiction-list` is not unique to
+   the fiction lists: /home has four, and the legacy layout has one. Blanking
+   those would hide content on a page where no filter pass is coming to reveal
+   it again. */
+html.rrx-page-list.rrx-filters-pending .fiction-list {
+  visibility: hidden;
+}
+
+.rrx-toolbar__count {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-on-surface-muted, #8a8a8a);
+}
+
+/* ==========================================================================
+   Filter panel
+   ========================================================================== */
+
+.rrx-panel {
+  flex: 1 0 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid color-mix(in srgb, var(--color-on-surface, #888) 20%, transparent);
+}
+
+.rrx-panel__body {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: 0.5rem 1.5rem;
+  align-items: start;
+}
+
+.rrx-group {
+  min-width: 0;
+}
+
+.rrx-group__title {
+  margin: 0 0 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-on-surface-muted, #8a8a8a);
+}
+
+.rrx-field__stack {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.rrx-chip--on {
+  color: var(--color-on-primary, #fff);
+  background: var(--color-primary, #4f8ef7);
+  border-color: var(--color-primary, #4f8ef7);
+}
+
+/* --- tag combobox ---------------------------------------------------------
+   Its own dropdown rather than a native <datalist>, which will not reopen
+   after a pick without retyping: adding five tags fought you four times. */
+
+.rrx-combo {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+
+.rrx-combo__menu {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  z-index: 60;
+  max-height: 12rem;
+  overflow-y: auto;
+  background: var(--color-surface, #111);
+  border: 1px solid color-mix(in srgb, var(--color-on-surface, #888) 30%, transparent);
+  border-radius: var(--radius-sm, 0.25rem);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 35%);
+}
+
+.rrx-combo__item {
+  display: block;
+  width: 100%;
+  padding: 0.3rem 0.55rem;
+  font: inherit;
+  text-align: left;
+  color: var(--color-on-surface, #b4b4b4);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.rrx-combo__item:hover,
+.rrx-combo__item:focus-visible {
+  color: var(--color-on-surface-strong, #eaeaea);
+  background: color-mix(in srgb, var(--color-primary, #4f8ef7) 22%, transparent);
+}
+
+.rrx-panel__footer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid color-mix(in srgb, var(--color-on-surface, #888) 12%, transparent);
+}
+
+.rrx-field {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 1.9rem;
+}
+
+.rrx-field--wrap {
+  align-items: flex-start;
+}
+
+.rrx-field__label {
+  flex: 0 0 5.5rem;
+  color: var(--color-on-surface-muted, #8a8a8a);
+}
+
+.rrx-field__dash {
+  color: var(--color-on-surface-muted, #8a8a8a);
+}
+
+.rrx-field__num,
+.rrx-field__text {
+  min-width: 0;
+  padding: 0.2rem 0.4rem;
+  font: inherit;
+  color: var(--color-on-surface-strong, #eaeaea);
+  background: var(--color-surface, #111);
+  border: 1px solid color-mix(in srgb, var(--color-on-surface, #888) 25%, transparent);
+  border-radius: var(--radius-sm, 0.25rem);
+}
+
+.rrx-field__num {
+  width: 5rem;
+}
+
+.rrx-field__text {
+  flex: 1 1 auto;
+}
+
+.rrx-field__num:focus-visible,
+.rrx-field__text:focus-visible {
+  outline: 2px solid var(--color-primary, #4f8ef7);
+  outline-offset: 1px;
+}
+
+.rrx-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  flex: 1 1 auto;
+}
+
+.rrx-chip {
+  padding: 0.15rem 0.5rem;
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--color-on-surface, #b4b4b4);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--color-on-surface, #888) 25%, transparent);
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.rrx-chip:hover {
+  color: var(--color-on-surface-strong, #eaeaea);
+  border-color: color-mix(in srgb, var(--color-on-surface, #888) 50%, transparent);
+}
+
+.rrx-chip[aria-pressed='true'] {
+  color: var(--color-on-primary, #fff);
+  background: var(--color-primary, #4f8ef7);
+  border-color: var(--color-primary, #4f8ef7);
+}
+
+.rrx-chip:focus-visible {
+  outline: 2px solid var(--color-primary, #4f8ef7);
+  outline-offset: 2px;
+}
+
+.rrx-btn--primary {
+  color: var(--color-on-primary, #fff);
+  background: var(--color-primary, #4f8ef7);
+  border-color: var(--color-primary, #4f8ef7);
+}
+
+.rrx-btn--primary:hover {
+  color: var(--color-on-primary, #fff);
+  filter: brightness(1.1);
+}
+
+/* ==========================================================================
+   Load-more infinite scroll status
+   ========================================================================== */
+
+.rrx-loadmore {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.75rem 0;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.8125rem;
+  color: var(--color-on-surface, #b4b4b4);
+  background: var(--color-surface-alt, #1b1b1b);
+  border: 1px dashed color-mix(in srgb, var(--color-on-surface, #888) 30%, transparent);
+  border-radius: var(--radius-md, 0.375rem);
+}
+
+.rrx-loadmore__status {
+  flex: 1 1 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.rrx-loadmore__status--error {
+  color: var(--color-danger, #c0392b);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rrx-chip {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
+   Reading width of the fiction lists
+   --------------------------------------------------------------------------
+   Royal Road caps the list column with its own `.container`. Scoped to the
+   list pages by the page class boot.js stamps on <html>, so the same rule does
+   not stretch the home page, which has a `.fiction-list` of its own.
+   ========================================================================== */
+
+html.rrx-page-list.rrx-list-wide .container:has(.fiction-list) {
+  max-width: var(--rrx-list-max) !important;
+}
