@@ -32,6 +32,15 @@
   /** Per-key wording. `note` is the explanatory line under the control. */
   const COPY = {
     // ── fiction lists ─────────────────────────────────────────────────────
+    'design.mode': {
+      label: 'Which Royal Road design to use',
+      note: 'Royal Road serves two layouts and remembers your choice in a cookie. Everything this extension does is built on the newer one, so on the older one it does nothing at all. Choosing here holds on every page and needs no account. “Leave it to Royal Road” changes nothing, including undoing a choice you made before — pick the old design for that.',
+      optionLabels: {
+        leave: 'Leave it to Royal Road',
+        new: 'Always the new design',
+        old: 'Always the old design (this extension will do nothing)',
+      },
+    },
     'list.expandAll': {
       label: 'Expand all descriptions',
       note: 'Every description on the list pages stays open, with no fade at the bottom and no chevron to click.',
@@ -244,6 +253,13 @@
    * runs, so a long box still reads as a few short lists.
    */
   const SECTIONS = [
+    {
+      id: 'design',
+      title: 'Royal Road’s design',
+      blurb:
+        'Royal Road serves two layouts. This extension only works on the newer one, so this is the setting the rest depend on.',
+      groups: [{ title: 'Which layout to use', keys: ['design.mode'] }],
+    },
     {
       id: 'lists',
       title: 'Fiction lists',

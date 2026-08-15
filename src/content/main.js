@@ -293,6 +293,19 @@
       // would otherwise put the guard straight back.
       RRX.boot.legacy = true;
       document.documentElement.classList.remove(RRX.ROOT_CLASS.filtersPending);
+
+      // Two things still matter on this layout, and nothing else does.
+      const { settings, hidden } = await RRX.boot.ready;
+
+      // Write the boot mirror even here: it is the only way a legacy page can
+      // leave behind what the next one needs to switch before it paints.
+      RRX.store.writeMirror(settings, hidden);
+
+      // And react to the layout choice changing in the popup, so this tab
+      // follows straight away rather than at the next navigation. Without it the
+      // popup appears to do nothing on the page you are looking at, which is the
+      // page you changed it for.
+      RRX.store.onChange(({ settings: next }) => RRX.boot.enforceDesign(next));
       return;
     }
     const { settings, hidden } = await RRX.boot.ready;
@@ -305,6 +318,9 @@
 
     // Options page, popup, or another tab changed something.
     RRX.store.onChange(({ settings: s, hidden: h }) => {
+      // Asking for the old layout has to work from here too, and it ends this
+      // page, so it comes before anything that would restyle a page about to go.
+      if (RRX.boot.enforceDesign(s)) return;
       adoptState(s, h);
       applyState();
       runOnce();

@@ -12,10 +12,11 @@ no analytics, no server of its own, and no write to your Royal Road account.
 > Road" is the trademark of its owner and is used here only to say what the extension works
 > on.
 
-> **Redesign only.** Royal Road currently runs two UIs. This extension targets the new one
-> and is inert on the legacy layout: every selector it uses is anchored either to a
-> `data-rr-*` hook that exists only in the redesign or to its own `rrx-` names (enforced by
-> a test), and no visible UI is injected until a DOM probe confirms the redesign.
+> **Redesign only.** Royal Road currently runs two UIs. This extension targets the new one:
+> every selector it uses is anchored either to a `data-rr-*` hook that exists only in the
+> redesign or to its own `rrx-` names (enforced by a test), and no visible UI is injected
+> until a DOM probe confirms the redesign. The only thing it does on the legacy layout is
+> switch you to the redesign, if you have asked it to.
 
 ## What it does
 
@@ -58,6 +59,11 @@ no analytics, no server of its own, and no write to your Royal Road account.
   under it still make sense, and the author's own comments, which are left alone entirely
   unless you say otherwise and are only ever collapsed even then.
 
+**Everywhere on the site**: none of the above works on Royal Road's legacy layout, so the
+extension's popup carries a choice of layout — leave it to Royal Road, always the new design,
+or always the old one. No account needed. The old-design option really does stop everything
+else working, which is why it is there: wanting it back is a fair thing to want.
+
 **On a fiction page**: control each section, in the order it appears. About Fiction,
 Statistics, Table of Contents, Leave A Review and Reviews are each left alone, always open or
 always closed. Others Also Liked is left alone, shown or hidden. Reviews also get a default
@@ -78,8 +84,9 @@ toggle away in options:
 Anything that alters an author's words, such as collapsing a note or a shoutout, is opt-in,
 and so is every rule that folds or hides a comment.
 
-The options page is three boxes, one per part of the site: fiction lists (including the
-hidden-fiction manager), fiction pages, and chapter pages.
+The options page is four boxes: which of Royal Road's two layouts to use, then one per part
+of the site — fiction lists (including the hidden-fiction manager), fiction pages, and
+chapter pages.
 
 ## Install
 
@@ -107,8 +114,23 @@ Then `chrome://extensions` -> enable **Developer mode** -> **Load unpacked** -> 
 
 ### Make sure you are on the redesign
 
-The extension does nothing on the legacy layout, by design. To switch, run this in the
-console on royalroad.com and reload:
+Royal Road serves two layouts, and everything here is built on the newer one, so on the
+legacy layout the extension does nothing at all.
+
+Pick **Always the new design** under *Royal Road design*, at the top of the extension's popup,
+and it will hold on every page from then on — on the page you are looking at straight away, and
+on later ones before they are painted. The same setting is first in the options page.
+
+To go back, pick **Always the old design**. Leaving it on *Leave it to Royal Road* will not
+undo an earlier choice: Royal Road remembers it in a cookie, and only actively asking for the
+old design clears it.
+
+Two things worth knowing. **It needs no account** — which layout you get is decided by a
+cookie rather than by being signed in, so this works signed out. And **it is reversible**:
+Royal Road's own "Revert To Legacy UI" link still works, though with "always use the new
+design" switched on it will be undone on your next page load, so turn that off first.
+
+If you would rather do it by hand, it is one cookie:
 
 ```js
 document.cookie = 'beta-ui-v2=always; path=/; domain=.royalroad.com';

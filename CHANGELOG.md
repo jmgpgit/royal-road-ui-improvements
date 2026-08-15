@@ -4,6 +4,29 @@ Notable changes, newest first. Versions follow [semantic versioning](https://sem
 the patch number for fixes, the minor for new settings, the major for anything that changes
 what an existing setting does.
 
+## 1.2.0
+
+**Royal Road's two layouts**
+
+- Royal Road serves an old layout and a new one, and this extension only works on the new one:
+  on the old one it does nothing at all, with nothing to say why. There is now a choice of
+  layout at the top of the extension's popup, and first in its options: leave it to Royal Road
+  (the default, which changes nothing), always the new design, or always the old one.
+- Choosing a layout applies to the page you are looking at straight away, and to every page
+  after that before it is painted. It is re-applied on every load rather than only when you
+  change it, so a hard refresh lands on the layout you asked for and Royal Road cannot quietly
+  put you back.
+- Three states rather than a switch, because Royal Road remembers your choice in a cookie: "I
+  have not chosen" and "put me back on the old one" are different things, and only the second
+  can undo an earlier opt-in. A switch that merely turned off would leave you on the new design
+  for ever with no way back.
+- Always the old design is a real option, and it stops the rest of the extension working. That
+  is the point: wanting the old layout back is a legitimate thing to want.
+- Switching needs no account — the layout is decided by a cookie, not by being signed in, so
+  this works signed out.
+- No new permission: the cookie belongs to royalroad.com, whose pages the extension can
+  already read.
+
 ## 1.1.0
 
 **Chapters**
