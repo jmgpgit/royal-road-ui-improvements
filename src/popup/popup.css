@@ -21,6 +21,13 @@
   box-sizing: border-box;
 }
 
+/* Sections are swapped by the `hidden` attribute, and `.row` sets a display of
+   its own, so state the rule explicitly rather than relying on the user agent
+   sheet losing that fight. */
+[hidden] {
+  display: none !important;
+}
+
 body {
   width: 17rem;
   margin: 0;
@@ -127,4 +134,12 @@ h1:not(:first-of-type) {
 .btn:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
+}
+
+/* Shown instead of a section when the tab is not a page this extension acts on.
+   Quieter than a control, because it is telling you there is nothing to do. */
+.notice {
+  margin: 0.2rem 0 0.9rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
 }

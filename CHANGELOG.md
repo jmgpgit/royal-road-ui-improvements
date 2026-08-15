@@ -4,6 +4,30 @@ Notable changes, newest first. Versions follow [semantic versioning](https://sem
 the patch number for fixes, the minor for new settings, the major for anything that changes
 what an existing setting does.
 
+## 1.1.0
+
+**Chapters**
+
+- A recap of how the previous chapter ended, at the top of this one: always visible, behind a
+  click, on hover, or off. Off by default, and while it is off nothing is fetched. When it is
+  on, the chapter before is fetched once and kept for the tab, so reading forward costs one
+  request per chapter and going back over chapters costs none. The recap is the author's words
+  as text: no images, no scripts, no end-of-chapter shoutouts. Its length is adjustable, and
+  a chapter ending on a line of asterisks does not spend a paragraph on it.
+
+**The popup**
+
+- The popup now shows the controls for the kind of page it was opened over, rather than every
+  section at once. It reads the page type from the active tab with the same function the
+  content script uses, so the two cannot disagree, and it says so plainly when you are not on
+  Royal Road instead of offering dead controls. No new permission: the tab's URL is already
+  readable for a tab the extension can reach.
+- Turning filters off, and the list toolbar on, are both in the popup now. A list filtered
+  down to nothing with the toolbar switched off had no way back except the options page.
+- Expand all, hover expand and hiding have gone from the popup, and are still in options. The
+  first two are one click away on the toolbar, on the only page they affect; the third is set
+  once.
+
 ## 1.0.0
 
 First public release.

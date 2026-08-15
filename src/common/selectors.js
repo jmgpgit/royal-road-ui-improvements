@@ -161,6 +161,13 @@
     /** Text of the heading that titles the whole About-author section. */
     authorPanelHeading: 'About author',
     chapterContent: '.chapter-content',
+    /**
+     * Royal Road's own previous-chapter link, which it marks by direction
+     * rather than by label. Repeated above and below the chapter, and simply
+     * absent on the first chapter of a fiction, which is how the recap knows
+     * there is nothing before this one to show.
+     */
+    chapterPrev: '[data-vt-direction="prev"]',
     chapterContainer: '#chapter-page-container',
     commentLoader: '#comment-loader',
     commentsPaginate: '#comments-pagination',

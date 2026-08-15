@@ -6,68 +6,154 @@
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <h1>Lists</h1>
+    <!--
+      One section per page shape the extension covers, and only the one matching
+      the tab in front of you is shown. The popup used to show all of them at
+      once, which meant roughly half of it did nothing wherever you opened it,
+      and the list half competed with the in-page toolbar sitting a centimetre
+      away on the same page.
 
-    <label class="row" for="p-expandAll">
-      <input type="checkbox" id="p-expandAll" data-setting="list.expandAll" />
-      <span>Expand all descriptions</span>
-    </label>
+      Every `<select>` here is filled by popup.js from SCHEMA and COPY, so the
+      options and their wording are declared once, in the same place the options
+      page reads them from.
+    -->
 
-    <label class="row" for="p-hoverExpand">
-      <input type="checkbox" id="p-hoverExpand" data-setting="list.hoverExpand" />
-      <span>Expand on hover</span>
-    </label>
+    <section data-page="list" hidden>
+      <h1>This list</h1>
 
-    <label class="row" for="p-hideEnabled">
-      <input type="checkbox" id="p-hideEnabled" data-setting="hide.enabled" />
-      <span>Hide fictions</span>
-    </label>
+      <!-- The escape hatch, and the reason this is first. Filters live in the
+           in-page panel, which opens only from the in-page toolbar, which can
+           itself be switched off: a list filtered down to nothing then has no
+           way back except the options page. -->
+      <label class="row" for="p-filtersEnabled">
+        <input type="checkbox" id="p-filtersEnabled" data-setting="filters.enabled" />
+        <span>Apply my filters</span>
+      </label>
 
-    <label class="row" for="p-showHidden">
-      <input type="checkbox" id="p-showHidden" data-setting="hide.showHidden" />
-      <span>Show hidden in place <b id="p-count" class="count">0</b></span>
-    </label>
+      <label class="row row--stack" for="p-view">
+        <span>Layout</span>
+        <select id="p-view" class="select" data-setting="list.view"></select>
+      </label>
 
-    <label class="row row--stack" for="p-view">
-      <span>Layout</span>
-      <select id="p-view" class="select" data-setting="list.view"></select>
-    </label>
+      <label class="row" for="p-infiniteScroll">
+        <input type="checkbox" id="p-infiniteScroll" data-setting="list.infiniteScroll" />
+        <span>Keep loading as you scroll</span>
+      </label>
 
-    <h1>Reader</h1>
+      <label class="row" for="p-cleanTitles">
+        <input type="checkbox" id="p-cleanTitles" data-setting="list.cleanTitles" />
+        <span>Trim tags out of titles</span>
+      </label>
 
-    <label class="row" for="p-readerEnabled">
-      <input type="checkbox" id="p-readerEnabled" data-setting="reader.enabled" />
-      <span>Override chapter typography</span>
-    </label>
+      <label class="row" for="p-showHidden">
+        <input type="checkbox" id="p-showHidden" data-setting="hide.showHidden" />
+        <span>Show hidden in place <b id="p-count" class="count">0</b></span>
+      </label>
 
-    <label class="row row--stack" for="p-lineHeight">
-      <span>Line height <b id="p-lineHeight-out" class="count">-</b></span>
-      <input
-        type="range"
-        id="p-lineHeight"
-        data-setting="reader.lineHeight"
-        min="1"
-        max="2.6"
-        step="0.05"
-      />
-    </label>
+      <!-- The other way back: everything else for lists is one click away on
+           the toolbar, so long as the toolbar is there. -->
+      <label class="row" for="p-showToolbar">
+        <input type="checkbox" id="p-showToolbar" data-setting="list.showToolbar" />
+        <span>Show the toolbar on lists</span>
+      </label>
+    </section>
 
-    <label class="row" for="p-justify">
-      <input type="checkbox" id="p-justify" data-setting="reader.justify" />
-      <span>Justify text</span>
-    </label>
+    <section data-page="fiction" hidden>
+      <h1>This fiction</h1>
 
-    <label class="row row--stack" for="p-maxWidth">
-      <span>Reading width <b id="p-maxWidth-out" class="count">-</b></span>
-      <input
-        type="range"
-        id="p-maxWidth"
-        data-setting="reader.maxWidthPx"
-        min="600"
-        max="2400"
-        step="20"
-      />
-    </label>
+      <!-- In the order the sections appear down a fiction page, so the popup
+           reads as a map of what is in front of you rather than a list sorted
+           by anything of ours. The two review controls sit together at the end
+           for the same reason. -->
+      <label class="row row--stack" for="p-stats">
+        <span>Statistics</span>
+        <select id="p-stats" class="select" data-setting="fiction.stats"></select>
+      </label>
+
+      <label class="row row--stack" for="p-chapters">
+        <span>Table of contents</span>
+        <select id="p-chapters" class="select" data-setting="fiction.chapters"></select>
+      </label>
+
+      <label class="row row--stack" for="p-recommendations">
+        <span>Others Also Liked</span>
+        <select id="p-recommendations" class="select" data-setting="fiction.recommendations"></select>
+      </label>
+
+      <label class="row" for="p-reviewsAutoLoad">
+        <input type="checkbox" id="p-reviewsAutoLoad" data-setting="fiction.reviewsAutoLoad" />
+        <span>Keep loading reviews</span>
+      </label>
+
+      <label class="row row--stack" for="p-reviewSort">
+        <span>Sort reviews by</span>
+        <select id="p-reviewSort" class="select" data-setting="fiction.reviewSort"></select>
+      </label>
+    </section>
+
+    <section data-page="chapter" hidden>
+      <h1>This chapter</h1>
+
+      <label class="row" for="p-readerEnabled">
+        <input type="checkbox" id="p-readerEnabled" data-setting="reader.enabled" />
+        <span>Override chapter typography</span>
+      </label>
+
+      <label class="row row--stack" for="p-lineHeight">
+        <span>Line height <b id="p-lineHeight-out" class="count">-</b></span>
+        <input
+          type="range"
+          id="p-lineHeight"
+          data-setting="reader.lineHeight"
+          min="1"
+          max="2.6"
+          step="0.05"
+        />
+      </label>
+
+      <label class="row row--stack" for="p-maxWidth">
+        <span>Reading width <b id="p-maxWidth-out" class="count">-</b></span>
+        <input
+          type="range"
+          id="p-maxWidth"
+          data-setting="reader.maxWidthPx"
+          min="600"
+          max="2400"
+          step="20"
+        />
+      </label>
+
+      <label class="row" for="p-justify">
+        <input type="checkbox" id="p-justify" data-setting="reader.justify" />
+        <span>Justify text</span>
+      </label>
+
+      <label class="row row--stack" for="p-recapMode">
+        <span>End of the previous chapter</span>
+        <select id="p-recapMode" class="select" data-setting="recap.mode"></select>
+      </label>
+
+      <label class="row row--stack" for="p-notesMode">
+        <span>Author notes</span>
+        <select id="p-notesMode" class="select" data-setting="notes.mode"></select>
+      </label>
+
+      <label class="row row--stack" for="p-thanks">
+        <span>Comments that only say thanks</span>
+        <select id="p-thanks" class="select" data-setting="comments.thanks"></select>
+      </label>
+
+      <label class="row" for="p-commentsAutoLoad">
+        <input type="checkbox" id="p-commentsAutoLoad" data-setting="comments.autoLoad" />
+        <span>Keep loading comments</span>
+      </label>
+    </section>
+
+    <!-- Opened somewhere the extension does nothing. Saying so beats showing
+         controls that cannot change anything in front of you. -->
+    <p id="p-elsewhere" class="notice" hidden>
+      Nothing to change here. Open a Royal Road fiction list, fiction or chapter.
+    </p>
 
     <button type="button" id="p-manage" class="btn">All settings &amp; hidden fictions…</button>
 
@@ -76,6 +162,7 @@
     <script src="../common/schema.js"></script>
     <script src="../common/model.js"></script>
     <script src="../common/store.js"></script>
+    <script src="../options/settings-ui.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

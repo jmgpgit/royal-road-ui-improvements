@@ -46,6 +46,10 @@ no analytics, no server of its own, and no write to your Royal Road account.
 - **Author notes**: collapse cross-promotion ("shoutouts") while keeping the real note, or
   collapse notes entirely, or per-author. Nothing is deleted: a chip always puts it back.
 - Hide the About-author panel.
+- **A recap of the previous chapter**: the closing paragraphs of the chapter before, at the
+  top of this one, for when you are following several fictions at once and cannot remember
+  how the last one left off. Always visible, behind a click, on hover, or off. Off ships as
+  the default, and while it is off nothing is fetched at all.
 - **Comments**: a rule between threads and a thread line down each reply chain (colour is
   yours to pick), a collapse control on any thread with replies, low-content comments
   ("thanks", "tyfc") or a lone Royal Road emoticon collapsed to one dimmed line or hidden

@@ -17,12 +17,17 @@ A compact copy of both is mirrored into `localStorage` on royalroad.com. This ex
 the extension can read your settings before the page paints, which is what stops hidden
 fictions flashing up before they are hidden. It is the same data, on the same machine.
 
+With the previous-chapter recap switched on, the closing text of each chapter it reads is kept
+in `sessionStorage` on royalroad.com, so that moving back and forth does not fetch the same
+chapter twice. It is the page's own words, it belongs to that one tab, and it dies with the
+tab. See [`src/content/features/recap.js`](src/content/features/recap.js).
+
 Nothing is stored anywhere else. There is no account, no sync, and no identifier of any kind.
 
 ## What is sent
 
 The extension has no server. It never contacts any host except royalroad.com, and it makes
-exactly three kinds of request, all of them ordinary page loads you could make yourself:
+exactly four kinds of request, all of them ordinary page loads you could make yourself:
 
 1. **Adding the next page of a list.** Reaching the bottom of a fiction list fetches the next
    page of that same list (`?page=N`) and adds it underneath. This is on by default, and any
@@ -35,8 +40,13 @@ exactly three kinds of request, all of them ordinary page loads you could make y
    already contain Royal Road's tag list, it fetches `/fictions/search` once to learn the
    available tags, then caches them for a week.
    See [`src/content/tags.js`](src/content/tags.js).
+4. **The previous chapter, for the recap.** With the recap switched on, opening a chapter
+   fetches the chapter before it, once per tab session, and takes its closing paragraphs. This
+   is off by default; while it is off nothing is fetched. It only ever follows the "previous
+   chapter" link already on the page.
+   See [`src/content/features/recap.js`](src/content/features/recap.js).
 
-All three are GETs for public pages. None carries anything about you beyond the cookies your
+All four are GETs for public pages. None carries anything about you beyond the cookies your
 browser would already send to royalroad.com.
 
 ## What it never does
@@ -66,7 +76,8 @@ unhidden content.
 Options -> Backup exports everything the extension holds as a JSON file, and imports it back.
 Removing the extension removes its stored settings with it. The `localStorage` copy described
 above lives under royalroad.com rather than under the extension, so clearing site data for
-royalroad.com is what removes that one.
+royalroad.com is what removes that one. The recap cache goes when you close the tab, and
+clearing site data for royalroad.com removes it too.
 
 ## Changes
 

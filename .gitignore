@@ -21,3 +21,9 @@ test/fixtures/**
 *.swp
 .DS_Store
 Thumbs.db
+
+# Firefox profile `npm start` reuses so you are not logging into Royal Road on
+# every launch. It holds a real session, and web-ext rewrites its prefs on each
+# run to allow remote debugging and unsigned add-ons, which makes it unsuitable
+# for anything but this. `npm start -- --fresh` skips it entirely.
+.dev-profile/
