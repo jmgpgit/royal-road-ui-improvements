@@ -165,6 +165,7 @@
     'reader.fontFamily': () => state.settings['reader.enabled'],
     'reader.maxWidthPx': () => state.settings['reader.enabled'],
     'comments.foldPatterns': () => state.settings['comments.patternAction'] !== 'keep',
+    'recap.paragraphs': () => state.settings['recap.mode'] !== 'off',
     'comments.separators': () => state.settings['comments.threading'],
     'comments.dividerOpacity': () =>
       state.settings['comments.threading'] && state.settings['comments.separators'],

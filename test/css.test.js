@@ -195,6 +195,38 @@ test('MANAGED_CLASSES covers what rootClassesFor emits, but not lifecycle flags'
   assert.ok(!css.MANAGED_CLASSES.includes('rrx-filters-pending'));
 });
 
+test('the recap is set in the same type as the chapter under it', () => {
+  // The recap builds its own paragraphs from the previous chapter's text, so it
+  // is the one piece of chapter prose on the page that is NOT inside
+  // `.chapter-content` and matches none of Royal Road's containers. Every
+  // reader override therefore has to name it explicitly, or the reader's font,
+  // colour and leading stop at the top of the page: the same author's words,
+  // set in a different typeface, directly above the chapter they came from.
+  const text = fs
+    .readFileSync(path.join(__dirname, '..', 'src', 'content', 'inject-reader.css'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+
+  /** The selector list of the rule gated on this `<html>` class. */
+  const selectorsFor = (cls) => {
+    const blocks = text.split('}');
+    const block = blocks.find((b) => b.includes(`html.${cls} `));
+    assert.ok(block, `no rule is gated on html.${cls}`);
+    return block.slice(0, block.indexOf('{'));
+  };
+
+  for (const cls of ['rrx-font', 'rrx-text-color', 'rrx-line-height', 'rrx-justify']) {
+    assert.match(
+      selectorsFor(cls),
+      /\.rrx-recap__body/,
+      `html.${cls} styles the chapter but not the recap above it`
+    );
+  }
+
+  // The link inside the recap keeps its own colour, exactly as a link inside
+  // the chapter does: a recoloured chapter must not swallow its own link.
+  assert.match(selectorsFor('rrx-text-color'), /\.rrx-recap__body \*:not\(a\):not\(a \*\)/);
+});
+
 test('every selector in every stylesheet actually parses', () => {
   // A selector the browser cannot parse is dropped silently, taking its whole
   // rule with it, and the feature just stops working with nothing in the

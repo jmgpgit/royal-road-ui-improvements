@@ -100,6 +100,22 @@
     'reader.fontFamily': { type: 'string', default: '', maxLength: 200 },
     'reader.maxWidthPx': { type: 'int', default: null, nullable: true, min: 600, max: 4000 },
 
+    /**
+     * How the previous chapter's ending is shown at the top of a chapter.
+     *
+     * `always` prints it, `click` and `hover` keep it behind a summary you open,
+     * and `off` fetches nothing at all. Reading several fictions at once makes
+     * "what happened last time" the most common thing a reader has to leave the
+     * page to answer, and Royal Road offers nothing for it.
+     */
+    'recap.mode': { type: 'enum', default: 'off', values: ['off', 'always', 'click', 'hover'] },
+    /**
+     * How much of the ending to show, in paragraphs. Trailing scene-break
+     * markers do not count towards it: chapters routinely end on a line of
+     * asterisks, and a recap of punctuation helps nobody.
+     */
+    'recap.paragraphs': { type: 'int', default: 4, min: 1, max: 15 },
+
     // ── author notes, panels ────────────────────────────────────
     // Defaults to off: collapsing part of an author's note is a judgement call,
     // and one the reader should opt into rather than discover.

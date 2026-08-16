@@ -57,11 +57,25 @@ is written to be checkable against the source, so every claim in it names the fi
 ```sh
 npm install
 npm test           # the whole suite, no browser needed
-npm start          # launches Firefox with the extension loaded
+npm start          # launches Firefox on royalroad.com, already on the redesign
 ```
 
 You need Node 20 or newer. There are two dependencies, `jsdom` and `web-ext`, and no build
 step for the source: the files that ship are the files in `src/`.
+
+`npm start` keeps its Firefox profile in `.dev-profile/` (gitignored), so you log into Royal
+Road once rather than every launch. The redesign cookie is a session cookie and so is *not*
+kept. The dev script below re-sets it and reloads once on the first page of each run, which
+is the flicker you will see. Add `-- --fresh` for a throwaway profile, which is what you want
+when testing first-run behaviour. Any other flag goes through to `web-ext run`, so
+`npm start -- --devtools` works.
+
+It runs from a generated copy of the tree in `dist/dev/`, not from `src/` directly, because it
+adds one dev-only content script that sets the cookie below. That script exists only in
+`dist/dev/` and cannot reach a package; `tools/dev.mjs` explains why at length. Edits under
+`src/` are mirrored across live, so the extension still reloads as you save; as before, that
+re-registers the content scripts but does not re-run them in tabs that are already open, so
+reload the page too.
 
 ## Reporting a bug
 
@@ -74,6 +88,9 @@ Royal Road serves the redesign only when a cookie is set. To be sure which one y
 ```js
 document.cookie = 'beta-ui-v2=always; path=/; domain=.royalroad.com';
 ```
+
+(`npm start` sets that for you; this is the line to paste in a browser you are only using to
+reproduce a report.)
 
 ## The tests, and the fixtures they need
 

@@ -15,10 +15,19 @@
  * not set contributes nothing.
  */
 
+/* Every rule here also names `.rrx-recap__body`, which is the one piece of
+   chapter prose on the page that is not inside `.chapter-content`: the recap
+   builds its own paragraphs from the previous chapter's text, so it matches
+   none of Royal Road's containers. It is the same author's words as the chapter
+   below it and has to be set in the same typeface, or the reader's font, colour
+   and leading stop at the top of the page for no reason they can see.
+   The label above it stays UI furniture and is deliberately left alone. */
+
 /* Line height. Genuinely absent from Royal Road: its "paragraph spacing" is the
    gap *between* paragraphs, not the leading within one. */
 html.rrx-line-height .chapter-content p,
 html.rrx-line-height .chapter-content li,
+html.rrx-line-height .rrx-recap__body p,
 html.rrx-line-height .author-note p {
   line-height: var(--rrx-line-height) !important;
 }
@@ -26,13 +35,15 @@ html.rrx-line-height .author-note p {
 /* Justification. Hyphenation rides along by default because justified text
    without it opens rivers of whitespace at these column widths. */
 html.rrx-justify .chapter-content p,
-html.rrx-justify .chapter-content li {
+html.rrx-justify .chapter-content li,
+html.rrx-justify .rrx-recap__body p {
   text-align: justify !important;
   text-justify: inter-word;
 }
 
 html.rrx-hyphens .chapter-content p,
-html.rrx-hyphens .chapter-content li {
+html.rrx-hyphens .chapter-content li,
+html.rrx-hyphens .rrx-recap__body p {
   hyphens: auto;
   -webkit-hyphens: auto;
 }
@@ -41,7 +52,9 @@ html.rrx-hyphens .chapter-content li {
    descendants too: pair it with Royal Road's own "strip font colour" if the
    author has been especially creative. */
 html.rrx-text-color .chapter-content,
-html.rrx-text-color .chapter-content *:not(a):not(a *) {
+html.rrx-text-color .chapter-content *:not(a):not(a *),
+html.rrx-text-color .rrx-recap__body,
+html.rrx-text-color .rrx-recap__body *:not(a):not(a *) {
   color: var(--rrx-text-color) !important;
 }
 
@@ -49,7 +62,9 @@ html.rrx-text-color .chapter-content *:not(a):not(a *) {
    injected stylesheet, so a webfont here would silently fall back and look like
    a bug. */
 html.rrx-font .chapter-content,
-html.rrx-font .chapter-content * {
+html.rrx-font .chapter-content *,
+html.rrx-font .rrx-recap__body,
+html.rrx-font .rrx-recap__body * {
   font-family: var(--rrx-font) !important;
 }
 
@@ -116,4 +131,65 @@ html.rrx-wide .author-note-card {
 
 .rrx-note-hidden {
   display: none !important;
+}
+
+/* ==========================================================================
+   The previous chapter's ending
+   --------------------------------------------------------------------------
+   Deliberately quieter than the chapter itself: it is context, and it sits
+   directly above the thing the reader actually came for. Royal Road's own
+   surface colours are used so it belongs to whatever theme is running, with
+   `currentColor` behind them so it stays legible on a theme that defines
+   neither.
+   ========================================================================== */
+
+.rrx-recap {
+  margin: 0 0 1.5rem;
+  padding: 0.9rem 1.1rem;
+  border-left: 3px solid currentColor;
+  border-radius: 0.35rem;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+  font-size: 0.95em;
+}
+
+.rrx-recap__label {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  cursor: pointer;
+}
+
+/* Always-on mode is not a disclosure, so its label is not a control. */
+.rrx-recap--open .rrx-recap__label {
+  cursor: default;
+  margin-bottom: 0.5rem;
+}
+
+.rrx-recap__body > p {
+  margin: 0 0 0.7rem;
+  opacity: 0.85;
+}
+
+.rrx-recap__body > p:first-of-type::before {
+  content: '…';
+  opacity: 0.5;
+  margin-right: 0.25rem;
+}
+
+.rrx-recap__link {
+  font-size: 0.8125rem;
+  opacity: 0.75;
+}
+
+/* Hover mode opens the same `details` element from JavaScript: a closed one
+   hides its contents through `::details-content`, which no rule on a descendant
+   can reveal. See openOnHover in features/recap.js. */
+
+@media (prefers-reduced-motion: reduce) {
+  .rrx-recap {
+    transition: none;
+  }
 }

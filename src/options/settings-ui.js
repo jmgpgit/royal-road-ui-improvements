@@ -153,6 +153,22 @@
       placeholder: 'Georgia, serif',
     },
 
+    'recap.mode': {
+      label: 'Show the end of the previous chapter',
+      note: 'Puts the closing paragraphs of the chapter before at the top of this one, for when you are reading several fictions at once and cannot remember how the last one left off. Nothing is fetched while this is off.',
+      optionLabels: {
+        off: 'Do not show it',
+        always: 'Always show it',
+        click: 'Hide it behind a click',
+        hover: 'Show it on hover',
+      },
+    },
+    'recap.paragraphs': {
+      label: 'How much to show',
+      note: 'Paragraphs from the end of the previous chapter. A closing line of asterisks does not count towards it.',
+      unit: 'paragraphs',
+    },
+
     // ── author notes and page furniture ───────────────────────────────────
     'notes.mode': {
       label: 'Author notes',
@@ -288,6 +304,10 @@
         {
           title: 'Author notes and extras',
           keys: ['notes.mode', 'notes.hideAuthorPanel'],
+        },
+        {
+          title: 'Continuing a story',
+          keys: ['recap.mode', 'recap.paragraphs'],
         },
         {
           title: 'Comments',
