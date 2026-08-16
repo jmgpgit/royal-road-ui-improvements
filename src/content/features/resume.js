@@ -203,16 +203,22 @@
   }
 
   /**
-   * Forget this chapter: it has been read, or never started.
+   * Forget where the reader was in this chapter: they have read it, or never
+   * started it.
    *
-   * Both halves, because they are written at different times - the scratchpad
-   * as you scroll, the record on the way out - and a record left behind in
-   * either would resume a chapter that is finished.
+   * Both copies of the POSITION, because they are written at different times -
+   * the scratchpad as you scroll, the record on the way out - and either left
+   * behind would resume a chapter that is finished.
+   *
+   * Only the position. The same record carries the comment watermark, which
+   * belongs to a different feature and a different question: someone who reads
+   * a chapter, reads its comments and moves on must not come back to find the
+   * whole conversation unread again.
    */
   function forget(id) {
     dirty = null;
     RRX.store.clearPosition(id);
-    Promise.resolve(RRX.store.forgetChapter(id)).catch(() => {});
+    Promise.resolve(RRX.store.forgetPosition(id)).catch(() => {});
   }
 
   function onScroll() {

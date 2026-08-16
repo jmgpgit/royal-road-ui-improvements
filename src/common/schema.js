@@ -205,6 +205,26 @@
     /** A [−] on every thread that has replies. */
     'comments.collapsible': { type: 'bool', default: true },
     /** Keep loading comment pages as you scroll, instead of one click per page. */
+    /**
+     * Comments that have arrived since your last visit.
+     *
+     * `mark` points them out; `fold` also collapses the ones you have already
+     * seen. Nothing is ever hidden: a comment you have read is not one you
+     * wanted removed, and the new reply may be underneath it. The list Royal
+     * Road serves is ranked rather than chronological, so there is no "new
+     * from here" line - each comment is judged on its own timestamp.
+     */
+    'comments.seen': { type: 'enum', default: 'off', values: ['off', 'mark', 'fold'] },
+    /**
+     * How long a chapter's last-visit mark is worth keeping, in days.
+     *
+     * Past it the chapter reads as never visited, which is both the useful
+     * answer - "new since June" means nothing on a reread months later - and
+     * what stops the one cumulative thing here growing forever: a reading
+     * position deletes itself when the chapter is finished, a watermark
+     * otherwise would not.
+     */
+    'comments.seenDays': { type: 'int', default: 60, min: 1, max: 365 },
     'comments.autoLoad': { type: 'bool', default: false },
     /**
      * What to do with comments that say nothing but "thanks for the chapter".

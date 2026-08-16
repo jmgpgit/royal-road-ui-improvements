@@ -53,18 +53,46 @@
    * @param {number} chapterId
    * @param {{f?:number,a?:number,p?:number,o?:number,n?:number,len?:number}} patch
    */
-  async function markChapter(chapterId, patch) {
+  async function markChapter(chapterId, patch, { seenMaxAgeS } = {}) {
     const id = Number(chapterId);
     if (!Number.isInteger(id) || id <= 0) return null;
 
     const chapters = await loadChapters();
-    const merged = { ...chapters, [id]: { ...(chapters[id] || {}), ...(patch || {}) } };
-    const next = RRX.pruneChapters(RRX.normalizeChapters(merged));
+    const now = Math.floor(Date.now() / 1000);
+    // Every write stamps the record, which is what makes an expiry possible at
+    // all: without it there is no telling how old a watermark is.
+    const merged = { ...chapters, [id]: { ...(chapters[id] || {}), a: now, ...(patch || {}) } };
+    const next = RRX.pruneChapters(RRX.normalizeChapters(merged), { now, seenMaxAgeS });
     await ext.storage.local.set({ [KEY_CHAPTERS]: next });
     return next[id] || null;
   }
 
-  /** Drop one chapter's record: it has been read, or was never started. */
+  /**
+   * Drop where the reader was in a chapter, and nothing else.
+   *
+   * A record holds two unrelated things - a reading position and the comment
+   * watermark - with two different lifetimes. Finishing a chapter ends the
+   * position; it says nothing about which comments have been seen, and someone
+   * who reads a chapter, reads its comments, and then moves on must not come
+   * back to find the whole conversation unread again. The record goes only when
+   * both halves are gone.
+   */
+  async function forgetPosition(chapterId) {
+    const id = Number(chapterId);
+    const chapters = await loadChapters();
+    const record = chapters[id];
+    if (!record) return chapters;
+
+    const kept = { ...record };
+    for (const field of ['p', 'o', 'n', 'len', 'd']) delete kept[field];
+    if (kept.s === undefined) delete chapters[id];
+    else chapters[id] = kept;
+
+    await ext.storage.local.set({ [KEY_CHAPTERS]: chapters });
+    return chapters;
+  }
+
+  /** Drop one chapter's record entirely, both halves. */
   async function forgetChapter(chapterId) {
     const id = Number(chapterId);
     const chapters = await loadChapters();
@@ -230,6 +258,7 @@
     load,
     loadChapters,
     markChapter,
+    forgetPosition,
     forgetChapter,
     forgetChapters,
     saveSettings,

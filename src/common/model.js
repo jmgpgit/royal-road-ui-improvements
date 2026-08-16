@@ -129,6 +129,9 @@
   //   len how long its text was - together, the edit detector: a chapter that
   //       has been rewritten under a saved position must not be restored to a
   //       paragraph that is now a different scene
+  //   s   the newest comment already seen on this chapter, unix seconds. Kept
+  //       here rather than in its own key because it is the same grain and the
+  //       same write: one record per chapter, one flush on the way out
   //   d   how much of the chapter's TEXT had been on screen, 0..1. Measured
   //       against the chapter box rather than the page, which grows when the
   //       comments load, and reported to the reader as a percentage
@@ -140,6 +143,18 @@
   /** Keep the newest, and drop the emptiest first. */
   const CHAPTERS_MAX = 20000;
   const CHAPTERS_KEEP = 18000;
+
+  /**
+   * How long a comment watermark is worth keeping, in seconds.
+   *
+   * Two reasons, and they point the same way. Coming back to a chapter after
+   * two months, "what is new since June" is not a useful question and the
+   * comments are worth seeing afresh. And a watermark is the one thing here
+   * that would otherwise accumulate forever: a reading position deletes itself
+   * when the chapter is finished, but a watermark would be kept for every
+   * chapter whose comments were ever loaded.
+   */
+  const SEEN_MAX_AGE_S = 60 * 24 * 60 * 60;
 
   function normalizeChapters(raw) {
     const src = raw && typeof raw === 'object' ? raw : {};
@@ -155,6 +170,8 @@
       };
 
       const record = { f: int(rec.f, 1) || 0, a: int(rec.a, 0) || 0 };
+      const seen = int(rec.s, 1);
+      if (seen !== null) record.s = seen;
       const p = int(rec.p, 0);
       if (p !== null) {
         record.p = p;
@@ -177,12 +194,41 @@
   }
 
   /**
-   * Trim the map when it passes `max`, oldest first, and bare records - opened
-   * but never scrolled - before ones carrying a position.
+   * Drop what is no longer worth keeping.
+   *
+   * Two passes, because the two things a record holds have different lifetimes.
+   *
+   * A watermark expires after `SEEN_MAX_AGE_S` (see there). A reading position
+   * does not: somebody who put a chapter down half way through last spring
+   * still wants it back, and unlike a watermark it deletes itself as soon as
+   * they finish the chapter, so it cannot pile up the same way. A record left
+   * holding neither is dropped: its only remaining fact is that the chapter was
+   * once opened, which nothing reads.
+   *
+   * The cap is the backstop after that, oldest first, and records with no
+   * position before ones that have one.
+   *
+   * @param {number} now unix SECONDS, passed in because this module has no clock
    */
-  function pruneChapters(chapters, max = CHAPTERS_MAX, keep = CHAPTERS_KEEP) {
-    const entries = Object.entries(chapters || {});
-    if (entries.length <= max) return chapters;
+  function pruneChapters(
+    chapters,
+    { now = 0, seenMaxAgeS = SEEN_MAX_AGE_S, max = CHAPTERS_MAX, keep = CHAPTERS_KEEP } = {}
+  ) {
+    const src = chapters && typeof chapters === 'object' ? chapters : {};
+    const out = {};
+
+    for (const [id, rec] of Object.entries(src)) {
+      const record = { ...rec };
+      const stale = now && record.a && now - record.a > seenMaxAgeS;
+      if (stale) delete record.s;
+      // `p` is the position; without it and without a watermark there is
+      // nothing here anybody asks for.
+      if (record.p === undefined && record.s === undefined && stale) continue;
+      out[id] = record;
+    }
+
+    const entries = Object.entries(out);
+    if (entries.length <= max) return out;
 
     entries.sort((a, b) => {
       const aHas = a[1] && a[1].p !== undefined ? 1 : 0;
@@ -191,9 +237,9 @@
       return (b[1].a || 0) - (a[1].a || 0);
     });
 
-    const out = {};
-    for (const [id, rec] of entries.slice(0, keep)) out[id] = rec;
-    return out;
+    const capped = {};
+    for (const [id, rec] of entries.slice(0, keep)) capped[id] = rec;
+    return capped;
   }
 
   // --- synchronous boot mirror --------------------------------------------
@@ -281,6 +327,7 @@
     normalizeChapters,
     pruneChapters,
     CHAPTERS_MAX,
+    SEEN_MAX_AGE_S,
     buildMirror,
     parseMirror,
     buildBackup,

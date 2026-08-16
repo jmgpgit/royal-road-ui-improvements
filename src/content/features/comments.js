@@ -246,6 +246,71 @@
     comment.insertBefore(button, comment.firstChild);
   }
 
+  /** Marks our own annotation so a sweep cannot be triggered by it. */
+  const COUNT_ID = 'rrx-hidden-count';
+
+  /**
+   * How many comments the reader's own rules have taken off the page.
+   *
+   * Only the ones actually removed. Folding leaves a dimmed line that opens on
+   * hover, and a collapsed thread was collapsed by the reader a moment ago and
+   * needs no reminding - neither is "hidden". `display: none` reaches exactly
+   * one class, and only on comments with no replies, because hiding softens to
+   * folding for anything holding a chain.
+   */
+  const hiddenCount = (scope) =>
+    (scope || document).querySelectorAll(
+      '.rrx-comment-thanks-hidden:not(:has(.comment-replies, [data-rr-deep-replies]))'
+    ).length;
+
+  /**
+   * Say so on Royal Road's own "Showing 31 to 40 of 137 comments" line, which
+   * would otherwise be quietly wrong about what is on the page.
+   *
+   * That line is rendered by Royal Road's own script after the comments load -
+   * it is in no server response, so there is no selector for it and none can be
+   * written. It is found by looking inside the pagination block for the leaf
+   * that talks about a count, and if that ever stops matching, the annotation
+   * simply does not appear. It is an addition to somebody else's sentence: it
+   * must never be the reason something breaks.
+   */
+  function showHiddenCount(scope) {
+    const root = document.querySelector(SEL.commentsPaginate);
+    if (!root) return;
+
+    const count = hiddenCount(scope || document);
+    const existing = document.getElementById(COUNT_ID);
+
+    if (!count) {
+      if (existing) existing.remove();
+      return;
+    }
+
+    const text = ` (${count} hidden)`;
+    if (existing) {
+      if (existing.textContent !== text) existing.textContent = text;
+      if (existing.isConnected) return;
+    }
+
+    // "of 137 comments", the one phrase that line always contains.
+    // Deliberately not anchored to "Showing", which is the wording most
+    // likely to change.
+    const SUMMARY = /of\s+[\d,]+\s+comments?/i;
+    const summary = [...root.querySelectorAll('*')].find(
+      (el) =>
+        !el.children.length &&
+        !el.closest('.' + RRX.UI_CLASS) &&
+        SUMMARY.test(el.textContent || '')
+    );
+    if (!summary) return;
+
+    summary.appendChild(
+      existing && !existing.isConnected
+        ? existing
+        : ui.el('span', { id: COUNT_ID, class: 'rrx-ui rrx-hidden-count', text })
+    );
+  }
+
   function syncCards(scope, ctx) {
     if (ctx.page !== 'chapter') return;
 
@@ -300,6 +365,8 @@
       comment.classList.toggle('rrx-comment-thanks', action === 'fold');
       comment.classList.toggle('rrx-comment-thanks-hidden', action === 'hide');
     }
+
+    showHiddenCount(document);
   }
 
   // --- loading the rest ------------------------------------------------------
@@ -350,6 +417,8 @@
     customPatterns,
     syncCards,
     repliesOf,
+    hiddenCount,
+    showHiddenCount,
     watchCommentScroll,
     pager,
   };

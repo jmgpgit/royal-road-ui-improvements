@@ -169,6 +169,7 @@
     // Only the estimate uses it; a word count does not.
     'chapter.wpm': () =>
       state.settings['chapter.wordCount'] === 'time' || state.settings['chapter.wordCount'] === 'both',
+    'comments.seenDays': () => state.settings['comments.seen'] !== 'off',
     'comments.separators': () => state.settings['comments.threading'],
     'comments.dividerOpacity': () =>
       state.settings['comments.threading'] && state.settings['comments.separators'],

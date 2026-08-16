@@ -4,6 +4,50 @@ Notable changes, newest first. Versions follow [semantic versioning](https://sem
 the patch number for fixes, the minor for new settings, the major for anything that changes
 what an existing setting does.
 
+## 1.4.0
+
+**Comments**
+
+- Comments that have arrived since your last visit are marked with a "New" badge and an accent
+  down the edge, and — if you want — everything you have already seen collapses to one dimmed
+  line that opens again on hover. Nothing is
+  ever hidden: a comment you have read is not one you asked to have removed, and the new reply
+  may be underneath it.
+- A comment stays open whenever there is anything new anywhere below it, so a new reply never
+  arrives inside a folded conversation. One with a reply box open in it is left alone too.
+- Royal Road ranks its comments rather than ordering them by time, so there is no "new from
+  here" line — it would land in an arbitrary place. Each comment is judged on its own
+  timestamp instead.
+- A bar above the comments says how many are new and since when, folds everything else out of
+  the way, or marks the lot as read.
+- Your last visit is only recorded once the comments have actually been on screen for a few
+  seconds, and it is set to the newest comment on the page rather than to the current time —
+  so a comment posted while the tab sat open, or a second page you never loaded, is not
+  written off as read.
+- This compares when a comment was posted against when you last had the chapter open. It does
+  not follow which comments you actually read, so an older one further down a ranked list
+  counts as read whether or not you scrolled to it — the setting says so plainly.
+- Forgotten after 60 days, which you can change. A chapter you come back to much later shows
+  its comments afresh, and it stops the one cumulative thing here — one date per chapter —
+  growing without limit.
+- The bar above the comments appears when there is something new, or when comments have been
+  folded — in which case it says so and gives the date it is folding from, with an Unfold
+  button for reading the lot. That date is the newest comment that was there when you last
+  read the chapter, which is what everything else is measured against, and is usually a little
+  earlier than the visit itself. It says nothing on a first visit, and nothing when there is
+  nothing to report. How many comments your own rules hid is added to Royal Road's own
+  "showing 31 to 40 of 137 comments" instead.
+- Off by default. Nothing is recorded while it is off.
+
+**Fixed**
+
+- Reading a chapter's comments, moving on to the next chapter and coming back no longer showed
+  the whole conversation as unread again. Finishing a chapter forgot where you were in it, and
+  took the record of which comments you had seen with it: they share one record, and only the
+  reading half should have gone.
+- Which comments you had seen is now recorded as soon as you have looked at them, rather than
+  as the page is being closed — a write started that late often never finished.
+
 ## 1.3.0
 
 **Chapter facts**

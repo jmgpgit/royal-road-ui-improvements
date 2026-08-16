@@ -275,6 +275,21 @@
       label: 'Apply comment filtering to the author too',
       note: 'Off by default. The author’s own comments are left alone, because a short reply from them is usually the one worth reading. They are never hidden either way; the most this can do is collapse them.',
     },
+    'comments.seen': {
+      label: 'Mark comments posted since you last read the chapter',
+      note: 'Compares when each comment was posted against when you last had this chapter open. It does not follow which comments you actually read, so an older one further down the list counts as read whether or not you ever scrolled to it. Nothing is ever hidden: the older ones can collapse to a dimmed line that opens on hover, and anything with a newer reply underneath it stays open. Your visit is recorded once the comments have been on screen for a few seconds, and forgotten after 60 days — so coming back to a chapter much later shows its comments afresh.',
+      optionLabels: {
+        off: 'Leave alone',
+        mark: 'Mark the newer ones',
+        fold: 'Mark the newer ones, and collapse the older ones',
+      },
+    },
+    'comments.seenDays': {
+      label: 'Forget a chapter after',
+      note: 'How long to remember when you last read a chapter. Past this it counts as a chapter you have never opened, so its comments all read as new again — which is usually what you want on a reread months later. It also keeps this from growing without limit: one date per chapter, and only for as long as this says.',
+      unit: 'days',
+      step: 5,
+    },
     'comments.autoLoad': {
       label: 'Keep loading comments as you scroll',
       note: 'Adds the next page to the bottom instead of replacing the comments you have already read.',
@@ -365,6 +380,8 @@
         {
           title: 'Comments',
           keys: [
+            'comments.seen',
+            'comments.seenDays',
             'comments.threading',
             'comments.separators',
             'comments.dividerOpacity',

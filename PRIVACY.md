@@ -12,9 +12,12 @@ Three things, all in `browser.storage.local`, which is local to your browser pro
 - **Your settings.** The list in [`src/common/schema.js`](src/common/schema.js) is exhaustive.
 - **Your hidden fictions.** For each one: its Royal Road id, title, cover URL and the time you
   hid it, so the manager can list them. See [`src/common/store.js`](src/common/store.js).
-- **Where you stopped reading**, once you switch that on. For each chapter you have opened: its
-  Royal Road id, its fiction's id, when you last had it open, and how far down you were — as a
-  paragraph number, not a scrolled distance. No chapter text and no titles.
+- **Where you stopped reading, and which comments you have seen**, once you switch those on.
+  For each chapter you have opened: its Royal Road id, its fiction's id, when you last had it
+  open, how far down you were — as a paragraph number, not a scrolled distance — and the time
+  of the newest comment you had seen on it. No chapter text, no comment text, no titles. The
+  comment date is forgotten after 60 days by default, and a reading position is deleted as
+  soon as you finish the chapter, so neither accumulates indefinitely.
   See [`src/common/model.js`](src/common/model.js) for the exact shape.
 
 A compact copy of your settings and the ids of your hidden fictions is mirrored into

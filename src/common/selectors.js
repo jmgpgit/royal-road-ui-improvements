@@ -242,6 +242,20 @@
     /** Corroborates the feather. English-only, so never relied on alone. */
     commentTooltip: '[data-rr-tooltip-content]',
     /**
+     * When a comment was posted. Exactly one per comment, and always resolved
+     * through the `ownParts` discipline the rest of this file's comment
+     * selectors need: a comment contains its replies, and each of those carries
+     * one of these too.
+     *
+     * Read through the `unixtime` attribute rather than the text, which Royal
+     * Road rewrites client-side into "3 days ago".
+     *
+     * Rejected: ordering by `data-comment-id`, which does look monotonic and
+     * would need no parsing, but is an implementation detail Royal Road has
+     * never promised and says nothing about an edited or imported comment.
+     */
+    commentTime: 'time[unixtime]',
+    /**
      * A Royal Road emoticon inside a comment.
      *
      * Two directories are in use: `/public/smilies/` and `/public/Smileys/`.

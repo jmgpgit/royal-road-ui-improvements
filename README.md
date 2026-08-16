@@ -77,6 +77,10 @@ never hides an author's own comments. [`CONTRIBUTING.md`](CONTRIBUTING.md) has t
   top of this one, for when you are following several fictions at once and cannot remember
   how the last one left off. Always visible, behind a click, on hover, or off. Off ships as
   the default, and while it is off nothing is fetched at all.
+- **New comments since your last visit**: marked, with everything you have already seen
+  optionally folded to one dimmed line. A comment with something new underneath it always
+  stays open, and nothing is ever hidden. A bar above the comments counts them, shows only the
+  new ones, or marks them all as read.
 - **Comments**: a rule between threads and a thread line down each reply chain (colour is
   yours to pick), a collapse control on any thread with replies, low-content comments
   ("thanks", "tyfc") or a lone Royal Road emoticon collapsed to one dimmed line or hidden
