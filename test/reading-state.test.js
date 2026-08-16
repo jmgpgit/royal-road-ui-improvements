@@ -132,7 +132,13 @@ test('reading a chapter’s comments, moving on, and coming back leaves them fol
   assert.ok(afterSecond, 'the whole record was deleted when the chapter was finished');
   assert.equal(afterSecond.s, afterFirst.s, 'the comment watermark did not survive');
 
-  // --- visit three: back to chapter 1 ---
+  // --- visit three: back to chapter 1, later ---
+  // Aged deliberately. These three visits happen in the same millisecond, and a
+  // reload inside the grace window is treated as one sitting so the page is not
+  // reorganised under somebody who is still reading. "Coming back" means coming
+  // back, so the record has to look like it.
+  storage.chapters[CH1].a -= 60 * 60;
+
   const third = visit({ storage, chapter: CH1 });
   const ctx3 = { page: 'chapter', settings: settings(third) };
   await settle();
@@ -160,6 +166,10 @@ test('a sweep before the record has loaded does not poison the watermark', async
   // this runs long before an async storage read can finish. Resolving from a
   // record that is not in yet gives "never visited", and pinning that made
   // every return look like a first visit for the rest of the page view.
+  // Aged, so this reads as a return rather than a reload: inside the grace
+  // window nothing folds by design, which would hide what this is testing.
+  storage.chapters[CH1].a -= 60 * 60;
+
   const back = visit({ storage, chapter: CH1 });
   const ctx = { page: 'chapter', settings: settings(back) };
   back.RRX.commentsNew.apply(ctx); // synchronous: the read cannot have finished

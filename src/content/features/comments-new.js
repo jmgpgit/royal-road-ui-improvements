@@ -27,6 +27,8 @@
   const NEW_CLASS = 'rrx-comment-new';
   const SEEN_CLASS = 'rrx-comment-seen';
   const HAS_NEW_CLASS = 'rrx-has-new';
+  /** Set while the reader has asked to see every comment in full. */
+  const SHOW_ALL_CLASS = 'rrx-show-all';
   const ONLY_NEW_CLASS = 'rrx-comments-onlynew';
 
   /**
@@ -35,6 +37,14 @@
    * scrolling past on the way to the next chapter does not.
    */
   const DWELL_MS = 3000;
+
+  /**
+   * How long a reload still counts as the same sitting.
+   *
+   * Long enough to cover a refresh, a tab restore, or coming back from the
+   * kitchen; short enough that returning tomorrow folds what you read today.
+   */
+  const SAME_SITTING_S = 15 * 60;
 
   const chapterId = () => RRX.chapterIdFromHref(location.pathname);
 
@@ -235,6 +245,14 @@
     // none of them.
     const known = !!seenAt;
 
+    // Reading the comments is what sets the watermark, so a reload a moment
+    // later is correct to call them all seen - and collapsing the page you were
+    // just looking at is still the wrong thing to do. Inside the window this
+    // counts as the same sitting: comments are still marked, so anything new
+    // that arrives is still pointed at, but nothing folds.
+    const sinceVisit = record && record.a ? Math.floor(Date.now() / 1000) - record.a : Infinity;
+    const foldable = known && sinceVisit > SAME_SITTING_S;
+
     const key = `${seenAt}|${mode}`;
     for (const comment of comments) {
       if (comment.dataset.rrxSeenKey === key) continue;
@@ -267,7 +285,7 @@
       badge(comment, isNew);
       // Never over someone typing a reply into it.
       const busy = comment.contains(document.activeElement);
-      const fold = known && mode === 'fold' && !showAll && !keep.has(comment) && !busy;
+      const fold = foldable && mode === 'fold' && !showAll && !keep.has(comment) && !busy;
       if (fold) folded += 1;
       comment.classList.toggle(SEEN_CLASS, fold);
       // A new reply can be buried in a collapsed "N more replies" chain, where
@@ -279,7 +297,22 @@
       );
     }
 
-    return { total: comments.length, fresh, folded };
+    // What the low-effort rules are suppressing. comments.js owns both classes
+    // and applies them whether or not "show everything" is on, so these stay
+    // countable while the control is pressed - which is what lets it keep a
+    // stable label instead of renaming itself the moment it is used.
+    //
+    // Counted separately because they are not the same promise: a folded
+    // comment is a dimmed line you can already open by hovering, while a hidden
+    // one is gone from the page with nothing to hover. Only the second needs a
+    // control to exist at all.
+    // `folded` stays separate from these: it means "folded for having been
+    // read", which only makes sense with a previous visit behind it. Adding the
+    // low-effort folds into it made the bar claim a watermark date on a chapter
+    // nobody had opened, and `new Date(0)` reads as 1 January 1970.
+    const lowEffort = document.querySelectorAll('.rrx-comment-thanks').length;
+    const hidden = document.querySelectorAll('.rrx-comment-thanks-hidden').length;
+    return { total: comments.length, fresh, folded, lowEffort, hidden };
   }
 
   // --- the bar ----------------------------------------------------------------
@@ -320,14 +353,17 @@
    * correct behaviour look broken.
    */
   function label(counts) {
+    // Nothing dated without a watermark to date it from.
+    if (!seenAt) return counts.hidden ? `${counts.hidden} hidden` : '';
+
     const when = since();
-    if (!counts.fresh) return `Comments older than ${when} are folded`;
+    if (!counts.fresh) return counts.folded ? `Comments older than ${when} are folded` : '';
     const count = `${counts.fresh} new ${counts.fresh === 1 ? 'comment' : 'comments'} since ${when}`;
     return counts.folded ? `${count} · the rest folded` : count;
   }
 
   function render(counts) {
-    const signature = [seenAt, counts.fresh, counts.folded, counts.total, onlyNew, showAll].join(
+    const signature = [seenAt, counts.fresh, counts.folded, counts.lowEffort, counts.hidden, counts.total, onlyNew, showAll].join(
       '|'
     );
     const existing = document.getElementById(BAR_ID);
@@ -369,15 +405,26 @@
           : null,
         // Only worth offering while something is actually folded. Each folded
         // comment already opens on hover; this is for reading the lot.
-        counts.folded || showAll
+        counts.folded || counts.lowEffort || counts.hidden || showAll
           ? ui.toggleButton({
               id: 'showAll',
-              label: 'Unfold',
-              title: 'Show every comment in full for this visit',
+              // Named for the more surprising half of what it does. Somebody
+              // whose comments are being hidden has nothing on screen to hover,
+              // so "Unfold" would describe the one case they cannot see.
+              label: counts.hidden ? 'Show hidden' : 'Unfold',
+              title: counts.hidden
+                ? `Show every comment in full for this visit, including the ${counts.hidden} being hidden`
+                : 'Show every comment in full for this visit',
               iconName: 'expandAll',
               pressed: showAll,
               onClick: () => {
                 showAll = !showAll;
+                // Both kinds of folding, not just the one this file owns. The
+                // button says "show every comment in full", and a reader who
+                // presses it and still sees "tftc" collapsed is right to call
+                // that broken. The low-effort folding lives in comments.js and
+                // is driven by CSS, so an <html> class is what reaches it.
+                document.documentElement.classList.toggle(SHOW_ALL_CLASS, showAll);
                 apply(lastCtx);
               },
             })
@@ -439,7 +486,13 @@
     // Something new to point at, or something folded to explain. With neither -
     // a first visit, or nothing having happened since - the bar would only be
     // stating that nothing has changed.
-    if (!counts.fresh && !counts.folded && !showAll) {
+    // `hidden` belongs here as much as the other two, and is the easiest to
+    // forget: a hidden comment is gone from the page, so the bar is the only
+    // route back to it. Without this a chapter you have already read - nothing
+    // new, nothing folded as seen - loses that route entirely, and infinite
+    // scroll makes it worse, because the first page can be clean while a later
+    // one hides plenty.
+    if (!counts.fresh && !counts.folded && !counts.lowEffort && !counts.hidden && !showAll) {
       if (existing) existing.remove();
       return;
     }

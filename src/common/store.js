@@ -231,10 +231,16 @@
 
       // Oldest out first. Bounded because this shares royalroad.com's origin
       // budget with the boot mirror, and it is only a scratchpad.
+      //
+      // The timestamp is `a`, the same short name the stored record uses. It
+      // read `.at` here for a while, which no writer has ever set: every
+      // comparison came out 0, the sort held its input order, and integer-like
+      // keys enumerate ascending - so the cap dropped the LOWEST chapter id
+      // rather than the oldest. It stayed hidden because the cap still worked.
       const keys = Object.keys(pos);
       if (keys.length > POS_MAX) {
         keys
-          .sort((a, b) => (pos[a].at || 0) - (pos[b].at || 0))
+          .sort((a, b) => (pos[a].a || 0) - (pos[b].a || 0))
           .slice(0, keys.length - POS_MAX)
           .forEach((key) => delete pos[key]);
       }

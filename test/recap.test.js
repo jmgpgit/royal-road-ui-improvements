@@ -213,3 +213,22 @@ test('a recap opened on purpose stays open when the pointer leaves', async () =>
   summary.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true }));
   assert.equal(block.hasAttribute('open'), false, 'clicking again lets it go');
 });
+
+test('the cache is capped, so a long session cannot crowd out the site', () => {
+  // Every entry is the chapter's whole text, ~12 KB, in a sessionStorage budget
+  // shared with royalroad.com. Uncapped, a binge filled it, every setItem then
+  // threw, the catch swallowed it, and the recap refetched every chapter for
+  // the rest of the session with no way back.
+  const w = load();
+  const store = w.RRX.recap;
+  for (let i = 1; i <= 60; i += 1) store.cacheSet(String(i), 'x'.repeat(500));
+
+  const keys = [];
+  for (let i = 0; i < w.sessionStorage.length; i += 1) {
+    const key = w.sessionStorage.key(i);
+    if (key && key.startsWith('rrx:recap:')) keys.push(key);
+  }
+  assert.ok(keys.length <= 40, `kept ${keys.length} entries, expected the cap to hold`);
+  assert.ok(w.sessionStorage.getItem('rrx:recap:60'), 'the newest chapter survived');
+  assert.equal(w.sessionStorage.getItem('rrx:recap:1'), null, 'the oldest was dropped');
+});

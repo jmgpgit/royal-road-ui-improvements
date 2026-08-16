@@ -732,6 +732,37 @@ test('Royal Road’s page numbers go once we have appended beneath them', async 
   assert.equal(paginate.classList.contains('rrx-endless'), false, 'restored on reset');
 });
 
+test('the page numbers stay gone if Royal Road re-renders its paginator', async () => {
+  // `hideFooter` used to be called from exactly one place: the end of a load.
+  // Anything that re-rendered the pagination took the class with it, the page
+  // numbers came back under a list still being appended to, and nothing put
+  // them away again - permanently so once every page was in, because no further
+  // load would ever run. Reported as "sometimes the page numbering comes back".
+  const w = await fictionPage({ 'fiction.reviewsAutoLoad': true });
+  const root = w.document.querySelector(w.RRX.SEL.reviewsPaginate);
+  const host = w.document.querySelector(w.RRX.SEL.reviewsContainer);
+  const pager = w.RRX.fictionPage.reviewPager;
+  assert.ok(root && host, 'the fiction page has the reviews paginator');
+
+  // Nowhere near the end, so `check` will not try to load.
+  host.getBoundingClientRect = () => boxOf({ width: 900, height: 900, bottom: 5000 });
+  pager.state.added = 2;
+  pager.hideFooter(true);
+  assert.ok(root.classList.contains('rrx-endless'), 'hidden after appending');
+
+  // Royal Road re-renders, and the class goes with it.
+  root.classList.remove('rrx-endless');
+  pager.check();
+  assert.ok(root.classList.contains('rrx-endless'), 'a check puts it back');
+
+  // And it must come back once there is nothing left to load, which is when
+  // `check` returns earliest and the old code could never recover.
+  root.classList.remove('rrx-endless');
+  pager.state.done = true;
+  pager.check();
+  assert.ok(root.classList.contains('rrx-endless'), 'even with nothing left to load');
+});
+
 // -- when the reviews pager is allowed to fire --------------------------------
 
 /** A stand-in for an element's on-screen box. */

@@ -829,3 +829,76 @@ test('turning a rule on after the page loaded re-evaluates every comment', () =>
   w.RRX.comments.syncCards(d, ctxWith(w, {}));
   assert.equal(d.querySelectorAll('.rrx-comment-thanks').length, 0);
 });
+
+test('"4" stands in for "for" in the thanks acronyms', () => {
+  // t4tc and ty4tc are as common as tftc and tyftc. Catching one spelling and
+  // not the other reads as arbitrary to the person whose comment it is.
+  const w = load();
+  const { isThanks } = w.RRX.comments;
+
+  for (const text of ['t4tc', 'ty4tc', 'T4TC', 'ty4c', 'tyvm', 'thanx for the chapter']) {
+    assert.equal(isThanks(text), true, `should fold: ${JSON.stringify(text)}`);
+  }
+
+  // The digit must not widen the net: these are ordinary comments that happen
+  // to contain the same letters.
+  for (const text of ['t4', '4tc', 'tactic', 'tc', 'chapter 4 was the best one']) {
+    assert.equal(isThanks(text), false, `must NOT fold: ${JSON.stringify(text)}`);
+  }
+});
+
+test('the food metaphors readers actually use are acknowledgements too', () => {
+  const w = load();
+  const { isThanks } = w.RRX.comments;
+
+  for (const text of [
+    'thanks for the meal',
+    'Thank you for the meal',
+    'ty for the meal',
+    'thanks for the feast',
+    'thanks for the snack',
+    'Thank you for the story',
+  ]) {
+    assert.equal(isThanks(text), true, `should fold: ${JSON.stringify(text)}`);
+  }
+
+  // The words are only filler AFTER a thanks. On their own they are a comment.
+  for (const text of [
+    'the meal scene was great',
+    'I cooked a meal while reading',
+    'thanks for the meal, though the fight felt rushed',
+  ]) {
+    assert.equal(isThanks(text), false, `must NOT fold: ${JSON.stringify(text)}`);
+  }
+});
+
+test('an emoticon does not rescue a comment from the filter', () => {
+  // Punctuation is stripped to a space, so ":D" became a bare "d" and survived
+  // as the remainder. ":)" folded and ":D" did not, which looks like a coin toss
+  // to whoever wrote it.
+  const w = load();
+  const { isThanks } = w.RRX.comments;
+
+  for (const text of [
+    'Thanks for the chapter! :D',
+    'thanks for the chapter :P',
+    'tfc xD',
+    'thanks :3',
+    'ty <3',
+    'thanks for the chapter ^^',
+  ]) {
+    assert.equal(isThanks(text), true, `should fold: ${JSON.stringify(text)}`);
+  }
+});
+
+
+test('a bare reaction is left alone', () => {
+  // Tried, then withdrawn: a single word is thin, but it is still a reaction to
+  // the chapter, and folding it judges worth rather than content. Anyone who
+  // wants it has comments.foldPatterns.
+  const w = load();
+  const { isThanks } = w.RRX.comments;
+  for (const text of ['Interesting', 'nice', 'wow', 'lol', 'oof']) {
+    assert.equal(isThanks(text), false, `must NOT fold: ${JSON.stringify(text)}`);
+  }
+});

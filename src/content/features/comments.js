@@ -29,12 +29,19 @@
    * the pacing dragged" does not: the remainder there is the whole point of
    * the comment.
    */
-  const THANKS_LEAD = /^(thank you|thank u|thanks|thank|tysm|tks|thx|ty|cheers|arigato|gracias|danke)\b/;
+  const THANKS_LEAD =
+    /^(thank you|thank u|thanks|thanx|thank|tysm|tyvm|tks|thx|ty|cheers|arigato|gracias|danke)\b/;
   /** Words that carry no content once the thanks is removed. */
   const FILLER =
-    /\b(so|very|much|many|lots?|a|an|the|for|this|that|these|another|next|new|one|it|again|as|always|and|to|u|you|ur|your|author|op|man|mate|friend|dude|bro|sir|ma+te?|chapter|chappy|chappie|chappter|chap|chaps|ch|update|updates|post|release|read|awesome|great|amazing|nice|good|lovely|wonderful|excellent|fantastic|work|writing|story|part|episode|instalment|installment)\b/g;
-  /** Acronyms that are the entire comment. */
-  const THANKS_ACRONYMS = /^(t+y+f+t*c+|t+f+t*c+|ty|tysm|thx|tks)$/;
+    /\b(so|very|much|many|lots?|a|an|the|for|this|that|these|another|next|new|one|it|again|as|always|and|to|u|you|ur|your|author|op|man|mate|friend|dude|bro|sir|ma+te?|chapter|chappy|chappie|chappter|chap|chaps|ch|update|updates|post|release|read|awesome|great|amazing|nice|good|lovely|wonderful|excellent|fantastic|work|writing|story|tale|part|episode|instalment|installment|meal|feast|snack|food)\b/g;
+  /**
+   * Acronyms that are the entire comment.
+   *
+   * `[f4]` because "4" stands in for "for" as readily as "f" does: t4tc and
+   * ty4tc are as common as tftc and tyftc, and catching one spelling but not
+   * the other looks arbitrary to the person whose comment it is.
+   */
+  const THANKS_ACRONYMS = /^(t+y+[f4]+t*c+|t+[f4]+t*c+|ty|tyvm|tysm|thx|tks)$/;
 
   /**
    * Position-claiming comments: "first!", "second", "3rd".
@@ -46,13 +53,24 @@
   const ORDINAL_ONLY =
     /^(first|second|third|fourth|forth|fifth|1st|2nd|3rd|4th|5th)( comment| post| reply| here| again)?$/;
 
+  /**
+   * ASCII emoticons, removed before punctuation is.
+   *
+   * Stripping punctuation first turns ":D" into a bare "d", which then survives
+   * as the remainder and keeps "Thanks for the chapter! :D" out of the filter
+   * while the same comment with ":)" folds.
+   */
+  const EMOTICONS = /(?:[:;=8][-–]?[)([\]dpo3s|/\\]+|\bx+d+\b|<3+|\^[_.-]?\^)/g;
+
   const normalise = (text) =>
     text
       .toLowerCase()
       .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, ' ')
+      .replace(EMOTICONS, ' ')
       .replace(/[^a-z0-9\s]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
+
 
   /**
    * Is this comment nothing but thanks?
@@ -63,6 +81,10 @@
     if (!clean) return false;
     // Anything long enough to be saying something is left alone regardless.
     if (clean.split(' ').length > 8) return false;
+    // Bare reactions - "interesting", "lol", "nice" - were tried here and taken
+    // back out. A single word is thin, but it is still somebody's reaction to
+    // the chapter, and folding it is a judgement about worth rather than about
+    // content. `comments.foldPatterns` is there for anyone who disagrees.
     if (ORDINAL_ONLY.test(clean)) return true;
     if (THANKS_ACRONYMS.test(clean.replace(/\s/g, ''))) return true;
     if (!THANKS_LEAD.test(clean)) return false;

@@ -58,7 +58,14 @@ nodeTest.after(() => {
  * @param {number} opts.scrollY where the browser has already put the reader
  */
 function load({ stored = null, url = URL_BASE, scrollY = 0, settings = {} } = {}) {
-  const dom = new JSDOM(fixture('chapter.new.html'), { url, runScripts: 'outside-only' });
+  // `pretendToBeVisual` gives the window a requestAnimationFrame. Without it
+  // jsdom has none, so anything coalescing work into a frame silently never
+  // runs and a test of that coalescing proves nothing either way.
+  const dom = new JSDOM(fixture('chapter.new.html'), {
+    url,
+    runScripts: 'outside-only',
+    pretendToBeVisual: true,
+  });
   const w = dom.window;
   windows.push(w);
 
@@ -356,4 +363,89 @@ test('a record with nothing left in it is dropped', async () => {
 
   await w.RRX.store.forgetPosition(id);
   assert.equal(id in w.__chapters, false, 'an empty record was kept');
+});
+
+// --- the fixes in 1.4.1 -------------------------------------------------------
+
+test('the scratchpad evicts the oldest entry, not the lowest chapter id', async () => {
+  // The comparator read `.at`, which no writer has ever set, so every
+  // comparison was 0 - 0. A stable sort then left integer-like keys in
+  // ascending order and the cap dropped the LOWEST id. It stayed invisible
+  // because the cap itself still worked: 300 entries, just the wrong 300.
+  const { w } = load({ settings: { 'chapter.resume': 'jump' } });
+  const store = w.RRX.store;
+
+  // 301 chapters. The lowest id is the NEWEST, so id order and age disagree.
+  for (let i = 0; i < 301; i += 1) {
+    const id = 1000 + i;
+    store.writePosition(id, { p: 1, o: 0, n: 10, len: 100, a: 20000 - i, f: 1 });
+  }
+
+  const kept = store.readPositions();
+  assert.equal(Object.keys(kept).length, 300, 'the cap still holds');
+  assert.ok(kept[1000], 'the newest entry survived, even though its id is lowest');
+  assert.equal(kept[1300], undefined, 'and the oldest was the one dropped');
+});
+
+test('a flush honours the expiry the reader chose, not the built-in default', async () => {
+  // markChapter prunes on EVERY call, so a flush that omits seenMaxAgeS prunes
+  // the whole map against the 60-day default and silently overrides whatever
+  // comments.seenDays says. It has to go through the real flush path: calling
+  // markChapter directly with the right argument would prove nothing.
+  const { w, ctx } = load({
+    settings: { 'chapter.resume': 'jump', 'comments.seenDays': 365 },
+  });
+  const store = w.RRX.store;
+  w.RRX.resume.apply(ctx);
+  await settle();
+
+  // jsdom has no layout, so the chapter has to be told where it is: part-read,
+  // which is the state that makes a position worth flushing at all.
+  Object.defineProperty(w, 'innerHeight', { value: 800, configurable: true });
+  const content = w.document.querySelector('.chapter-content');
+  content.getBoundingClientRect = () => ({ top: -5000, height: 10000, bottom: 5000 });
+  for (const child of content.children) {
+    child.getBoundingClientRect = () => ({ top: 10, height: 20, bottom: 30 });
+  }
+
+  // A watermark 200 days old: stale at the 60-day default, fresh at 365.
+  const now = Math.floor(Date.now() / 1000);
+  await store.markChapter(4242, { s: now - 1 }, { seenMaxAgeS: 365 * 86400 });
+  const seeded = await store.loadChapters();
+  seeded[4242].a = now - 200 * 24 * 60 * 60;
+  await w.RRX.ext.storage.local.set({ chapters: seeded });
+
+  // Scroll to make this chapter dirty, then leave the page: that is a flush.
+  w.dispatchEvent(new w.Event('scroll'));
+  await settle();
+  w.dispatchEvent(new w.Event('pagehide'));
+  await settle();
+
+  const after = await store.loadChapters();
+  assert.ok(after[CHAPTER], 'the flush recorded this chapter, so it really ran');
+  assert.ok(after[4242], 'and the 200-day-old chapter survived it');
+  assert.ok(after[4242].s, 'keeping its watermark, because the reader asked for a year');
+});
+
+test('scrolling measures once per frame, not once per event', async () => {
+  // measure() forces layout and used to rebuild the chapter's ~12 KB of text on
+  // every scroll event. Counting frames proves nothing - the unthrottled version
+  // never asked for one. Count the measurements themselves.
+  const { w, ctx } = load({ settings: { 'chapter.resume': 'jump' }, scrollY: 400 });
+  w.RRX.resume.apply(ctx);
+  await settle();
+
+  let measured = 0;
+  const inner = w.RRX.chapterTop.content;
+  w.RRX.chapterTop.content = (...args) => {
+    measured += 1;
+    return inner.apply(w.RRX.chapterTop, args);
+  };
+
+  for (let i = 0; i < 20; i += 1) w.dispatchEvent(new w.Event('scroll'));
+  const duringBurst = measured;
+  await settle();
+
+  assert.equal(duringBurst, 0, `20 scroll events measured ${duringBurst} times before any frame ran`);
+  assert.ok(measured <= 2, `and ${measured} times in total, not once per event`);
 });

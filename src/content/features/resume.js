@@ -65,6 +65,20 @@
    *
    * @returns {{p:number,o:number,n:number,len:number,d:number}|null}
    */
+  /**
+   * The chapter's text length, read once.
+   *
+   * `textContent` on the whole chapter builds a fresh ~12 KB string every time
+   * it is touched, and this used to happen on every scroll event. The text does
+   * not change while the page is open, so it is measured once and kept - the
+   * same trick `chapter-meta.js` uses for its word count.
+   */
+  let textLen = { el: null, len: 0 };
+  function lengthOf(content) {
+    if (textLen.el !== content) textLen = { el: content, len: (content.textContent || '').length };
+    return textLen.len;
+  }
+
   function measure() {
     const content = RRX.chapterTop && RRX.chapterTop.content();
     if (!content) return null;
@@ -88,7 +102,7 @@
       p: index,
       o: Number(into.toFixed(3)),
       n: children.length,
-      len: (content.textContent || '').length,
+      len: lengthOf(content),
       d: Number(Math.min(1, Math.max(0, seen / height)).toFixed(3)),
       // Has the chapter text itself reached the top of the viewport? Until it
       // has, the reader is still in the hero, the notes or the recap, and
@@ -160,6 +174,8 @@
   let lastWrite = 0;
   let settleTimer = null;
   let listening = false;
+  /** The last ctx seen, so a flush can honour the reader's expiry setting. */
+  let lastCtx = null;
 
   /**
    * Started at script evaluation rather than in `onPage`, so the record is
@@ -199,7 +215,13 @@
     dirty = null;
     // Fire and forget: a pagehide handler cannot await, which is exactly why
     // the scratchpad above is written synchronously as well.
-    Promise.resolve(RRX.store.markChapter(id, patch)).catch(() => {});
+    //
+    // `seenMaxAgeS` has to travel with every write, not just the comment one:
+    // markChapter prunes on each call, so a write that omits it prunes the whole
+    // map against the built-in default and silently overrides whatever the
+    // reader set `comments.seenDays` to.
+    const seenMaxAgeS = lastCtx ? (lastCtx.settings['comments.seenDays'] || 60) * 86400 : undefined;
+    Promise.resolve(RRX.store.markChapter(id, patch, { seenMaxAgeS })).catch(() => {});
   }
 
   /**
@@ -221,10 +243,28 @@
     Promise.resolve(RRX.store.forgetPosition(id)).catch(() => {});
   }
 
+  /**
+   * Scroll fires far faster than the page can change, and `measure` forces
+   * layout. Coalescing to one pass per frame keeps a measuring loop off the
+   * critical path of somebody simply reading, which is the single most common
+   * thing that happens on these pages.
+   */
+  let queued = false;
   function onScroll() {
     if (restoring) return;
+    // Set before the frame, not inside it: this is what stops a restore from
+    // yanking somebody who has already started reading, and a restore can land
+    // in the gap between the event and the callback.
     userScrolled = true;
+    if (queued) return;
+    queued = true;
+    root.requestAnimationFrame(() => {
+      queued = false;
+      if (!restoring) measureNow();
+    });
+  }
 
+  function measureNow() {
     const now = measure();
     if (!now) return;
 
@@ -408,6 +448,7 @@
   }
 
   function apply(ctx) {
+    lastCtx = ctx;
     const mode = ctx.settings['chapter.resume'];
     if (mode === 'off') return;
 
