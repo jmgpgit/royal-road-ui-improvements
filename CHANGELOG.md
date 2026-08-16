@@ -4,6 +4,45 @@ Notable changes, newest first. Versions follow [semantic versioning](https://sem
 the patch number for fixes, the minor for new settings, the major for anything that changes
 what an existing setting does.
 
+## 1.3.0
+
+**Chapter facts**
+
+- When a chapter was posted, above it. Royal Road prints this below the chapter, past the
+  author notes and the About-author panel, which is the one place it cannot answer "how old is
+  this?" before you start reading. Whatever dates Royal Road shows are mirrored, so if a
+  chapter ever carries an edited date that appears too.
+- How long the chapter is: a word count, an estimated reading time, or both. Counted from the
+  chapter text alone, so author notes and comments are not included, and the estimate uses a
+  reading speed you can set.
+- How many chapters you have left: which chapter of the fiction this one is, and how many come
+  after it. Royal Road already knows — its own "Select a chapter" dropdown numbers them — but it
+  ships that dropdown empty and only fills it when you open it. This asks for the same list,
+  once per fiction, and keeps it for the tab.
+- All three are off by default. The first two read what Royal Road already sent; the third is
+  the only one that fetches anything, and it fetches nothing while it is off.
+
+**Coming back to a chapter**
+
+- Where you stopped reading, remembered: reopening a chapter either offers to take you back to
+  the paragraph you were on, or takes you straight there. Off by default, and nothing is
+  recorded while it is off.
+- How far through you are is measured against the chapter text itself, not the page, so the
+  comments loading underneath it neither hold you short of the end nor push you past it.
+- Nothing is remembered before you reach the chapter text or after you have read to the end of
+  it, and moving on to the next chapter forgets the one behind you — but only when you got
+  there through Royal Road's own next-chapter link, so opening chapter 40 from the contents
+  does not lose your place in 39.
+- The position is a paragraph, not a scroll distance, so it survives the recap arriving late,
+  a different window width, and your own font and width settings. If the chapter has been
+  rewritten since, it says so rather than claiming the same place.
+
+**Under the hood**
+
+- Everything the extension puts above a chapter now shares one strip, ordered by declaration
+  rather than by whichever finished first. The recap is fetched, so before this the reading
+  order depended on whether it came from the cache.
+
 ## 1.2.0
 
 **Royal Road's two layouts**

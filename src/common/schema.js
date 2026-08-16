@@ -130,6 +130,49 @@
      */
     'recap.paragraphs': { type: 'int', default: 4, min: 1, max: 15 },
 
+    // ── chapter facts ─────────────────────────────────────────────────────
+    /**
+     * Repeat the chapter's own timestamps above the text. Royal Road prints
+     * them below it, past the author notes and the About-author panel, which
+     * is the one place they cannot answer "how old is this?" before you start.
+     * Whatever stamps it renders are mirrored, so an edited-at appearing later
+     * needs no change here.
+     */
+    'chapter.topTimestamp': { type: 'bool', default: false },
+    /**
+     * How long the chapter is, above it.
+     *
+     * One setting rather than two switches: the count and the estimate are the
+     * same measurement shown two ways, and a "reading time" toggle that does
+     * nothing until a separate "word count" toggle is also on reads as broken.
+     */
+    'chapter.wordCount': { type: 'enum', default: 'off', values: ['off', 'words', 'time', 'both'] },
+    /**
+     * Reading speed for that estimate. 250 is the conventional figure for
+     * English prose, so the number will not read as wrong before anyone has
+     * tuned it.
+     */
+    'chapter.wpm': { type: 'int', default: 250, min: 100, max: 1000 },
+    /**
+     * Where this chapter sits in its fiction, and how many are left after it,
+     * on the same line as the facts above the chapter.
+     *
+     * Royal Road knows: its "Select a chapter" dropdown numbers them. But the
+     * page ships that dropdown empty and fills it from `/fictions/chapterlist`
+     * only when you focus it, so the count costs that same request - about 3 KB
+     * for a hundred chapters, once per fiction per tab. Nothing is fetched
+     * while this is off.
+     */
+    'chapter.catchUp': { type: 'bool', default: false },
+    /**
+     * Come back to where you stopped reading a chapter.
+     *
+     * Three states rather than a switch: landing somewhere you did not ask to
+     * be is startling the first time it happens, so `ask` offers the jump and
+     * `jump` takes it. Nothing is recorded while this is `off`.
+     */
+    'chapter.resume': { type: 'enum', default: 'off', values: ['off', 'ask', 'jump'] },
+
     // ── author notes, panels ────────────────────────────────────
     // Defaults to off: collapsing part of an author's note is a judgement call,
     // and one the reader should opt into rather than discover.

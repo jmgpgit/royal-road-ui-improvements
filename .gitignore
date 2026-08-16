@@ -14,6 +14,12 @@ dist/
 test/fixtures/**
 !test/fixtures/README.md
 
+# Paste-ready store submission text, one file per release. Generated from the
+# code, CHANGELOG and PRIVACY at release time; not shared, because it is a
+# transcript of two dashboards' form fields rather than anything about the
+# extension. .claude/skills/release/ says what each file has to contain.
+store-submissions/
+
 # Local editor and agent state
 .claude/settings.local.json
 .vscode/
@@ -27,3 +33,16 @@ Thumbs.db
 # run to allow remote debugging and unsigned add-ons, which makes it unsuitable
 # for anything but this. `npm start -- --fresh` skips it entirely.
 .dev-profile/
+
+# Working notes for Claude Code. Deliberately not shared: they are reminders about
+# how to work on this repo, not documentation. Anything a contributor needs goes in
+# CONTRIBUTING.md instead. `.claude/skills/` holds the same notes, split out so the
+# end-of-workflow ones (the release procedure, the store submission) are loaded only
+# when they are needed rather than on every turn. Ignored as a directory so a note
+# added under a new skill name is covered too.
+#
+# Only `.claude/skills/` — `.claude/settings.json` and `.claude/commands/` stay
+# committable, because those would be project config a contributor could use.
+CLAUDE.md
+CLAUDE.local.md
+.claude/skills/

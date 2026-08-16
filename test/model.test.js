@@ -89,7 +89,7 @@ test('backup round-trips settings and hidden fictions', () => {
     181303: { title: 'Gifted', url: '/fiction/181303/gifted', cover: 'c.jpg', hiddenAt: 1000 },
   });
 
-  const backup = model.buildBackup(settings, hidden, 1700000000000);
+  const backup = model.buildBackup({ settings, hidden }, 1700000000000);
   assert.equal(backup.format, model.BACKUP_FORMAT);
   assert.equal(backup.exportedAt, '2023-11-14T22:13:20.000Z');
 

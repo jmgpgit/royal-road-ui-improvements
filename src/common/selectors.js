@@ -162,12 +162,52 @@
     authorPanelHeading: 'About author',
     chapterContent: '.chapter-content',
     /**
+     * The card holding the chapter itself: both navigation bars, the author
+     * notes, the chapter text and the meta bar under it - and NOT the comments,
+     * NOT the About-author panel. Exactly one per chapter page, and the direct
+     * parent of `.chapter-content`.
+     *
+     * This is the scope that makes `chapterTime` answerable at all. Unscoped,
+     * `time[unixtime]` finds three elements on a fresh chapter page - the
+     * chapter's own stamp and two copies of the AUTHOR'S JOIN DATE - and dozens
+     * more once the comments load, since every comment carries one.
+     * `[data-author-role]` excludes the join dates but nothing excludes the
+     * comments except a container.
+     *
+     * A bare class rather than a `data-rr-` hook, unusually, because Royal
+     * Road's own extras stylesheet keys off it (`.chapter.font-size-14
+     * .chapter-content p`), so it carries meaning to them and is not free to
+     * churn.
+     */
+    chapterCard: '.chapter',
+    /**
      * Royal Road's own previous-chapter link, which it marks by direction
      * rather than by label. Repeated above and below the chapter, and simply
      * absent on the first chapter of a fiction, which is how the recap knows
      * there is nothing before this one to show.
      */
     chapterPrev: '[data-vt-direction="prev"]',
+    /**
+     * The mirror of `chapterPrev`, absent on the latest chapter of a fiction.
+     * Its absence is therefore a free, always-current check on whether a
+     * chapter list we saved earlier has gone stale.
+     */
+    chapterNext: '[data-vt-direction="next"]',
+    /**
+     * A chapter timestamp. ALWAYS used scoped to `chapterCard`, never globally
+     * - see the note there.
+     *
+     * Read through the `unixtime` attribute, never `textContent`: Royal Road
+     * rewrites the rendered text client-side ("6 years", "10 days ago"), so a
+     * guard comparing text would never settle. The attribute is server-rendered
+     * and does not move.
+     */
+    chapterTime: 'time[unixtime]',
+    /**
+     * The tooltip naming a timestamp ("Created At"). English-only, so used to
+     * label a stamp we already found rather than to find one.
+     */
+    chapterTimeLabel: '[data-rr-tooltip-content]',
     chapterContainer: '#chapter-page-container',
     commentLoader: '#comment-loader',
     commentsPaginate: '#comments-pagination',

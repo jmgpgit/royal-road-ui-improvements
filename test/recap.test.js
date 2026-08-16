@@ -31,6 +31,7 @@ const MODULES = [
   'src/common/model.js',
   'src/common/css.js',
   'src/content/ui.js',
+  'src/content/chapter-top.js',
   'src/content/features/recap.js',
 ];
 

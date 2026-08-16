@@ -134,6 +134,67 @@ html.rrx-wide .author-note-card {
 }
 
 /* ==========================================================================
+   Chapter facts
+   --------------------------------------------------------------------------
+   A sibling of the chapter text, not a child of anything of ours: the parent
+   is `div.chapter.flex.flex-col.items-center`, which centres and shrink-wraps
+   whatever it holds. A wrapper around this and the recap therefore resized
+   itself every time the recap opened, and slid this sideways with it. As its
+   own child it is measured and centred alone. See content/chapter-top.js.
+
+   No margin: the parent's own `gap-4` already spaces it from the chapter.
+
+   Furniture, not prose, so deliberately NOT added to the reader typography
+   rules above - the same call as `.rrx-recap__label`. The reader's font,
+   colour and leading are for the author's words.
+   ========================================================================== */
+
+.rrx-chapter-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem 1rem;
+  margin: 0;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--color-on-surface-muted, #8a8a8a);
+}
+
+/* A separating dot rather than a box per fact: the bar is a short sentence of
+   small facts, and chipping each one makes it louder than the chapter title. */
+.rrx-chapter-meta__item + .rrx-chapter-meta__item::before {
+  content: '·';
+  margin-right: 1rem;
+  opacity: 0.6;
+}
+
+/* --------------------------------------------------------------------------
+   Resume
+   --------------------------------------------------------------------------
+   The offer, in `ask` mode. A real button, and the loudest thing this file
+   draws, because it is the one block here that does something when clicked and
+   it has to be obviously dismissible by ignoring it.
+   -------------------------------------------------------------------------- */
+
+.rrx-resume {
+  display: block;
+  margin: 0 auto 0.75rem;
+  padding: 0.4rem 0.9rem;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 0.8125rem;
+  color: var(--color-on-surface-strong, #eaeaea);
+  background: color-mix(in srgb, var(--color-primary, #4b7bec) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-primary, #4b7bec) 45%, transparent);
+  border-radius: 9999px;
+  cursor: pointer;
+}
+
+.rrx-resume:hover {
+  background: color-mix(in srgb, var(--color-primary, #4b7bec) 28%, transparent);
+}
+
+/* ==========================================================================
    The previous chapter's ending
    --------------------------------------------------------------------------
    Deliberately quieter than the chapter itself: it is context, and it sits

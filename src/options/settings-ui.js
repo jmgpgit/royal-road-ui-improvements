@@ -162,6 +162,39 @@
       placeholder: 'Georgia, serif',
     },
 
+    'chapter.topTimestamp': {
+      label: 'Show when the chapter was posted, at the top',
+      note: 'Royal Road prints this under the chapter, past the author notes, where you cannot see it before you start reading. This repeats it above the text. Whatever dates Royal Road shows are mirrored, so if it ever adds an edited date that appears too.',
+    },
+    'chapter.wordCount': {
+      label: 'Show how long the chapter is',
+      note: 'Counted from the chapter text, so author notes and comments are not included. The estimate uses the reading speed below.',
+      optionLabels: {
+        off: 'Do not show it',
+        words: 'Word count',
+        time: 'Reading time',
+        both: 'Both',
+      },
+    },
+    'chapter.wpm': {
+      label: 'Your reading speed',
+      note: 'Used only for the estimate above. 250 words a minute is the usual figure for English prose.',
+      unit: 'words a minute',
+      step: 10,
+    },
+    'chapter.catchUp': {
+      label: 'Show how many chapters you have left',
+      note: 'Which chapter of the fiction this is, and how many come after it, on the line above the chapter. The count comes from the same list Royal Road fills its own "Select a chapter" dropdown from, fetched once per fiction and kept for the tab. Nothing is fetched while this is off.',
+    },
+    'chapter.resume': {
+      label: 'Come back to where you stopped reading',
+      note: 'Remembers how far down a chapter you got, and returns you there next time you open it. Opening a link to a particular comment goes to that comment instead. Nothing is remembered while this is off, and it is kept on this device.',
+      optionLabels: {
+        off: 'Do not remember',
+        ask: 'Offer it at the top of the chapter',
+        jump: 'Go straight there',
+      },
+    },
     'recap.mode': {
       label: 'Show the end of the previous chapter',
       note: 'Puts the closing paragraphs of the chapter before at the top of this one, for when you are reading several fictions at once and cannot remember how the last one left off. Nothing is fetched while this is off.',
@@ -322,8 +355,12 @@
           keys: ['notes.mode', 'notes.hideAuthorPanel'],
         },
         {
+          title: 'Chapter facts',
+          keys: ['chapter.topTimestamp', 'chapter.wordCount', 'chapter.wpm', 'chapter.catchUp'],
+        },
+        {
           title: 'Continuing a story',
-          keys: ['recap.mode', 'recap.paragraphs'],
+          keys: ['chapter.resume', 'recap.mode', 'recap.paragraphs'],
         },
         {
           title: 'Comments',

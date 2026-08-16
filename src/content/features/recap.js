@@ -33,10 +33,10 @@
    */
   const SEPARATOR_ONLY = /^[\s*\-_~=.·•—–]+$/;
 
-  const chapterKey = (url) => {
-    const match = String(url).match(/\/chapter\/(\d+)/);
-    return match ? match[1] : null;
-  };
+  // The id in the URL, which is the cache key. Shared with the rest of the
+  // extension rather than kept private here: several features now need it, and
+  // two regexes for one question is one regex too many.
+  const chapterKey = (url) => RRX.chapterIdFromHref(String(url));
 
   function cacheGet(key) {
     try {
@@ -184,16 +184,11 @@
     });
   }
 
-  function anchor() {
-    // Not simply the first `.chapter-content`: continuous reading can prepend
-    // earlier chapters above this one, and each carries its own. The recap
-    // belongs to the chapter that was opened, so anything nested inside an
-    // appended chapter is skipped.
-    const content = [...document.querySelectorAll(SEL.chapterContent)].find(
-      (el) => !el.closest('.rrx-chapter')
-    );
-    return content && content.parentElement ? content : null;
-  }
+  // The recap sits in the shared rail above the chapter, below the meta bar.
+  // `chapterTop` owns both the anchor rule that used to live here and the order
+  // of the blocks in it, because this one arrives after a fetch and so cannot
+  // rely on being inserted in the order it should be read in.
+  const anchor = () => RRX.chapterTop && RRX.chapterTop.content();
 
   let state = { url: null, mode: null, wanted: null, busy: false };
 
@@ -229,9 +224,7 @@
       const full = await fetchTail(url, wanted);
       if (!full) return;
       const block = render(trim(full, wanted), mode, url);
-      const current = document.getElementById(BLOCK_ID);
-      if (current) current.replaceWith(block);
-      else where.parentElement.insertBefore(block, where);
+      if (!RRX.chapterTop.place(block, RRX.chapterTop.SLOTS.recap)) return;
       state = { url, mode, wanted, busy: false };
     } catch {
       // A recap is a convenience. If Royal Road will not serve the previous
