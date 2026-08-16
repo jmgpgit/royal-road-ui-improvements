@@ -7,7 +7,7 @@ the source rather than taken on trust. Every claim below names the file that imp
 
 ## What is stored, and where
 
-Three things, all in `browser.storage.local`, which is local to your browser profile:
+Four things, all in `browser.storage.local`, which is local to your browser profile:
 
 - **Your settings.** The list in [`src/common/schema.js`](src/common/schema.js) is exhaustive.
 - **Your hidden fictions.** For each one: its Royal Road id, title, cover URL and the time you
@@ -18,6 +18,9 @@ Three things, all in `browser.storage.local`, which is local to your browser pro
   of the newest comment you had seen on it. No chapter text, no comment text, no titles. The
   comment date is forgotten after 60 days by default, and a reading position is deleted as
   soon as you finish the chapter, so neither accumulates indefinitely.
+- **Royal Road's list of tags**, cached for a week so the filter panel does not refetch it. This
+  is Royal Road's own public vocabulary — "LitRPG", "Progression", and the rest — and says
+  nothing whatever about you. See [`src/content/tags.js`](src/content/tags.js).
   See [`src/common/model.js`](src/common/model.js) for the exact shape.
 
 A compact copy of your settings and the ids of your hidden fictions is mirrored into
@@ -46,13 +49,20 @@ which of its two layouts to serve you with a `beta-ui-v2` cookie, and this exten
 works on the newer one. Choosing **Always the new design** sets that cookie and reloads;
 choosing **Always the old design** deletes it and reloads. On the default, *Leave it to Royal
 Road*, the extension reads that one cookie to see whether anything needs doing and never
-writes it. It writes no other cookie and reads no other cookie. It records a preference
-about Royal Road's own appearance and nothing about you; it is Royal Road's cookie, of the
-kind the site sets itself, and Royal Road's own "Revert To Legacy UI" link overwrites it. The
-extension writes no other cookie and reads no cookie except this one.
+writes it. It records a preference about Royal Road's own appearance and nothing about you; it
+is Royal Road's cookie, of the kind the site sets itself, and Royal Road's own "Revert To
+Legacy UI" link overwrites it. The extension writes no other cookie and reads no cookie except
+this one.
 See [`src/common/design.js`](src/common/design.js).
 
-Nothing is stored anywhere else. There is no account, no sync, and no identifier of any kind.
+Nothing is stored anywhere else. There is no account and no identifier of any kind.
+
+Nor is any of it synced. Everything above lives in `browser.storage.local`, which your browser
+does not carry between devices; the extension never uses the `storage.sync` API that would.
+This is a choice about where your data lives, not an interference with your browser: Firefox
+Sync and Chrome sync work exactly as they always did, and the extension neither reads nor
+affects them. Moving settings between machines is done with Options -> Backup, a file you
+export and import yourself.
 
 ## What is sent
 

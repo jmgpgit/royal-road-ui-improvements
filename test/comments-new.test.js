@@ -55,7 +55,11 @@ nodeTest.after(() => {
 const DAY = 24 * 60 * 60;
 const nowS = () => Math.floor(Date.now() / 1000);
 
-function load({ seenAt = 0, mode = 'fold', visitedDaysAgo = 0, days = 60 } = {}) {
+// `visitedDaysAgo` defaults to a real previous visit rather than "just now":
+// a reload within the grace window is deliberately treated as the same sitting,
+// so 0 would mean nothing ever folds and most of this file would be testing that
+// instead of what it means to.
+function load({ seenAt = 0, mode = 'fold', visitedDaysAgo = 1, days = 60 } = {}) {
   const dom = new JSDOM(fixture('chapter-comments-nested.new.html'), {
     url: `https://www.royalroad.com/fiction/149588/x/chapter/${CHAPTER}/y`,
     runScripts: 'outside-only',
@@ -509,4 +513,164 @@ test('a new comment is marked with a word, not only a colour', () => {
 
   w2.document.querySelector('[data-rrx-action="markSeen"]').click();
   assert.equal(w2.document.querySelectorAll('.rrx-comment-newpill').length, 0);
+});
+
+test('Unfold clears the low-effort folding too, not only the already-read kind', async () => {
+  // Two features fold comments: this one folds what you have already read, and
+  // comments.js folds "tftc" and friends. They share one set of CSS rules, but
+  // the button only ever cleared its own class - so pressing something labelled
+  // "Show every comment in full" left every "tftc" collapsed.
+  const { w, ctx } = load({ seenAt: nowS() - DAY });
+  w.RRX.commentsNew.apply(ctx);
+  await new Promise((r) => setTimeout(r, 20));
+
+  const html = w.document.documentElement;
+  assert.equal(html.classList.contains('rrx-show-all'), false, 'nothing asked for yet');
+
+  const unfold = w.document.querySelector('[data-rrx-toggle="showAll"]');
+  assert.ok(unfold, 'the control is offered while anything is folded');
+  unfold.click();
+  await new Promise((r) => setTimeout(r, 20));
+
+  assert.equal(
+    html.classList.contains('rrx-show-all'),
+    true,
+    'pressing it says so on <html>, which is what reaches the other feature'
+  );
+});
+
+test('every fold rule yields to "show everything", or the class is decoration', () => {
+  // The class above only helps if the stylesheet honours it. comments.js does
+  // its folding entirely in CSS, so this is where that promise is kept.
+  const css = fs.readFileSync(path.join(ROOT, 'src/content/inject-comments.css'), 'utf8');
+  // Only rules that actually fold. The reduced-motion block names the class
+  // too, but all it does there is switch a transition off.
+  const folds = css
+    .split('}')
+    .filter(
+      (rule) =>
+        rule.includes('.rrx-comment-thanks') &&
+        (rule.includes('max-height') || rule.includes('display: none'))
+    );
+  assert.ok(folds.length, 'found the fold rules');
+  for (const rule of folds) {
+    const selector = rule.slice(0, rule.indexOf('{')).trim().replace(/\s+/g, ' ');
+    assert.match(rule, /rrx-show-all/, `a fold rule ignores the request: ${selector}`);
+  }
+});
+
+test('hidden comments get a way back, and the control says which it is', async () => {
+  // Hiding removes a comment from the page outright: there is no dimmed line to
+  // hover, so without a control there is no route back at all. The count line
+  // Royal Road gets annotated with "(N hidden)" only says it happened.
+  const { w, ctx } = load({ seenAt: nowS() - DAY });
+  w.RRX.commentsNew.apply(ctx);
+  await new Promise((r) => setTimeout(r, 20));
+
+  // comments.js owns this class; stand in for it having hidden something.
+  const victim = w.document.querySelector('[data-comment-id]');
+  victim.classList.add('rrx-comment-thanks-hidden');
+  w.RRX.commentsNew.apply(ctx);
+  await new Promise((r) => setTimeout(r, 20));
+
+  const control = w.document.querySelector('[data-rrx-toggle="showAll"]');
+  assert.ok(control, 'a control is offered');
+  assert.equal(
+    control.textContent.trim(),
+    'Show hidden',
+    'and it is named for the half you cannot see, not for folding'
+  );
+  assert.match(control.getAttribute('title'), /hidden/i, 'the tooltip says so too');
+});
+
+test('with nothing hidden it is still just Unfold', async () => {
+  // The label follows what is actually suppressed; it must not cry "hidden" at
+  // somebody who only has folding switched on.
+  const { w, ctx } = load({ seenAt: nowS() - DAY });
+  w.RRX.commentsNew.apply(ctx);
+  await new Promise((r) => setTimeout(r, 20));
+
+  const control = w.document.querySelector('[data-rrx-toggle="showAll"]');
+  assert.ok(control, 'a control is offered for the folding');
+  assert.equal(control.textContent.trim(), 'Unfold');
+});
+
+test('a page whose only suppression is hiding still gets the control', async () => {
+  // The reported case: open a chapter you have already read, so nothing is new
+  // and nothing folds as "seen", but the low-effort rules hide some comments.
+  // The bar was removed on "nothing fresh, nothing folded" and took the only
+  // route back to those comments with it. Infinite scroll makes it worse: the
+  // first page can be clean while a later one hides plenty.
+  const { w } = load();
+  const newest = Math.max(...stamps(w));
+  const { w: w2, ctx } = load({ seenAt: newest, mode: 'mark' });
+  w2.RRX.commentsNew.apply(ctx);
+  await new Promise((r) => setTimeout(r, 20));
+
+  // Nothing new, nothing folded: with no hiding there is correctly no bar.
+  assert.equal(w2.document.getElementById(w2.RRX.commentsNew.BAR_ID), null);
+
+  // Now a later page arrives and something on it is hidden outright.
+  w2.document.querySelector('[data-comment-id]').classList.add('rrx-comment-thanks-hidden');
+  w2.RRX.commentsNew.apply(ctx);
+  await new Promise((r) => setTimeout(r, 20));
+
+  assert.ok(
+    w2.document.getElementById(w2.RRX.commentsNew.BAR_ID),
+    'the bar has to come back, or the hidden comments are unreachable'
+  );
+  assert.equal(
+    w2.document.querySelector('[data-rrx-toggle="showAll"]').textContent.trim(),
+    'Show hidden'
+  );
+});
+
+test('a chapter never opened is never given a date', async () => {
+  // seenAt is 0 on a first visit and `new Date(0)` is 1 January 1970, so a bar
+  // that reaches for the date regardless announces "Comments older than 1 ene
+  // 1970 are folded" on a chapter nobody has read.
+  const { w, ctx } = load({ seenAt: 0 });
+  // Something for the bar to exist for, without a watermark behind it.
+  w.document.querySelector('[data-comment-id]').classList.add('rrx-comment-thanks');
+  w.RRX.commentsNew.apply(ctx);
+  await new Promise((r) => setTimeout(r, 20));
+
+  const bar = w.document.getElementById(w.RRX.commentsNew.BAR_ID);
+  if (bar) {
+    assert.doesNotMatch(bar.textContent, /1970/, 'claimed a date it does not have');
+    assert.doesNotMatch(bar.textContent, /older than/i, 'claimed a boundary it does not have');
+  }
+});
+
+test('reloading straight after reading does not collapse the page under you', async () => {
+  // Reading the comments is what sets the watermark, so a reload a moment later
+  // is technically right to call them all seen - and folding the page somebody
+  // is still looking at is the one case where being right is no use.
+  const { w } = load({ seenAt: 0 });
+  const newest = Math.max(...stamps(w));
+
+  const back = load({ seenAt: newest, visitedDaysAgo: 0 });
+  back.w.RRX.commentsNew.apply(back.ctx);
+  await new Promise((r) => setTimeout(r, 20));
+
+  assert.equal(
+    countOf(back.w, back.w.RRX.commentsNew.SEEN_CLASS),
+    0,
+    'a reload folded what was just being read'
+  );
+});
+
+test('but coming back later folds what was read, as it always did', async () => {
+  const { w } = load({ seenAt: 0 });
+  const newest = Math.max(...stamps(w));
+
+  // Past the grace window: a genuine return, not a reload.
+  const later = load({ seenAt: newest, visitedDaysAgo: 1 });
+  later.w.RRX.commentsNew.apply(later.ctx);
+  await new Promise((r) => setTimeout(r, 20));
+
+  assert.ok(
+    countOf(later.w, later.w.RRX.commentsNew.SEEN_CLASS) > 0,
+    'coming back tomorrow should still fold what was read'
+  );
 });

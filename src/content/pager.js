@@ -78,7 +78,9 @@
      */
     function hideFooter(on) {
       const el = rootEl();
-      if (el) el.classList.toggle('rrx-endless', on);
+      // Compared before writing, because this is now called from `check`, which
+      // runs on every scroll event.
+      if (el && el.classList.contains('rrx-endless') !== on) el.classList.toggle('rrx-endless', on);
     }
 
     async function loadNext() {
@@ -145,6 +147,13 @@
     }
 
     function check() {
+      // Re-assert, rather than trusting the one write in `loadNext`. Royal
+      // Road's pagination re-renders on its own account, and that takes the
+      // class with it: the page numbers reappear under a list we are still
+      // appending to, and nothing puts them away again, because the only thing
+      // that ever set the class was a load. Once every page is in, `state.done`
+      // is true and no load will ever run again, so it would be permanent.
+      if (state.added > 0) hideFooter(true);
       if (state.busy || state.done) return;
       if (ready && !ready()) {
         if (prime) prime();

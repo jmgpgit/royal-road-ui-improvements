@@ -261,15 +261,15 @@ html.rrx-comments [data-comment-id]:hover > .rrx-thread-toggle,
    read a deep comment as childless and hide it outright, taking a chain of
    answers with it. */
 
-:is(.rrx-comment-thanks, .rrx-comment-seen):not(:has(.comment-replies, [data-rr-deep-replies])) {
+html:not(.rrx-show-all) :is(.rrx-comment-thanks, .rrx-comment-seen):not(:has(.comment-replies, [data-rr-deep-replies])) {
   max-height: 1.6rem;
   overflow: hidden;
   opacity: 0.4;
   transition: max-height 0.15s ease, opacity 0.15s ease;
 }
 
-:is(.rrx-comment-thanks, .rrx-comment-seen):not(:has(.comment-replies, [data-rr-deep-replies])):hover,
-:is(.rrx-comment-thanks, .rrx-comment-seen):not(:has(.comment-replies, [data-rr-deep-replies])):focus-within {
+html:not(.rrx-show-all) :is(.rrx-comment-thanks, .rrx-comment-seen):not(:has(.comment-replies, [data-rr-deep-replies])):hover,
+html:not(.rrx-show-all) :is(.rrx-comment-thanks, .rrx-comment-seen):not(:has(.comment-replies, [data-rr-deep-replies])):focus-within {
   max-height: 40rem;
   opacity: 1;
 }
@@ -277,7 +277,7 @@ html.rrx-comments [data-comment-id]:hover > .rrx-thread-toggle,
 /* Hiding only ever reaches a comment with no replies: comments.js softens it
    to folding otherwise, so a chain is never left answering nothing. The guard
    stays as a belt-and-braces against that ever changing. */
-.rrx-comment-thanks-hidden:not(:has(.comment-replies, [data-rr-deep-replies])) {
+html:not(.rrx-show-all) .rrx-comment-thanks-hidden:not(:has(.comment-replies, [data-rr-deep-replies])) {
   display: none !important;
 }
 
@@ -287,7 +287,7 @@ html.rrx-comments [data-comment-id]:hover > .rrx-thread-toggle,
    div that sits alongside the body row, so it is excluded by what it contains
    rather than by what it is. */
 
-:is(.rrx-comment-thanks, .rrx-comment-seen):has(.comment-replies, [data-rr-deep-replies])
+html:not(.rrx-show-all) :is(.rrx-comment-thanks, .rrx-comment-seen):has(.comment-replies, [data-rr-deep-replies])
   > :not(.rrx-thread-toggle)
   > :not(.comment-replies):not(:has([data-rr-deep-replies])) {
   max-height: 1.6rem;
@@ -296,10 +296,10 @@ html.rrx-comments [data-comment-id]:hover > .rrx-thread-toggle,
   transition: max-height 0.15s ease, opacity 0.15s ease;
 }
 
-:is(.rrx-comment-thanks, .rrx-comment-seen):has(.comment-replies, [data-rr-deep-replies]):hover
+html:not(.rrx-show-all) :is(.rrx-comment-thanks, .rrx-comment-seen):has(.comment-replies, [data-rr-deep-replies]):hover
   > :not(.rrx-thread-toggle)
   > :not(.comment-replies):not(:has([data-rr-deep-replies])),
-:is(.rrx-comment-thanks, .rrx-comment-seen):has(.comment-replies, [data-rr-deep-replies]):focus-within
+html:not(.rrx-show-all) :is(.rrx-comment-thanks, .rrx-comment-seen):has(.comment-replies, [data-rr-deep-replies]):focus-within
   > :not(.rrx-thread-toggle)
   > :not(.comment-replies):not(:has([data-rr-deep-replies])) {
   max-height: 40rem;
@@ -390,12 +390,21 @@ html.rrx-comments-onlynew .rrx-comment-seen:not(:has(.comment-replies, [data-rr-
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  margin: 0 0 0.75rem;
+  /* Clearance above, because of what sits there: this bar goes in at the top of
+     `#comments-pagination`, and directly above it is Royal Road's comment
+     editor, whose Preview and Post buttons are right-aligned. Our own controls
+     are pushed right too (see `__count` below), so without this the Unfold
+     button lands a few pixels under the Post button - two blue buttons in a
+     column, reading as one overlapping the other. */
+  margin: 1.25rem 0 0.75rem;
   font-family: var(--font-sans, system-ui, sans-serif);
   font-size: 0.8125rem;
   color: var(--color-on-surface-muted, #8a8a8a);
 }
 
+/* Pushes the controls to the right, away from the sentence explaining what is
+   folded. That is what puts them under Royal Road's Post button, which the
+   margin above answers. */
 .rrx-comments-bar__count {
   margin-right: auto;
 }

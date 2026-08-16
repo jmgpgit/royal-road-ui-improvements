@@ -46,11 +46,50 @@
     }
   }
 
+  /**
+   * How many chapters to keep. Each is the chapter's whole text, ~12 KB, and
+   * sessionStorage is a ~5 MB budget SHARED with royalroad.com - so an evening's
+   * reading with no ceiling can crowd out the site itself.
+   */
+  const CACHE_MAX = 40;
+
+  /**
+   * Keep the cache under its ceiling, oldest first.
+   *
+   * Without this the cache only ever grew, and the failure was invisible: once
+   * the quota was gone every `setItem` threw, the catch below swallowed it, and
+   * the recap refetched every chapter for the rest of the session with no way
+   * back. Dropping the oldest entries is what makes it self-healing.
+   */
+  function evict(max = CACHE_MAX) {
+    const keys = [];
+    for (let i = 0; i < root.sessionStorage.length; i += 1) {
+      const key = root.sessionStorage.key(i);
+      if (key && key.startsWith(CACHE_PREFIX)) keys.push(key);
+    }
+    if (keys.length <= max) return;
+    // Insertion order is the browser's own, which is oldest-first for keys that
+    // are only ever added, and these are: an entry is never rewritten.
+    for (const key of keys.slice(0, keys.length - max)) {
+      root.sessionStorage.removeItem(key);
+    }
+  }
+
   function cacheSet(key, html) {
     try {
+      // Make room FOR this entry, not just down to the ceiling: trimming to the
+      // cap and then adding one leaves the cap exceeded by one, for ever.
+      evict(CACHE_MAX - 1);
       root.sessionStorage.setItem(CACHE_PREFIX + key, html);
     } catch {
-      /* quota or blocked storage: not worth reporting for a cache */
+      // Out of room even after evicting, or storage is blocked outright. Drop
+      // what we hold rather than limping on with a cache that can never accept
+      // another entry.
+      try {
+        evict(0);
+      } catch {
+        /* nothing more to try; the recap just costs a fetch each time */
+      }
     }
   }
 
@@ -243,5 +282,5 @@
     },
   });
 
-  RRX.recap = { tailOf, trim, previousUrl, apply, SEPARATOR_ONLY };
+  RRX.recap = { tailOf, trim, previousUrl, apply, cacheSet, CACHE_MAX, SEPARATOR_ONLY };
 })(globalThis);

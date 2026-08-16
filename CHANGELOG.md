@@ -4,6 +4,70 @@ Notable changes, newest first. Versions follow [semantic versioning](https://sem
 the patch number for fixes, the minor for new settings, the major for anything that changes
 what an existing setting does.
 
+## 1.4.1
+
+**Fixes**
+
+- The scratchpad that holds your reading position kept the newest 300 chapters — except it
+  never actually sorted them. It compared a field no writer has ever set, so every comparison
+  came out equal and the cap dropped the *lowest chapter id* rather than the oldest entry. The
+  cap always worked, which is why this stayed hidden: it kept 300 chapters, just not the right
+  300.
+- **"Remember which comments I have seen for N days" was honoured on one path and ignored on the
+  other.** Leaving a chapter prunes the whole record, and that write did not carry your setting,
+  so it pruned at the built-in 60 days no matter what you had chosen.
+- **Scrolling a chapter is much cheaper.** Reading your position forces the browser to lay the
+  page out, and it ran on every single scroll event — rebuilding the chapter's entire text each
+  time, about 12 KB, purely to count its length. It now runs once per frame, and the length is
+  measured once per chapter.
+- **The comments bar no longer crowds Royal Road's Post button.** It sits at the top of the
+  comment pagination block, directly below the editor, and its controls are right-aligned — so
+  Unfold landed a few pixels under Post, two blue buttons in a column reading as one on top of
+  the other. It now clears it.
+- **Hidden comments have a way back.** Hiding removes a comment from the page outright, so
+  unlike folding there is no dimmed line left to hover — and nothing offered a way to see them.
+  The comment count was annotated "(N hidden)" and that was the end of it. The bar now offers
+  **Show hidden** whenever anything is being hidden, named for the half you cannot see. It
+  appears on a chapter you have already read, where nothing is new and nothing folds, and it
+  appears when a later page of comments brings the first hidden one — the case infinite scroll
+  makes ordinary.
+- Royal Road's page numbers no longer reappear under a list that is still being appended to.
+  They were hidden once, at the end of a load, and anything that re-rendered the pagination took
+  that with it — after which nothing put them back, since only a load ever hid them and once
+  every page was in there were no more loads. It is now re-applied as the pager checks.
+- Reloading a chapter straight after reading its comments no longer folds them all. Reading is
+  what sets the watermark, so a reload a moment later is technically right to call them seen —
+  and collapsing the page somebody is still looking at is no use to them. A reload within
+  fifteen minutes counts as the same sitting: anything genuinely new is still marked, nothing
+  folds, and coming back tomorrow behaves as it always did.
+- The comments bar no longer says "Comments older than 1 Jan 1970 are folded" on a chapter you
+  have never opened. There is no previous visit to date it from, so it does not try.
+- "thanks for the meal" and its relatives fold. So do "for the story" and "for the tale".
+- An emoticon no longer rescues a comment from the filter. Punctuation is stripped to spaces,
+  so ":D" left a bare "d" behind and "Thanks for the chapter! :D" stayed while the same comment
+  with ":)" folded. `:P`, `xD`, `<3`, `:3` and `^^` are handled the same way.
+- **"4" is read as "for" in the acknowledgement filter**, so `t4tc` and `ty4tc` fold alongside
+  `tftc` and `tyftc`. `tyvm` and `thanx` are recognised too. Catching one spelling and not its
+  obvious twin looked arbitrary to whoever wrote it.
+- **"Unfold" now unfolds everything, as it always claimed to.** Two separate things fold
+  comments — the ones you have already read, and the low-effort ones like "tftc" — and the
+  button only ever cleared the first, so pressing something labelled "show every comment in
+  full" left half of them collapsed. It is also offered now whenever anything is folded, rather
+  than only when something was folded for having been read.
+- **The previous-chapter recap's cache no longer grows without limit.** It kept every chapter it
+  fetched for the life of the tab, in a storage budget shared with Royal Road itself. Once full,
+  every further write failed silently and the recap refetched the same chapters for the rest of
+  the session. It now keeps the 40 most recent and drops the oldest to make room.
+
+**Privacy policy**
+
+- Says four things are stored, which is the true number: the tag list Royal Road publishes was
+  cached but never documented. It is Royal Road's own public vocabulary and says nothing about
+  you.
+- Says plainly that nothing is synced and, just as importantly, that this is a choice about
+  where your data lives rather than any interference with Firefox Sync or Chrome sync, which
+  work exactly as they always did.
+
 ## 1.4.0
 
 **Comments**
