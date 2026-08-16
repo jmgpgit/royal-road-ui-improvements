@@ -1,11 +1,9 @@
 'use strict';
 
 /**
- * DOM primitives for the controls we inject: a tiny element factory, an inline
- * SVG icon set, and the toolbar builder.
- *
- * Everything is built with createElement/createElementNS rather than innerHTML,
- * so no fiction title or other page string is ever parsed as markup.
+ * DOM primitives for the injected controls: element factory, inline SVG icons,
+ * toolbar builders. Built with createElement/createElementNS, never innerHTML,
+ * so no fiction title or other page string is parsed as markup.
  */
 (function (root) {
   const RRX = root.RRX;
@@ -63,10 +61,7 @@
     return svg;
   }
 
-  /**
-   * A toolbar toggle. `aria-pressed` is the single source of truth for its
-   * on/off styling, so no extra state class is needed.
-   */
+  /** A toolbar toggle. `aria-pressed` drives its on/off styling, so no state class. */
   function toggleButton({ id, label, title, iconName, pressed, badge, onClick }) {
     const children = [icon(iconName), el('span', { text: label })];
     if (badge !== undefined) children.push(el('span', { class: 'rrx-badge', text: String(badge) }));
@@ -107,13 +102,9 @@
     );
   }
 
-  /**
-   * Transient confirmation with an undo affordance. Hiding a fiction is easy to
-   * mis-click and the card vanishes instantly, so an inline undo is the only
-   * cheap way back - everything else means opening the manager.
-   *
-   * One toast at a time: a second call replaces the first.
-   */
+  /** Transient confirmation with undo. Hiding a fiction is easy to mis-click and the
+   *  card vanishes instantly; without inline undo the only way back is the manager.
+   *  One toast at a time - a second call replaces the first. */
   let toastTimer = null;
   function toast(message, actionLabel, onAction, timeoutMs = 6000) {
     const existing = document.getElementById('rrx-toast');

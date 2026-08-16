@@ -1,15 +1,11 @@
 'use strict';
 
 /**
- * Generates the dynamic stylesheet that hides fictions, plus the <html> class
- * list that switches the static features on and off.
- *
- * Hiding is done in CSS rather than by walking the DOM for three reasons:
- *  - it applies before first paint, so hidden cards never flash;
- *  - it applies to content Royal Road injects later (AJAX pagination, the
- *    React-rendered recommendations carousel) with no observer;
- *  - it lands before Embla measures its carousel slides, so /home carousels
- *    lay out correctly around the hidden ones.
+ * The dynamic hide stylesheet, and the <html> classes that switch the static
+ * features on and off. Hiding is CSS rather than a DOM walk: it lands before
+ * first paint so hidden cards never flash, covers content injected later (AJAX
+ * pagination, the React recommendations carousel) with no observer, and beats
+ * Embla's slide measurement so /home carousels lay out around the hidden ones.
  */
 (function (root, factory) {
   const isNode = typeof module !== 'undefined' && module.exports;
@@ -23,21 +19,13 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (deps) {
   const { CARD_GROUPS, VIEWS, normalizeIds, normalizeSettings } = deps;
 
-  /**
-   * Marks every element this extension injects.
-   *
-   * A contract in three directions: inject.css resets these elements away from
-   * Royal Road's styling, buildHideCss exempts them from the dimming applied to
-   * a hidden card, and main.js ignores them in its MutationObserver so a sweep
-   * cannot be triggered by its own output.
-   */
+  /** Marks every element this extension injects: inject.css resets them away from
+   *  Royal Road's styling, buildHideCss exempts them from a hidden card's dimming,
+   *  and main.js's MutationObserver ignores them so it cannot sweep on its own output. */
   const UI_CLASS = 'rrx-ui';
 
-  /**
-   * Every <html> class the extension drives. Each one gates a block of
-   * inject-*.css, which is what keeps the stylesheets inert until a setting
-   * turns them on.
-   */
+  /** Every <html> class the extension drives. Each gates a block of inject-*.css,
+   *  keeping the stylesheets inert until a setting turns them on. */
   const ROOT_CLASS = {
     expandAll: 'rrx-expand-all',
     hoverExpand: 'rrx-hover-expand',
@@ -59,11 +47,8 @@
 
   const VIEW_CLASSES = VIEWS.filter((v) => v !== 'default').map((v) => `rrx-view-${v}`);
 
-  /**
-   * The classes `rootClassesFor` owns, and which boot.js may therefore clear.
-   * `ready` and `filtersPending` are excluded on purpose: they are lifecycle
-   * flags, not settings, and clearing them on a settings change would be wrong.
-   */
+  /** What `rootClassesFor` owns, so boot.js may clear it. `ready` and `filtersPending`
+   *  are lifecycle flags, not settings; clearing them on a settings change is wrong. */
   const MANAGED_CLASSES = [
     ...Object.values(ROOT_CLASS).filter(
       (c) => c !== ROOT_CLASS.ready && c !== ROOT_CLASS.filtersPending
@@ -77,8 +62,7 @@
     const out = [];
 
     if (s['list.expandAll']) out.push(ROOT_CLASS.expandAll);
-    // expand-all already keeps everything open; adding hover on top would only
-    // pay for pointless transition work.
+    // expand-all already keeps everything open; hover on top is pure transition cost.
     if (s['list.hoverExpand'] && !s['list.expandAll']) out.push(ROOT_CLASS.hoverExpand);
     if (s['list.view'] !== 'default') out.push(`rrx-view-${s['list.view']}`);
     if (s['list.maxWidthPx'] !== null) out.push(ROOT_CLASS.listWide);
@@ -88,9 +72,8 @@
     if (s['comments.threading']) {
       out.push(ROOT_CLASS.comments);
       if (s['comments.separators']) out.push(ROOT_CLASS.commentRules);
-      // The collapse button needs room reserved for it on every comment, not
-      // only the ones that end up with a button, or comments in the same thread
-      // would not line up with each other.
+      // Room for the collapse button is reserved on every comment, not only the
+      // ones that get a button, or a thread's comments would not line up.
       if (s['comments.collapsible']) out.push(ROOT_CLASS.commentCollapsible);
     }
 
@@ -98,8 +81,7 @@
       if (s['reader.lineHeight'] !== null) out.push(ROOT_CLASS.lineHeight);
       if (s['reader.justify']) {
         out.push(ROOT_CLASS.justify);
-        // Justified text without hyphenation opens rivers of whitespace, so the
-        // two travel together unless explicitly separated.
+        // Justified text without hyphenation opens rivers of whitespace.
         if (s['reader.hyphens']) out.push(ROOT_CLASS.hyphens);
       }
       if (s['reader.textColor']) out.push(ROOT_CLASS.textColor);
@@ -107,17 +89,14 @@
       if (s['reader.maxWidthPx'] !== null) out.push(ROOT_CLASS.wide);
     }
 
-    // notes.hideAuthorPanel is applied by author-notes.js, not by a class: its
-    // target is only identifiable by climbing the DOM, which CSS alone cannot
-    // reason about safely.
+    // notes.hideAuthorPanel is applied by author-notes.js, not a class: its target
+    // is only identifiable by climbing the DOM.
 
     return out;
   }
 
-  /**
-   * CSS custom properties driven by settings. Kept separate from classes because
-   * these carry values rather than switching blocks on and off.
-   */
+  /** Settings-driven CSS custom properties. Separate from classes because these
+   *  carry values rather than switching blocks on and off. */
   function rootVarsFor(settings) {
     const s = normalizeSettings(settings);
     const vars = { '--rrx-hover-delay': `${s['list.hoverDelayMs']}ms` };
@@ -134,11 +113,8 @@
     return vars;
   }
 
-  /**
-   * The href test for one hidden fiction. The trailing slash is what keeps
-   * /fiction/1813 from matching /fiction/181303; the `$=` variant covers the
-   * rare slug-less link.
-   */
+  /** The href test for one hidden fiction. The trailing slash keeps /fiction/1813 from
+   *  matching /fiction/181303; the `$=` variant covers the rare slug-less link. */
   const hrefTest = (id) => [`[href*="/fiction/${id}/"]`, `[href$="/fiction/${id}"]`];
 
   /** `:is(<link><href>, …)` for one card group's link selector. */
@@ -147,12 +123,9 @@
   }
 
   /**
-   * Build the hide stylesheet.
-   *
-   * Emitted per card *group* rather than per fiction: a single `:has()` holding
-   * an `:is()` list of ids keeps the rule count constant no matter how many
-   * fictions are hidden, which matters because `:has()` is re-evaluated on every
-   * style recalculation.
+   * Emitted per card *group*, not per fiction: one `:has()` holding an `:is()` list
+   * of ids keeps the rule count constant however many fictions are hidden, and
+   * `:has()` is re-evaluated on every style recalculation.
    *
    * @param {Array<number|string>} ids hidden fiction ids
    * @returns {string} CSS text ('' when nothing is hidden)
@@ -166,10 +139,8 @@
       const match = `:is(${group.cards.join(',')}):has(:is(${linkMatch(group, clean)}))`;
       rules.push(
         `html:not(.${ROOT_CLASS.showHidden}) ${match}{display:none!important}`,
-        // "Show hidden" mode: dim the card's own content but not the controls we
-        // inject into it. Opacity cannot be undone by a descendant, so the
-        // dimming applies to the card's children and skips anything marked
-        // .rrx-ui.
+        // "Show hidden": dim the card's content but not our controls. Opacity cannot
+        // be undone by a descendant, so it goes on the children, skipping .rrx-ui.
         `html.${ROOT_CLASS.showHidden} ${match}>*:not(.${UI_CLASS}){opacity:.4!important;` +
           `filter:grayscale(.75)!important;pointer-events:none!important}`,
         `html.${ROOT_CLASS.showHidden} ${match}{position:relative;` +

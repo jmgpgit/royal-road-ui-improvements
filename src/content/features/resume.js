@@ -3,15 +3,12 @@
 /**
  * Come back to where you stopped reading.
  *
- * Royal Road remembers which chapters you have read, and nothing about where in
- * one you were. Close a chapter half way and the next visit starts at the top,
- * which on a four-thousand-word chapter means finding your place by eye.
+ * Royal Road records which chapters you have read and nothing about where in
+ * one you were, so a half-read chapter reopens at the top.
  *
  * The position is stored relative to a paragraph, never as a pixel offset: the
- * recap arrives after a fetch, the ad slots resolve late, images decode, and the
+ * recap arrives after a fetch, ad slots resolve late, images decode, and the
  * reader's own width and font settings change the height of everything above.
- * A block index survives all of that, because it is measured from something
- * inside the chapter rather than from the top of the document.
  *
  * Nothing is written while the feature is off.
  */
@@ -44,35 +41,25 @@
   /**
    * Where the reader is.
    *
-   * Two measurements, because they answer different questions.
-   *
    * `p`/`o` - a block index and a fraction into that block - is what a restore
-   * scrolls to. It is expressed against something inside the chapter, so it
-   * survives the recap arriving late, images decoding, and the reader's own
-   * width and font changing the height of everything.
+   * scrolls to. Measured inside the chapter, so it survives the recap arriving
+   * late, images decoding, and the reader's own width and font settings.
    *
-   * `d` is how much of the chapter has been read, and it is measured
-   * GEOMETRICALLY AGAINST THE CHAPTER TEXT ALONE - never the page. The page is
-   * the wrong ruler twice over: the comments load after it and make it taller,
-   * so the same scroll position means different things a second apart; and the
-   * author notes, the About-author panel and the comments are not the chapter,
-   * so scrolling through them is not progress through it. A block index is the
-   * wrong ruler too - blocks run from one line to a dozen here - which is why
-   * "almost at the end" read as a third of the way through.
+   * `d` - how much has been read - is measured geometrically against the
+   * chapter text alone, never the page: the comments load late and make the
+   * page taller, and the author notes, About-author panel and comments are not
+   * the chapter. A block index is the wrong ruler too - blocks run from one
+   * line to a dozen here - which is why "almost at the end" read as a third of
+   * the way through.
    *
-   * It counts to the BOTTOM of the viewport, so the chapter is done when its
-   * last line has been on screen, not when its last line reaches the top.
+   * It counts to the bottom of the viewport, so the chapter is done once its
+   * last line has been on screen.
    *
    * @returns {{p:number,o:number,n:number,len:number,d:number}|null}
    */
-  /**
-   * The chapter's text length, read once.
-   *
-   * `textContent` on the whole chapter builds a fresh ~12 KB string every time
-   * it is touched, and this used to happen on every scroll event. The text does
-   * not change while the page is open, so it is measured once and kept - the
-   * same trick `chapter-meta.js` uses for its word count.
-   */
+  /** Read once: `textContent` on the whole chapter builds a fresh ~12 KB string
+   *  every time it is touched, and this used to happen on every scroll event.
+   *  The text does not change while the page is open. */
   let textLen = { el: null, len: 0 };
   function lengthOf(content) {
     if (textLen.el !== content) textLen = { el: content, len: (content.textContent || '').length };
@@ -86,8 +73,8 @@
     const children = [...content.children];
     if (!children.length) return null;
 
-    // The first block whose bottom is still below the top of the viewport is
-    // the one being read; anything above it has been passed.
+    // The first block whose bottom is still below the viewport top is the one
+    // being read.
     let index = children.findIndex((el) => el.getBoundingClientRect().bottom > 0);
     if (index < 0) index = children.length - 1;
 
@@ -104,23 +91,17 @@
       n: children.length,
       len: lengthOf(content),
       d: Number(Math.min(1, Math.max(0, seen / height)).toFixed(3)),
-      // Has the chapter text itself reached the top of the viewport? Until it
-      // has, the reader is still in the hero, the notes or the recap, and
-      // `p`/`o` cannot describe where they are: the topmost VISIBLE block is
-      // block 0 at offset 0, which means "the start of the chapter" - a place
-      // BELOW them. Restoring to it scrolls them forward, which is the one
-      // thing a resume must never do.
+      // Until the chapter text reaches the viewport top the reader is still in
+      // the hero, the notes or the recap, where `p`/`o` cannot describe them:
+      // the topmost visible block is block 0 at offset 0, i.e. the start of the
+      // chapter - a place below them. Restoring there scrolls them forward.
       started: box.top <= 0,
     };
   }
 
-  /**
-   * Worth coming back to?
-   *
-   * No if the chapter has not been started - see `started` above - and no once
-   * it has been finished, because an offer to resume something you have read is
-   * noise on every future visit.
-   */
+  /** No before the chapter is started - see `started` above - and no once it is
+   *  finished: an offer to resume something you have read is noise on every
+   *  future visit. */
   const worthKeeping = (now) => !!now && now.started && now.d < END_FRACTION;
 
   /** How far through, for the reader. Older records predate `d`. */
@@ -130,14 +111,11 @@
     return now && now.n ? Math.min(1, record.p / now.n) : 0;
   };
 
-  /**
-   * Has the chapter changed under the saved position?
-   *
-   * Two signals, because either alone is fooled: a chapter can gain a paragraph
-   * without changing length much (a split), or be rewritten in place without
-   * changing the count. When they disagree with what was stored, the block index
-   * is not trustworthy and the fraction of the whole chapter is used instead.
-   */
+  /** Two signals, because either alone is fooled: a split gains a paragraph
+   *  without changing the length much, a rewrite in place changes the length
+   *  without changing the count. When they disagree with what was stored the
+   *  block index is not trustworthy, and the fraction of the whole chapter is
+   *  used instead. */
   function edited(saved, now) {
     if (!saved || !now) return false;
     if (saved.n && now.n && saved.n !== now.n) return true;
@@ -151,8 +129,8 @@
     if (!children.length) return null;
 
     if (edited(saved, now)) {
-      // Fall back to the same proportion of the chapter, which is vague but
-      // honest - better than landing confidently in a scene that moved.
+      // The same proportion of the chapter instead: vague but honest, better
+      // than landing confidently in a scene that moved.
       const content = RRX.chapterTop.content();
       const box = content.getBoundingClientRect();
       const fraction = doneFraction(saved, now);
@@ -177,11 +155,9 @@
   /** The last ctx seen, so a flush can honour the reader's expiry setting. */
   let lastCtx = null;
 
-  /**
-   * Started at script evaluation rather than in `onPage`, so the record is
-   * normally in hand before the reader could have scrolled - the difference
-   * between opening where you left off and lurching there a moment later.
-   */
+  /** Started at script evaluation rather than in `onPage`, so the record is
+   *  normally in hand before the reader could have scrolled - otherwise the
+   *  page lurches into place a moment late. */
   const ready = (async () => {
     if (RRX.pageFromPath(location.pathname) !== 'chapter') return;
     const id = chapterId();
@@ -213,48 +189,36 @@
     if (!id || !dirty) return;
     const patch = dirty;
     dirty = null;
-    // Fire and forget: a pagehide handler cannot await, which is exactly why
-    // the scratchpad above is written synchronously as well.
+    // Fire and forget: a pagehide handler cannot await, which is why the
+    // scratchpad above is written synchronously as well.
     //
     // `seenMaxAgeS` has to travel with every write, not just the comment one:
-    // markChapter prunes on each call, so a write that omits it prunes the whole
-    // map against the built-in default and silently overrides whatever the
-    // reader set `comments.seenDays` to.
+    // markChapter prunes on each call, so a write that omits it prunes the
+    // whole map against the built-in default and silently overrides whatever
+    // the reader set `comments.seenDays` to.
     const seenMaxAgeS = lastCtx ? (lastCtx.settings['comments.seenDays'] || 60) * 86400 : undefined;
     Promise.resolve(RRX.store.markChapter(id, patch, { seenMaxAgeS })).catch(() => {});
   }
 
-  /**
-   * Forget where the reader was in this chapter: they have read it, or never
-   * started it.
-   *
-   * Both copies of the POSITION, because they are written at different times -
-   * the scratchpad as you scroll, the record on the way out - and either left
-   * behind would resume a chapter that is finished.
-   *
-   * Only the position. The same record carries the comment watermark, which
-   * belongs to a different feature and a different question: someone who reads
-   * a chapter, reads its comments and moves on must not come back to find the
-   * whole conversation unread again.
-   */
+  /** Both copies of the position, because they are written at different times -
+   *  the scratchpad as you scroll, the record on the way out - and either left
+   *  behind would resume a finished chapter. Only the position: the same record
+   *  carries the comment watermark, and someone who read a chapter and its
+   *  comments must not come back to find the conversation unread again. */
   function forget(id) {
     dirty = null;
     RRX.store.clearPosition(id);
     Promise.resolve(RRX.store.forgetPosition(id)).catch(() => {});
   }
 
-  /**
-   * Scroll fires far faster than the page can change, and `measure` forces
-   * layout. Coalescing to one pass per frame keeps a measuring loop off the
-   * critical path of somebody simply reading, which is the single most common
-   * thing that happens on these pages.
-   */
+  /** Scroll fires far faster than the page can change and `measure` forces
+   *  layout, so passes are coalesced to one per frame. */
   let queued = false;
   function onScroll() {
     if (restoring) return;
-    // Set before the frame, not inside it: this is what stops a restore from
-    // yanking somebody who has already started reading, and a restore can land
-    // in the gap between the event and the callback.
+    // Set before the frame, not inside it: a restore can land in the gap
+    // between the event and the callback, and would yank somebody already
+    // reading.
     userScrolled = true;
     if (queued) return;
     queued = true;
@@ -287,8 +251,8 @@
     if (listening) return;
     listening = true;
     root.addEventListener('scroll', onScroll, { passive: true });
-    // Any deliberate act counts as taking over: opening the recap, or clicking
-    // into the page, must stop us re-applying a position over the top of it.
+    // Any deliberate act counts as taking over: opening the recap or clicking
+    // into the page must stop us re-applying a position over the top of it.
     for (const event of ['pointerdown', 'keydown', 'wheel', 'touchstart']) {
       root.addEventListener(event, () => {
         userScrolled = true;
@@ -325,10 +289,8 @@
     );
   }
 
-  /**
-   * The chip for `ask` mode: offers the jump instead of taking it. Lives in the
-   * rail above the chapter, so it cannot cover anything the reader is reading.
-   */
+  /** The chip for `ask` mode: offers the jump instead of taking it. In the rail
+   *  above the chapter, so it cannot cover anything being read. */
   function offer(percent) {
     const chip = ui.el('button', {
       type: 'button',
@@ -345,18 +307,14 @@
     RRX.chapterTop.place(chip, RRX.chapterTop.SLOTS.resume);
   }
 
-  /**
-   * Restore, offer, or do neither.
-   *
-   * Runs at most once per page load. `onPage` re-enters on every settings
-   * change, and a second restore would drag the reader back to where they were
-   * ten minutes ago.
-   */
+  /** At most once per page load: `onPage` re-enters on every settings change,
+   *  and a second restore would drag the reader back to where they were ten
+   *  minutes ago. */
   function restore(mode) {
     if (restored || userScrolled) return;
 
-    // A link to a specific comment is a request to go somewhere else, and it
-    // wins outright. Royal Road's own permalinks are `?comment=N#comment-N`.
+    // A link to a specific comment is a request to go somewhere else and wins
+    // outright. Royal Road's own permalinks are `?comment=N#comment-N`.
     if (location.hash || location.search.includes('comment=')) return;
     if (root.scrollY >= TOP_PX) return;
     if (!saved || saved.p === undefined) return;
@@ -377,15 +335,10 @@
     announce(target.exact);
   }
 
-  /**
-   * The chapter before this one, if the reader got here by finishing it.
-   *
-   * Clicking Royal Road's own "next chapter" is the one arrival that says the
-   * previous chapter is done. Checked against the referrer rather than assumed
-   * from the link alone: opening chapter 40 from the table of contents also has
-   * a previous chapter, and someone who stopped half way through 39 would lose
-   * their place in it for no reason.
-   */
+  /** The chapter before this one, only if the reader arrived by finishing it.
+   *  Checked against the referrer rather than assumed from the link: opening
+   *  chapter 40 from the table of contents also has a previous chapter, and
+   *  someone who stopped half way through 39 would lose their place in it. */
   function finishedBefore() {
     const link = document.querySelector(SEL.chapterPrev);
     if (!link) return null;
@@ -397,17 +350,16 @@
   /**
    * Keep the reader on the block they were restored to while the page settles.
    *
-   * Everything above the chapter arrives late and at its own pace: the ad slots
-   * resolve, images decode, and the recap is fetched, so it can appear a second
-   * or more after the restore and push the whole chapter down underneath
-   * somebody who is already reading. The saved position survives all of that -
-   * it is measured against a paragraph - but the scroll offset that expressed it
-   * does not, so it is re-applied whenever the chapter actually moves.
+   * Everything above the chapter arrives late and at its own pace: ad slots
+   * resolve, images decode, and the recap is fetched a second or more after the
+   * restore, pushing the whole chapter down under somebody already reading. The
+   * saved position survives that - it is measured against a paragraph - but the
+   * scroll offset expressing it does not, so it is re-applied whenever the
+   * chapter moves.
    *
    * Bounded three ways, because a thing that scrolls the page unasked has to be
-   * impossible to leave running: it stops at the first sign of the reader doing
-   * anything, it stops once the chapter has held still, and it stops after
-   * SETTLE_BUDGET_MS whatever happens.
+   * impossible to leave running: the reader doing anything, the chapter holding
+   * still, and SETTLE_BUDGET_MS whatever happens.
    */
   const SETTLE_BUDGET_MS = 6000;
   const SHIFT_PX = 4;
@@ -433,8 +385,7 @@
       if (now === null || Math.abs(now - was) < SHIFT_PX) return;
       was = now;
       const target = targetFor(saved, measure());
-      // No toast: the reader was already told once, and this is the same
-      // restore being kept rather than a new one.
+      // No toast: the same restore being kept, not a new one.
       if (target) scrollTo(target.top);
     };
 
@@ -459,8 +410,8 @@
     ready.then(() => {
       const before = restored;
       restore(mode);
-      // Only for a restore that actually happened, and never for `ask`: there
-      // the reader chooses the moment, by which time the page has settled.
+      // Only for a restore that happened, and never for `ask`: there the reader
+      // chooses the moment, by which time the page has settled.
       if (!before && restored && mode !== 'ask') holdPosition();
     });
   }

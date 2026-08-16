@@ -3,17 +3,12 @@
 /**
  * The end of the previous chapter, at the top of this one.
  *
- * Reading several fictions at once, the hardest thing to recover is not the plot
- * but the last few paragraphs: how the chapter you are continuing from actually
- * ended. Royal Road offers nothing for that, and the alternative is opening the
- * previous chapter in another tab and scrolling to the bottom.
+ * Reading several fictions at once, the hard thing to recover is not the plot but
+ * how the last chapter actually ended. Royal Road offers nothing for that.
  *
  * The previous chapter is fetched once and cached in `sessionStorage`, so moving
- * forward through a fiction costs one request per chapter, and going back over
- * chapters you have already seen costs none. The cache is per tab session and
- * dies with it, which is the right lifetime for something this cheap to rebuild.
- *
- * Nothing is fetched at all while the feature is off.
+ * forward costs one request per chapter and going back costs none. The cache dies
+ * with the tab session. Nothing is fetched while the feature is off.
  */
 (function (root) {
   const RRX = root.RRX;
@@ -24,18 +19,13 @@
   const BLOCK_ID = 'rrx-recap';
   const CACHE_PREFIX = 'rrx:recap:';
 
-  /**
-   * Paragraphs that are only a scene break.
-   *
-   * Chapters very often end on a line of asterisks or dashes. Counting those
-   * towards the recap spends the reader's paragraphs on punctuation, so they are
-   * skipped from the end before anything is taken.
-   */
+  /** Paragraphs that are only a scene break. Chapters very often end on a line of
+   *  asterisks or dashes, and counting those spends the reader's paragraphs on
+   *  punctuation. */
   const SEPARATOR_ONLY = /^[\s*\-_~=.·•—–]+$/;
 
-  // The id in the URL, which is the cache key. Shared with the rest of the
-  // extension rather than kept private here: several features now need it, and
-  // two regexes for one question is one regex too many.
+  // The cache key. Shared with the rest of the extension: several features now
+  // need the chapter id, so one regex answers for all of them.
   const chapterKey = (url) => RRX.chapterIdFromHref(String(url));
 
   function cacheGet(key) {
@@ -46,21 +36,13 @@
     }
   }
 
-  /**
-   * How many chapters to keep. Each is the chapter's whole text, ~12 KB, and
-   * sessionStorage is a ~5 MB budget SHARED with royalroad.com - so an evening's
-   * reading with no ceiling can crowd out the site itself.
-   */
+  /** How many chapters to keep. Each is a chapter's whole text, ~12 KB, and the
+   *  ~5 MB sessionStorage budget is shared with royalroad.com itself. */
   const CACHE_MAX = 40;
 
-  /**
-   * Keep the cache under its ceiling, oldest first.
-   *
-   * Without this the cache only ever grew, and the failure was invisible: once
-   * the quota was gone every `setItem` threw, the catch below swallowed it, and
-   * the recap refetched every chapter for the rest of the session with no way
-   * back. Dropping the oldest entries is what makes it self-healing.
-   */
+  /** Keep the cache under its ceiling, oldest first. Without this it only grew,
+   *  and the failure was invisible: once the quota was gone every `setItem` threw,
+   *  the catch below swallowed it, and every chapter refetched thereafter. */
   function evict(max = CACHE_MAX) {
     const keys = [];
     for (let i = 0; i < root.sessionStorage.length; i += 1) {
@@ -68,8 +50,7 @@
       if (key && key.startsWith(CACHE_PREFIX)) keys.push(key);
     }
     if (keys.length <= max) return;
-    // Insertion order is the browser's own, which is oldest-first for keys that
-    // are only ever added, and these are: an entry is never rewritten.
+    // Insertion order is oldest-first here because an entry is never rewritten.
     for (const key of keys.slice(0, keys.length - max)) {
       root.sessionStorage.removeItem(key);
     }
@@ -77,18 +58,17 @@
 
   function cacheSet(key, html) {
     try {
-      // Make room FOR this entry, not just down to the ceiling: trimming to the
-      // cap and then adding one leaves the cap exceeded by one, for ever.
+      // Room for this entry, not just down to the ceiling: trimming to the cap
+      // and then adding one leaves it exceeded by one, for ever.
       evict(CACHE_MAX - 1);
       root.sessionStorage.setItem(CACHE_PREFIX + key, html);
     } catch {
-      // Out of room even after evicting, or storage is blocked outright. Drop
-      // what we hold rather than limping on with a cache that can never accept
-      // another entry.
+      // Out of room even after evicting, or storage is blocked. Drop what we
+      // hold rather than keeping a cache that can never accept another entry.
       try {
         evict(0);
       } catch {
-        /* nothing more to try; the recap just costs a fetch each time */
+        /* the recap just costs a fetch each time */
       }
     }
   }
@@ -115,9 +95,8 @@
     const kept = paragraphs.slice(Math.max(0, end - wanted), end);
     if (!kept.length) return '';
 
-    // Rebuilt as text rather than adopted as markup: a recap needs the author's
-    // words, not their images, scripts or the shoutout blocks that sometimes sit
-    // at the end of a chapter.
+    // Rebuilt as text, not adopted as markup: a recap wants the author's words,
+    // not their images, scripts, or end-of-chapter shoutout blocks.
     return kept.map((p) => p.textContent.trim()).filter(Boolean).join('\n\n');
   }
 
@@ -138,8 +117,7 @@
     if (!response.ok) throw new Error(`Royal Road returned ${response.status}`);
     const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
 
-    // Cached whole rather than trimmed, so changing the paragraph count does not
-    // mean fetching the chapter again.
+    // Cached whole, so changing the paragraph count does not refetch.
     const full = tailOf(doc, 999);
     cacheSet(key, full);
     return full;
@@ -166,9 +144,8 @@
       ]);
     }
 
-    // `<details>` for click, so it is a real disclosure control: keyboard
-    // reachable, findable by the browser's own find-in-page, and it remembers
-    // nothing we have to manage.
+    // `<details>` for click: a real disclosure control, keyboard reachable and
+    // findable by the browser's own find-in-page.
     const summary = ui.el('summary', { class: 'rrx-recap__label', text: 'Previously' });
     const block = ui.el(
       'details',
@@ -180,27 +157,21 @@
   }
 
   /**
-   * Open on hover, in JavaScript, because CSS cannot do it.
+   * Open on hover in JavaScript, because CSS cannot. A closed `<details>` hides
+   * its contents through `::details-content`, which a rule on a descendant cannot
+   * reach - `display: block` on a closed one's body changes nothing, so a CSS-only
+   * hover mode silently behaves as click mode. Only the attribute opens it.
    *
-   * A closed `<details>` hides its contents through `::details-content`, which a
-   * rule on a descendant cannot reach: `display: block` on the body of a closed
-   * one changes nothing, so a CSS-only hover mode silently behaves as click mode
-   * and the setting quietly lies about what it does. Toggling the attribute is
-   * the only thing that actually opens it.
-   *
-   * Clicking still works and wins: a recap opened deliberately stays open when
-   * the pointer leaves, because having it shut itself mid-sentence is worse than
-   * having to close it by hand.
+   * A click pins it open: shutting itself mid-sentence is worse than closing it
+   * by hand.
    */
   function openOnHover(block, summary) {
-    // Whether the reader asked for it to stay, as opposed to it being open only
-    // because the pointer happens to be over it.
+    // The reader asked for it to stay, as opposed to the pointer being over it.
     let pinned = false;
 
-    // The browser's own toggle is taken over rather than worked around. By the
-    // time anyone can click, hovering has already opened the block, so letting
-    // the default action run would make a click CLOSE the thing the reader was
-    // reaching for. Clicking pins it instead, and clicking again lets it go.
+    // The browser's own toggle is taken over: by the time anyone can click,
+    // hovering has already opened the block, so the default action would close
+    // the thing the reader was reaching for.
     summary.addEventListener('click', (event) => {
       event.preventDefault();
       pinned = !pinned;
@@ -216,7 +187,7 @@
 
     block.addEventListener('mouseenter', reveal);
     block.addEventListener('mouseleave', conceal);
-    // Tabbing to it counts as reaching for it, so a keyboard gets there too.
+    // Tabbing to it counts as reaching for it.
     block.addEventListener('focusin', reveal);
     block.addEventListener('focusout', () => {
       if (!block.contains(document.activeElement)) conceal();
@@ -224,9 +195,8 @@
   }
 
   // The recap sits in the shared rail above the chapter, below the meta bar.
-  // `chapterTop` owns both the anchor rule that used to live here and the order
-  // of the blocks in it, because this one arrives after a fetch and so cannot
-  // rely on being inserted in the order it should be read in.
+  // `chapterTop` owns the order, because this block arrives after a fetch and so
+  // cannot rely on being inserted in the order it should be read in.
   const anchor = () => RRX.chapterTop && RRX.chapterTop.content();
 
   let state = { url: null, mode: null, wanted: null, busy: false };
@@ -243,8 +213,7 @@
     }
 
     const url = previousUrl();
-    // The first chapter of a fiction has nothing before it, which is not a
-    // failure and should say nothing at all.
+    // The first chapter has nothing before it: not a failure, so say nothing.
     if (!url) {
       if (existing) existing.remove();
       return;
@@ -253,8 +222,8 @@
     const where = anchor();
     if (!where) return;
 
-    // Already showing exactly this: leave it alone. This runs on every sweep,
-    // and rebuilding would collapse an opened recap under the reader.
+    // Already showing exactly this. Runs on every sweep, and rebuilding would
+    // collapse an opened recap under the reader.
     if (existing && state.url === url && state.mode === mode && state.wanted === wanted) return;
     if (state.busy) return;
 
@@ -266,8 +235,7 @@
       if (!RRX.chapterTop.place(block, RRX.chapterTop.SLOTS.recap)) return;
       state = { url, mode, wanted, busy: false };
     } catch {
-      // A recap is a convenience. If Royal Road will not serve the previous
-      // chapter, the reader still has the one they came for.
+      // A recap is a convenience; the reader still has the chapter they came for.
       if (existing) existing.remove();
     } finally {
       state.busy = false;

@@ -1,18 +1,13 @@
 'use strict';
 
 /**
- * Whether a card survives the active filters, and how to describe those filters
- * back to the reader.
+ * Whether a card survives the active filters, and how to describe them to the
+ * reader. Pure: no DOM, no storage.
  *
- * Two rules govern everything here, and both exist to keep a markup change or a
- * half-filled form from emptying the page:
- *
- *  1. An unset filter (`null`, or an empty list) never excludes anything.
- *  2. An *unknown* field on the card (`null`, because it could not be read)
- *     never excludes anything either. A filter can only reject a card on
- *     evidence, never on absence of evidence.
- *
- * Pure: no DOM, no storage, so it is exhaustively unit-testable.
+ * Two rules keep a markup change or a half-filled form from emptying the page:
+ * an unset filter (`null` or empty list) excludes nothing, and an unknown card
+ * field (`null`, because it could not be read) excludes nothing either. A
+ * filter rejects on evidence, never on the absence of it.
  */
 (function (root, factory) {
   const isNode = typeof module !== 'undefined' && module.exports;
@@ -41,18 +36,12 @@
   ];
 
   /**
-   * Pull just the filter values out of a full settings object.
-   *
-   * Memoised on the settings object's identity, because `matchesFilters` calls
-   * this first and is itself called once per card on every sweep. Without the
-   * cache, filtering fifty cards means fifty full `normalizeSettings` walks of
-   * the whole schema, plus a fresh array and Set for each list-typed filter,
-   * to produce fifty identical answers.
-   *
-   * Identity is the right key: `main.js` replaces `ctx.settings` wholesale on
-   * every change rather than mutating it, so a new object means new values and
-   * the same object means the same values. One entry is enough, since every
-   * call in a sweep passes the same object.
+   * Filter values out of a full settings object, memoised on the settings
+   * object's identity: `matchesFilters` calls this once per card, so uncached,
+   * fifty cards means fifty `normalizeSettings` walks of the whole schema for
+   * fifty identical answers. Identity is a safe key because `main.js` replaces
+   * `ctx.settings` wholesale rather than mutating it; one entry is enough,
+   * since a sweep passes the same object every time.
    */
   let filterCache = { settings: null, values: null };
 
@@ -98,13 +87,12 @@
     }
 
     const tags = Array.isArray(card.tags) ? card.tags : [];
-    // tagsAll is a conjunction: every named tag must be present.
+    // Conjunction: every named tag must be present.
     if (f['filters.tagsAll'].length && !f['filters.tagsAll'].every((t) => tags.includes(t))) {
       return false;
     }
-    // ...and tagsNone is a veto on any of them. Only applied when the card
-    // actually listed tags, so a card whose chips failed to parse is not
-    // silently treated as tag-free and kept.
+    // Veto. Only when the card listed tags, so one whose chips failed to parse
+    // is not treated as tag-free and kept.
     if (f['filters.tagsNone'].length && tags.length) {
       if (f['filters.tagsNone'].some((t) => tags.includes(t))) return false;
     }
@@ -127,8 +115,7 @@
       }
     }
 
-    // Hide things already on my shelves. `mine` is absent when logged out, in
-    // which case there is nothing to hide.
+    // `mine` is absent when logged out; nothing to hide then.
     const mine = card.mine || {};
     if (f['filters.hideMine'].some((kind) => mine[kind])) return false;
 

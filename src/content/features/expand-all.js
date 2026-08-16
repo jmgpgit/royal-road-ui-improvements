@@ -3,10 +3,9 @@
 /**
  * Keep every fiction description expanded.
  *
- * There is no behaviour here on purpose. Royal Road's "show more" is driven
- * entirely by CSS (see inject.css), so this feature is the `.rrx-expand-all`
- * class on <html> plus a toolbar toggle. The module exists so features stay
- * one per file: adding another is a new file rather than an edit to main.js.
+ * No behaviour here: Royal Road's "show more" is pure CSS (inject.css), so the
+ * feature is the `.rrx-expand-all` class on <html> plus a toolbar toggle. Its
+ * own file so features stay one per file.
  */
 (function (root) {
   const RRX = root.RRX;
@@ -20,8 +19,8 @@
     label: 'Expand all',
     title: 'Keep every fiction description expanded on list pages',
     iconName: 'expandAll',
-    // Pointless on latest-updates, whose cards carry recent chapters instead of
-    // a blurb and so have no show-more widget at all.
+    // Latest-updates cards carry recent chapters instead of a blurb, so they
+    // have no show-more widget.
     isRelevant: (ctx) => ctx.hasDescriptions,
   });
 })(globalThis);

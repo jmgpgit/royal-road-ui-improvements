@@ -4,6 +4,22 @@ Notable changes, newest first. Versions follow [semantic versioning](https://sem
 the patch number for fixes, the minor for new settings, the major for anything that changes
 what an existing setting does.
 
+## 1.4.2
+
+Shorter prose, nothing else. No behaviour changed and no setting moved.
+
+- Comments across `src/` cut from 2,497 lines to 1,701, about a third. What went was padding:
+  scaffolding sentences, the same point made twice, and blocks longer than the function they
+  sat above. What stayed was every reason a thing is done a particular way, every past bug worth
+  not repeating, and everything learned by reading Royal Road's real markup — those cost hours
+  to work out again.
+- `README.md`, `CONTRIBUTING.md`, `TODO.md` and `PRIVACY.md` given the same treatment, more
+  gently: about 350 words, with every measured figure, file path, link and enumerated claim
+  intact. `PRIVACY.md` deliberately barely moved. It doubles as the policy both stores link to,
+  where the enumeration is the claim.
+- One error fixed on the way through: a reference to `src/common/model.js` in `PRIVACY.md` had
+  been dangling under the tag-cache bullet instead of the reading-progress one it documents.
+
 ## 1.4.1
 
 **Fixes**

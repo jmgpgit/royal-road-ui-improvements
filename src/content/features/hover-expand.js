@@ -3,14 +3,11 @@
 /**
  * Expand a fiction's description while the cursor rests on its card.
  *
- * Also pure CSS (see inject.css): `.rrx-hover-expand` on <html> plus a
- * `:hover` rule. The settle delay is a `transition-delay` rather than a JS
- * timer, which means sweeping the cursor down a list never opens anything, and
- * there is no timer to leak when Royal Road swaps the list out from under us.
- *
- * The chevron stays clickable while hovering, so "hover to peek, click to pin"
- * works: a click ticks Royal Road's own checkbox and the description stays open
- * after the cursor leaves.
+ * Pure CSS (see inject.css): `.rrx-hover-expand` on <html> plus a `:hover` rule.
+ * The settle delay is a `transition-delay`, not a JS timer, so sweeping down a
+ * list opens nothing and no timer leaks when Royal Road swaps the list out. The
+ * chevron stays clickable: a click ticks Royal Road's own checkbox, so hover
+ * peeks and click pins the description open.
  */
 (function (root) {
   const RRX = root.RRX;

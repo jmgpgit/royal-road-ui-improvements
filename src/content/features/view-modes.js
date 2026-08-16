@@ -1,13 +1,10 @@
 'use strict';
 
 /**
- * The list layout switcher.
- *
- * The layouts themselves are entirely in inject-views.css, gated behind an
- * `rrx-view-*` class that boot.js derives from `list.view`. All this file adds
- * is the toolbar control that cycles through them, which is why it is a
- * descriptor rather than a module with behaviour. The order it cycles in is
- * `RRX.VIEWS`, so adding a layout means adding it there and writing its CSS.
+ * The list layout switcher. The layouts are in inject-views.css, gated behind
+ * an `rrx-view-*` class boot.js derives from `list.view`; this file only adds
+ * the toolbar control that cycles them - hence a descriptor, not a module.
+ * Cycle order is `RRX.VIEWS`, so a new layout means an entry there plus CSS.
  */
 (function (root) {
   const RRX = root.RRX;
@@ -28,8 +25,8 @@
     label: 'View',
     iconName: 'view',
     title: 'Switch how this list is laid out',
-    // A cycle rather than a dropdown: five options, and the label always says
-    // which one you are on, so a menu would be more clicks for no more clarity.
+    // A cycle rather than a dropdown: the badge always says which layout you
+    // are on, so a menu would be more clicks for no more clarity.
     isPressed: (ctx) => ctx.settings['list.view'] !== 'default',
     badge: (ctx) => LABELS[ctx.settings['list.view']],
     onClick: (ctx) => {

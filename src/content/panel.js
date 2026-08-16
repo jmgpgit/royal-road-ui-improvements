@@ -1,14 +1,12 @@
 'use strict';
 
 /**
- * The filter panel that drops out of the toolbar.
+ * The filter panel that drops out of the toolbar. Grouped, not one flat run:
+ * fourteen filters in a flat list is a wall.
  *
- * Laid out in labelled groups rather than one flat run of fields: with
- * fourteen filters, a flat list is a wall.
- *
- * Committing is explicit (Apply), not on every keystroke: otherwise each digit
- * typed into a number box would re-filter the page and write to storage.
- * Chips commit to the draft immediately, since there is nothing to finish typing.
+ * Apply commits; otherwise every digit typed into a number box would re-filter
+ * the page and write to storage. Chips commit to the draft at once - there is
+ * nothing to finish typing.
  */
 (function (root) {
   const RRX = root.RRX;
@@ -29,21 +27,15 @@
   /** Draft values, held until Apply. Keyed the same as settings. */
   let draft = {};
 
-  /**
-   * Bumped on every open. Async work started by one open (loading the tag
-   * vocabulary) must not act after a later open has replaced it: the toolbar
-   * gets rebuilt underneath us, and a stale callback would re-parent the panel
-   * into the detached toolbar it captured, making it silently disappear.
-   */
+  /** Bumped on every open. The toolbar gets rebuilt underneath us, so a stale
+   *  tag-load callback would re-parent the panel into the detached toolbar it
+   *  captured and the panel would silently disappear. */
   let openToken = 0;
 
   // --- fields ----------------------------------------------------------------
 
-  /**
-   * A bounded number box. min/max come from the schema, so the control cannot
-   * offer a value the filter would reject: rating stops at 0 to 5 rather than
-   * spinning off in both directions.
-   */
+  /** A bounded number box. min/max come from the schema, so the control cannot
+   *  offer a value the filter would reject - rating stops at 0 to 5. */
   function numberInput(key, step, placeholder) {
     const spec = SCHEMA[key] || {};
     const input = el('input', {
@@ -97,15 +89,12 @@
   }
 
   /**
-   * Tag picker: a combobox that turns each pick into a chip.
+   * Tag picker: a combobox that turns each pick into a chip. Not a native
+   * `<datalist>` - its dropdown will not reopen after a pick without retyping,
+   * so this one keeps its own list open between picks.
    *
-   * Not a native `<datalist>`, which is the obvious choice and the wrong one:
-   * its dropdown will not reopen after a pick without retyping, so adding five
-   * tags fights you four times. This keeps its own filtered list open between
-   * picks, so tags accumulate as fast as you can click.
-   *
-   * You pick by label ("Romance Subplot") while the filter stores the slug
-   * (`romance`): those differ often enough that typing slugs was a real trap.
+   * You pick by label ("Romance Subplot"); the filter stores the slug
+   * (`romance`). Those differ often enough that typing slugs was a real trap.
    */
   function tagRow(label, key) {
     const chips = el('div', { class: 'rrx-chips' });
@@ -186,8 +175,7 @@
       e.preventDefault();
       e.stopPropagation(); // Enter here means "add this tag", not "apply"
       const [best] = RRX.tags.search(input.value, 1);
-      // Fall back to the typed text as a slug, so someone who knows the slug is
-      // not forced through the picker.
+      // Typed text falls back to a slug, so anyone who knows one can skip the picker.
       add(best ? best.slug : input.value.trim().toLowerCase().replace(/\s+/g, '_'));
       input.value = '';
       openMenu();
@@ -259,8 +247,7 @@
   function open(anchor, ctx, options = {}) {
     close();
     const token = (openToken += 1);
-    // A toolbar rebuild re-opens the panel; keeping the draft means clicking
-    // another toolbar button does not discard half-entered filter values.
+    // A toolbar rebuild re-opens the panel; keeping the draft saves half-entered values.
     if (!options.keepDraft) resetDraft(ctx);
 
     const apply = async () => {
@@ -321,8 +308,7 @@
       [body, footer]
     );
 
-    // Enter applies, Escape cancels: a filter form should behave like a form.
-    // (The tag inputs stop Enter first, since there it means "add this tag".)
+    // Enter applies, Escape cancels. The tag inputs stop Enter before it gets here.
     panel.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
@@ -337,12 +323,11 @@
     const first = panel.querySelector('input');
     if (first) first.focus();
 
-    // Warm the tag vocabulary; if it arrives after the panel opened, re-render
-    // so the pickers gain their dropdown rather than staying free-text.
+    // If the vocabulary lands after opening, re-render so the pickers gain their
+    // dropdown rather than staying free-text.
     if (!RRX.tags.all().length) {
       RRX.tags.load().then((tags) => {
-        // Only the newest open may act, and only onto the toolbar that is
-        // actually in the document now: `anchor` may have been replaced.
+        // Newest open only, and onto the live toolbar: `anchor` may be stale.
         if (token !== openToken || !tags.length || !isOpen()) return;
         const live = document.getElementById(PANEL_ID).parentElement;
         open(live, ctx, { keepDraft: true });

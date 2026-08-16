@@ -3,14 +3,10 @@
 /**
  * Reads a fiction card into the plain record the filters run against.
  *
- * Deliberately tolerant: anything it cannot find becomes `null` (or an empty
- * list), and `filters.js` treats a `null` field as "unknown, so do not exclude".
- * The failure mode when Royal Road changes its markup is therefore "that filter
- * quietly stops narrowing" rather than "the page goes blank", which matters,
- * because this runs against someone else's HTML that changes without notice.
- *
- * Pure apart from reading DOM properties, so it is testable under jsdom against
- * the real captures in test/fixtures/.
+ * Missing fields become `null` (or `[]`), which `filters.js` reads as "unknown,
+ * so do not exclude": a markup change on Royal Road's side quietly stops one
+ * filter narrowing rather than blanking the page. Pure DOM reads, so it is
+ * testable under jsdom against the captures in test/fixtures/.
  */
 (function (root, factory) {
   const isNode = typeof module !== 'undefined' && module.exports;
@@ -54,11 +50,8 @@
     return out;
   }
 
-  /**
-   * Status and type share the chip row and the same classes, so they are told
-   * apart by their text against the known vocabularies. An unrecognised chip is
-   * ignored rather than guessed at.
-   */
+  /** Status and type share the chip row and the same classes, so they are told
+   *  apart by text against the known vocabularies. Unrecognised chips are ignored. */
   function readChips(card) {
     let status = null;
     let type = null;
@@ -89,14 +82,9 @@
     return Number.isFinite(n) && n > 0 ? n : null;
   }
 
-  /**
-   * Follow / Favourite / Read Later.
-   *
-   * Three mechanisms, not one. Read Later is a real form whose `mark` input says
-   * what a click *would* do, so `mark="False"` means it is already marked.
-   * Follow and Favourite are passive tooltip-wrapped icons that Royal Road omits
-   * entirely when unset, so absence is the normal case, not a parse failure.
-   */
+  /** Read Later is a real form whose `mark` input says what a click *would* do, so
+   *  `mark="False"` means already marked. Follow and Favourite are tooltip-wrapped
+   *  icons Royal Road omits entirely when unset, so absence is normal. */
   function readMine(card) {
     const mine = { follow: false, favorite: false, ril: false };
 

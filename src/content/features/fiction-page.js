@@ -3,19 +3,16 @@
 /**
  * Fiction page: force accordions open or shut.
  *
- * Three-state per accordion, because a boolean was the wrong shape. Royal Road
- * already opens About, Chapters, Reviews and Recommendations and leaves
- * Statistics closed, so "open by default" did nothing on four of the five.
+ * Three-state per accordion, not a boolean: Royal Road already opens About,
+ * Chapters, Reviews and Recommendations and leaves Statistics closed, so "open
+ * by default" did nothing on four of the five.
  *
- * Both directions go through Royal Road's own trigger rather than forcing the
- * panel with CSS: force it open in CSS and the first click to close does
- * nothing, because the site still thinks it is shut.
- *
- * The hard part is timing. Royal Road binds its accordion handlers in a deferred
- * module script and then applies its own remembered state, so a click dispatched
- * before that lands is swallowed, and one dispatched during it is overwritten.
- * A fixed number of quick retries loses that race. Instead this watches for a
- * short window and re-asserts whenever the state settles wrong, then stops.
+ * Both directions go through Royal Road's own trigger. Force a panel open in CSS
+ * and the first click to close does nothing, because the site still thinks it is
+ * shut. Its handlers bind in a deferred module script that then applies its
+ * remembered state, so a click before that lands is swallowed and one during it
+ * is overwritten. Fixed retries lose that race; this watches for a short window
+ * and re-asserts whenever the state settles wrong.
  */
 (function (root) {
   const RRX = root.RRX;
@@ -24,13 +21,10 @@
   const { SEL, FICTION_ACCORDIONS } = RRX;
 
   /**
-   * How long to keep insisting before accepting Royal Road's answer.
-   *
-   * The whole window is used, with deliberately no early exit once the state
-   * looks right. Royal Road server-renders some panels in the state you asked
-   * for and then changes its mind when its deferred script initialises, so a
-   * watcher that stops at the first correct reading stops just before the only
-   * moment that mattered.
+   * How long to keep insisting. The whole window is used with no early exit:
+   * Royal Road server-renders some panels in the state you asked for and then
+   * changes its mind when its deferred script initialises, so stopping at the
+   * first correct reading stops just before the moment that mattered.
    */
   const ENFORCE_MS = 8000;
   const POLL_MS = 250;
@@ -40,13 +34,10 @@
   /** Accordions the reader has touched themselves; we stop fighting those. */
   const userTouched = new Set();
   /**
-   * The state each accordion's running loop is currently insisting on.
-   *
-   * `onPage` runs again on every settings change, so without this a second loop
-   * starts on top of the first. Two loops with different answers click the same
-   * trigger every 250ms for the rest of the window, flapping the panel open and
-   * shut. Recording the wanted state rather than a bare "busy" flag is what
-   * lets a changed setting take over a running loop instead of racing it.
+   * The state each accordion's loop is insisting on. `onPage` runs again on every
+   * settings change; without this a second loop starts on top of the first and the
+   * two flap the panel open and shut every 250ms. Storing the wanted state rather
+   * than a bare "busy" flag lets a changed setting take over a running loop.
    */
   const watching = new Map();
 
@@ -61,11 +52,9 @@
     const accordion = document.getElementById(id);
     // Absent is normal: "Leave A Review" only renders when logged in.
     if (!accordion || userTouched.has(id)) return;
-    // Already insisting on exactly this: nothing to do.
     if (watching.get(id) === want) return;
-    // A loop may be running for the *other* state. Recording the new answer
-    // first makes that one stand down on its next tick, so only one is ever
-    // clicking.
+    // A loop may be running for the other state; recording the new answer first
+    // makes it stand down on its next tick, so only one is ever clicking.
     watching.set(id, want);
 
     const trigger = triggerOf(accordion);
@@ -97,7 +86,6 @@
         t.click();
       }
 
-      // Keep watching for the whole window regardless of how it looks now.
       if (Date.now() < deadline) setTimeout(tick, POLL_MS);
     };
 
@@ -105,15 +93,13 @@
   }
 
   /**
-   * "About Fiction" holds a show-more block rather than a plain panel, so open
-   * and closed mean the description expanded or clamped to its first few lines.
-   * Collapsing the section itself just leaves an empty box.
+   * "About Fiction" holds a show-more block, not a plain panel: open and closed
+   * mean the description expanded or clamped to its first few lines. Collapsing
+   * the section itself just leaves an empty box.
    *
-   * Insisted on for the same window as the accordions, and for the same reason:
-   * Royal Road initialises this control in a deferred script and applies its own
-   * remembered state. Setting the checkbox once at document_end wins the race
-   * only when that script happens to run first, so "always open" appeared to
-   * work sometimes and not others.
+   * Insisted on for the same window as the accordions - the show-more is also set
+   * up in a deferred script that applies its own remembered state, so checking the
+   * box once at document_end only won when that script happened to run first.
    *
    * @param {'open'|'closed'} want
    */
@@ -134,7 +120,7 @@
     const tick = () => {
       const checkbox = checkboxOf();
       // Absent is normal early on: the section renders before its show-more is
-      // initialised, so keep looking rather than giving up.
+      // initialised.
       if (checkbox && !userTouched.has(ID)) {
         // A later call asked for the opposite; that loop owns this now.
         if (watching.get(ID) !== want) return;
@@ -149,8 +135,8 @@
 
         if (checkbox.checked !== shouldCheck) {
           checkbox.checked = shouldCheck;
-          // Royal Road's styling is driven by :has(input:checked), so nothing
-          // else needs telling, but fire the event in case anything listens.
+          // Royal Road's styling comes from :has(input:checked), so nothing else
+          // needs telling; the event is only for anything that happens to listen.
           checkbox.dispatchEvent(new Event('change', { bubbles: true }));
         }
       }
@@ -168,17 +154,12 @@
     if (section) section.classList.toggle('rrx-note-hidden', want === 'hide');
   }
 
-  /**
-   * The ordering the reader asked for, or '' while Royal Road's own is in use.
-   * The pager reads it: see the `params` hook below.
-   */
+  /** The ordering the reader asked for, '' while Royal Road's own is in use.
+   *  Read by the pager's `params` hook below. */
   let sortInUse = '';
 
-  /**
-   * Royal Road always opens reviews sorted by "Top". This picks its own item out
-   * of the site's sort dropdown, so the re-sort goes through Royal Road's own
-   * handler rather than being faked underneath it.
-   */
+  /** Royal Road always opens reviews sorted by "Top". Picking its own dropdown
+   *  item routes the re-sort through Royal Road's handler, not around it. */
   function setReviewSort(want) {
     if (want === 'leave') return;
     sortInUse = want;
@@ -199,13 +180,11 @@
   }
 
   /**
-   * Reviews paginate exactly like comments, so they share the pager.
-   *
-   * The ordering has to be passed explicitly. Royal Road leaves its own
-   * `data-rr-paginate-fetch-url` on whatever the page was rendered with, so
-   * after a re-sort the pager would ask for page 2 of the *old* order. On a
-   * fiction with few reviews that page is entirely rows already on screen: they
-   * deduplicate away, the pager sees nothing added, and stops for good.
+   * Reviews paginate exactly like comments, so they share the pager. The ordering
+   * must be passed explicitly: Royal Road leaves its `data-rr-paginate-fetch-url`
+   * on whatever the page was rendered with, so after a re-sort the pager asks for
+   * page 2 of the old order - on a fiction with few reviews, entirely rows already
+   * on screen. They deduplicate away, the pager sees nothing added, and stops.
    */
   const reviewPager = RRX.pager.create({
     rootSelector: SEL.reviewsPaginate,
@@ -227,8 +206,7 @@
 
       setRecommendations(ctx.settings['fiction.recommendations']);
 
-      // Sort first: re-sorting after loading extra pages would leave the list
-      // half in one order and half in another.
+      // Sort first, or extra pages load in the old order and the list ends up mixed.
       setReviewSort(ctx.settings['fiction.reviewSort']);
       if (ctx.settings['fiction.reviewsAutoLoad']) reviewPager.watch();
     },

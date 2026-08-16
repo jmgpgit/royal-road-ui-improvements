@@ -3,13 +3,10 @@
 /**
  * Permanently hide a fiction from every list.
  *
- * The hiding itself is done by the generated stylesheet (common/css.js), not by
- * this module: that is what makes hidden cards never paint, and what covers
- * content Royal Road renders after us (AJAX pagination, the React-rendered
- * recommendations carousel).
- *
- * What lives here is the DOM work CSS cannot do: reading a fiction's id and
- * metadata off its card, and hanging the little minus / plus control on it.
+ * The generated stylesheet (common/css.js) does the hiding, so hidden cards never
+ * paint and content Royal Road renders after us is covered too (AJAX pagination,
+ * the React-rendered recommendations carousel). Here: reading a fiction's id and
+ * metadata off its card, and hanging the minus / plus control on it.
  */
 (function (root) {
   const RRX = root.RRX;
@@ -19,12 +16,8 @@
 
   const CARD_QUERY = CARD_VARIANTS.join(',');
 
-  /**
-   * The link selector for whichever group a card belongs to. Reading the id
-   * through the *same* selector the stylesheet matches on is what keeps the
-   * button and the hiding in agreement - see selectors.js on why this is not
-   * simply `a[href*="/fiction/"]`.
-   */
+  /** The same link selector the stylesheet matches on, so the button and the
+   *  hiding never disagree - selectors.js says why this is not `a[href*="/fiction/"]`. */
   function linkQueryFor(card) {
     const group =
       CARD_GROUPS.find((g) => g.cards.some((sel) => card.matches(sel))) ||
@@ -73,9 +66,8 @@
     }
 
     return {
-      // Server-rendered cards put the title in a heading. The React-rendered
-      // recommendation slides do not, but every card variant has a cover whose
-      // alt text is the fiction title.
+      // Server-rendered cards put the title in a heading; React recommendation
+      // slides do not, but every variant has a cover whose alt is the title.
       title:
         (titleEl && titleEl.textContent.trim()) ||
         (cover && cover.getAttribute('alt')) ||
@@ -91,10 +83,8 @@
     }
   }
 
-  /**
-   * Give one already-tagged card the control that matches the current state.
-   * Rebuilt only when the mode actually changes, so re-syncing is cheap.
-   */
+  /** Give one already-tagged card the control that matches the current state.
+   *  Rebuilt only when the mode changes, so re-syncing is cheap. */
   function applyControls(card, id, ctx) {
     if (!ctx.settings['hide.enabled']) {
       removeControls(card);
@@ -108,7 +98,6 @@
 
     const existing = card.querySelector(':scope > .rrx-card-btn');
     if (existing && existing.dataset.rrxMode === mode) {
-      // Already correct; just keep the badge in step.
       syncBadge(card, isHidden);
       return;
     }
@@ -142,7 +131,7 @@
 
   /**
    * Tag every fiction card under `scope` and attach its control. Safe to call
-   * repeatedly - cards already carrying data-rrx-fid skip the id lookup.
+   * repeatedly - cards with data-rrx-fid skip the id lookup.
    *
    * @param {ParentNode} scope
    * @param {object} ctx shared app context from main.js
@@ -154,11 +143,10 @@
       if (!id) {
         if (card.dataset.rrxSkip) continue;
         const found = readFictionId(card);
-        // undefined means "no links yet" - leave the card unmarked so a later
-        // sweep can pick it up once React has filled it in.
+        // No links yet - leave it unmarked so a later sweep catches it once React fills it in.
         if (found === undefined) continue;
         if (found === null) {
-          // Definitively not ours. Remember the miss so we stop re-scanning it.
+          // Not ours. Remember the miss so we stop re-scanning it.
           card.dataset.rrxSkip = '1';
           continue;
         }

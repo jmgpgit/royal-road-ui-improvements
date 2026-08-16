@@ -3,17 +3,13 @@
 /**
  * The settings schema, and the one generic normalizer that walks it.
  *
- * With roughly forty settings, the shape is declared once and everything else
- * reads from here: validation, defaults, the options page bindings and storage
- * round-tripping. Adding a setting means adding a line to SCHEMA and a control
- * bound with `data-setting="<key>"`, and no normalizer changes.
+ * Declared once; validation, defaults, the options page bindings and storage
+ * round-tripping all read from here. A new setting is a line in SCHEMA plus a
+ * control with `data-setting="<key>"`, and no normalizer changes.
  *
- * Keys are flat, dotted strings (`'reader.lineHeight'`), not nested objects.
- * Flat keeps storage, `data-setting` binding and diffing trivial; the dots are
- * purely for grouping and for how the options page is laid out.
- *
- * `null` on a nullable numeric means "no constraint" - a filter set to null never
- * excludes anything. That is deliberately distinct from 0.
+ * Keys are flat dotted strings (`'reader.lineHeight'`) - flat keeps storage,
+ * binding and diffing trivial; the dots only group. `null` on a nullable
+ * numeric means "no constraint", deliberately distinct from 0.
  */
 (function (root, factory) {
   const api = factory();
@@ -27,12 +23,10 @@
   const VIEWS = ['default', 'compact', 'grid', 'two-col'];
 
   /**
-   * Accordion control is three-state, not a boolean.
-   *
-   * Royal Road already opens About, Chapters, Reviews and Recommendations by
-   * default and leaves Statistics shut, so "open by default" was a no-op on
-   * four of the five. What is actually useful is being able to force either way,
-   * or leave Royal Road's own choice alone.
+   * Three-state, not a boolean: Royal Road already opens About, Chapters,
+   * Reviews and Recommendations by default and leaves Statistics shut, so "open
+   * by default" was a no-op on four of the five. Force either way, or leave
+   * Royal Road's own choice alone.
    */
   const ACCORDION_STATES = ['leave', 'open', 'closed'];
 
@@ -42,15 +36,11 @@
   const SCHEMA = {
     // ── which of Royal Road's two layouts to use ──────────────────────────
     /**
-     * Which of Royal Road's two layouts to insist on.
-     *
-     * Three states rather than a switch, for the same reason the fiction-page
-     * sections have three: "leave alone" has to be the default, because
-     * installing an extension should not change which version of a site
-     * somebody sees, and a plain on/off would make "off" mean both "I have not
-     * chosen" and "put me back on the old one". Those need to be different.
-     * Royal Road remembers the choice in a cookie, so "off" cannot undo it by
-     * doing nothing - only actively clearing it puts somebody back.
+     * Three states rather than a switch: "leave alone" has to be the default,
+     * because installing an extension should not change which version of a site
+     * somebody sees, and on/off would make "off" mean both "I have not chosen"
+     * and "put me back on the old one". Royal Road remembers the choice in a
+     * cookie, so going back needs it actively cleared, not just left alone.
      */
     'design.mode': { type: 'enum', default: 'leave', values: ['leave', 'new', 'old'] },
 
@@ -59,11 +49,9 @@
     'list.hoverExpand': { type: 'bool', default: false },
     'list.hoverDelayMs': { type: 'int', default: 150, min: 0, max: 2000 },
     'list.showToolbar': { type: 'bool', default: true },
-    /**
-     * Strip "[LitRPG]" / "(Book One Complete)" suffixes from titles in lists.
-     * Lists only - on a fiction's own page the full title is the heading of the
-     * thing you deliberately opened.
-     */
+    /** Strip "[LitRPG]" / "(Book One Complete)" suffixes from titles. Lists only
+     *  - on a fiction's own page the full title is the heading of the thing you
+     *  deliberately opened. */
     'list.cleanTitles': { type: 'bool', default: false },
     /** Widen the fiction lists past Royal Road's own container. */
     'list.maxWidthPx': { type: 'int', default: null, nullable: true, min: 700, max: 4000 },
@@ -95,12 +83,9 @@
     'filters.staleForDays': bound(0, 3650),
     'filters.hideMine': { type: 'list', default: [], values: MINE },
 
-    /**
-     * Keep filling the list as you scroll rather than paging through it. Its
-     * limits (pages scanned, the gap between requests) are constants in
-     * list-loadmore.js rather than settings: they exist to be polite to Royal
-     * Road's servers, which is not a preference.
-     */
+    /** Its limits (pages scanned, the gap between requests) are constants in
+     *  list-loadmore.js rather than settings: they exist to be polite to Royal
+     *  Road's servers, which is not a preference. */
     'list.infiniteScroll': { type: 'bool', default: true },
 
     // ── chapter reader ────────────────────────────────────────────────────
@@ -116,73 +101,50 @@
 
     /**
      * How the previous chapter's ending is shown at the top of a chapter.
-     *
      * `always` prints it, `click` and `hover` keep it behind a summary you open,
-     * and `off` fetches nothing at all. Reading several fictions at once makes
-     * "what happened last time" the most common thing a reader has to leave the
-     * page to answer, and Royal Road offers nothing for it.
+     * `off` fetches nothing at all. Reading several fictions at once makes "what
+     * happened last time" the thing readers most often leave the page to answer,
+     * and Royal Road offers nothing for it.
      */
     'recap.mode': { type: 'enum', default: 'off', values: ['off', 'always', 'click', 'hover'] },
-    /**
-     * How much of the ending to show, in paragraphs. Trailing scene-break
-     * markers do not count towards it: chapters routinely end on a line of
-     * asterisks, and a recap of punctuation helps nobody.
-     */
+    /** How much of the ending to show, in paragraphs. Trailing scene-break
+     *  markers do not count: chapters routinely end on a line of asterisks. */
     'recap.paragraphs': { type: 'int', default: 4, min: 1, max: 15 },
 
     // ── chapter facts ─────────────────────────────────────────────────────
-    /**
-     * Repeat the chapter's own timestamps above the text. Royal Road prints
-     * them below it, past the author notes and the About-author panel, which
-     * is the one place they cannot answer "how old is this?" before you start.
-     * Whatever stamps it renders are mirrored, so an edited-at appearing later
-     * needs no change here.
-     */
+    /** Repeat the chapter's own timestamps above the text. Royal Road prints
+     *  them below it, past the author notes and the About-author panel, where
+     *  they cannot answer "how old is this?" before you start. Whatever stamps
+     *  it renders are mirrored, so a new edited-at needs no change here. */
     'chapter.topTimestamp': { type: 'bool', default: false },
-    /**
-     * How long the chapter is, above it.
-     *
-     * One setting rather than two switches: the count and the estimate are the
-     * same measurement shown two ways, and a "reading time" toggle that does
-     * nothing until a separate "word count" toggle is also on reads as broken.
-     */
+    /** How long the chapter is, above it. One setting rather than two switches:
+     *  the count and the estimate are the same measurement shown two ways, and a
+     *  "reading time" toggle that does nothing until "word count" is also on
+     *  reads as broken. */
     'chapter.wordCount': { type: 'enum', default: 'off', values: ['off', 'words', 'time', 'both'] },
-    /**
-     * Reading speed for that estimate. 250 is the conventional figure for
-     * English prose, so the number will not read as wrong before anyone has
-     * tuned it.
-     */
+    /** Reading speed for that estimate. 250 is the conventional figure for
+     *  English prose, so it will not read as wrong before anyone tunes it. */
     'chapter.wpm': { type: 'int', default: 250, min: 100, max: 1000 },
-    /**
-     * Where this chapter sits in its fiction, and how many are left after it,
-     * on the same line as the facts above the chapter.
-     *
-     * Royal Road knows: its "Select a chapter" dropdown numbers them. But the
-     * page ships that dropdown empty and fills it from `/fictions/chapterlist`
-     * only when you focus it, so the count costs that same request - about 3 KB
-     * for a hundred chapters, once per fiction per tab. Nothing is fetched
-     * while this is off.
-     */
+    /** Where this chapter sits in its fiction, and how many are left after it.
+     *  Royal Road's "Select a chapter" dropdown numbers them, but the page ships
+     *  it empty and fills it from `/fictions/chapterlist` only on focus, so the
+     *  count costs that same request - about 3 KB for a hundred chapters, once
+     *  per fiction per tab. Nothing is fetched while this is off. */
     'chapter.catchUp': { type: 'bool', default: false },
-    /**
-     * Come back to where you stopped reading a chapter.
-     *
-     * Three states rather than a switch: landing somewhere you did not ask to
-     * be is startling the first time it happens, so `ask` offers the jump and
-     * `jump` takes it. Nothing is recorded while this is `off`.
-     */
+    /** Come back to where you stopped reading. Three states rather than a
+     *  switch: landing somewhere you did not ask to be is startling the first
+     *  time, so `ask` offers the jump and `jump` takes it. Nothing is recorded
+     *  while this is `off`. */
     'chapter.resume': { type: 'enum', default: 'off', values: ['off', 'ask', 'jump'] },
 
     // ── author notes, panels ────────────────────────────────────
-    // Defaults to off: collapsing part of an author's note is a judgement call,
+    // Off by default: collapsing part of an author's note is a judgement call,
     // and one the reader should opt into rather than discover.
     'notes.mode': { type: 'enum', default: 'off', values: ['off', 'shoutouts', 'all'] },
     'notes.hideAuthorPanel': { type: 'bool', default: false },
-    /**
-     * Royal Road author ids whose notes are always collapsed, whatever
-     * `notes.mode` says. There is no control for this on the options page: it
-     * is set by exporting your settings, adding ids, and importing them back.
-     */
+    /** Royal Road author ids whose notes are always collapsed, whatever
+     *  `notes.mode` says. No control on the options page: export your settings,
+     *  add ids, import them back. */
     'notes.blockedAuthors': { type: 'list', default: [] },
 
     // ── comments ──────────────────────────────────────────────────────────
@@ -191,77 +153,49 @@
     'comments.separators': { type: 'bool', default: true },
     /** Empty means "use the theme's accent". Any CSS colour. */
     'comments.threadColor': { type: 'color', default: '', maxLength: 40 },
-    /**
-     * How strongly the divider between threads is drawn, as a percentage of
-     * the theme's text colour.
-     *
-     * Adjustable because no single value works everywhere: Royal Road ships a
-     * dozen themes, and on some of them the text colour sits close to the
-     * background, so a rule that is a clear hairline on one is invisible on
-     * another. The default is deliberately faint: it should read as a division
-     * between conversations, not as a rule drawn across the page.
-     */
+    /** How strongly the divider between threads is drawn, as a percentage of the
+     *  theme's text colour. Adjustable because Royal Road ships a dozen themes
+     *  and on some the text sits close to the background, so a clear hairline on
+     *  one is invisible on another. Deliberately faint by default: a division
+     *  between conversations, not a rule drawn across the page. */
     'comments.dividerOpacity': { type: 'int', default: 16, min: 1, max: 100 },
     /** A [−] on every thread that has replies. */
     'comments.collapsible': { type: 'bool', default: true },
-    /** Keep loading comment pages as you scroll, instead of one click per page. */
-    /**
-     * Comments that have arrived since your last visit.
-     *
-     * `mark` points them out; `fold` also collapses the ones you have already
-     * seen. Nothing is ever hidden: a comment you have read is not one you
-     * wanted removed, and the new reply may be underneath it. The list Royal
-     * Road serves is ranked rather than chronological, so there is no "new
-     * from here" line - each comment is judged on its own timestamp.
-     */
+    /** `mark` points out comments new since your last visit; `fold` also
+     *  collapses the ones you have seen. Nothing is ever hidden - the new reply
+     *  may be underneath a comment you already read. Royal Road serves the list
+     *  ranked rather than chronologically, so there is no "new from here" line;
+     *  each comment is judged on its own timestamp. */
     'comments.seen': { type: 'enum', default: 'off', values: ['off', 'mark', 'fold'] },
-    /**
-     * How long a chapter's last-visit mark is worth keeping, in days.
-     *
-     * Past it the chapter reads as never visited, which is both the useful
-     * answer - "new since June" means nothing on a reread months later - and
-     * what stops the one cumulative thing here growing forever: a reading
-     * position deletes itself when the chapter is finished, a watermark
-     * otherwise would not.
-     */
+    /** How long a chapter's last-visit mark is worth keeping, in days. Past it
+     *  the chapter reads as never visited, which is the useful answer - "new
+     *  since June" means nothing on a reread months later - and stops the one
+     *  cumulative thing here growing forever: a reading position deletes itself
+     *  when the chapter is finished, a watermark would not. */
     'comments.seenDays': { type: 'int', default: 60, min: 1, max: 365 },
+    /** Keep loading comment pages as you scroll, instead of one click per page. */
     'comments.autoLoad': { type: 'bool', default: false },
-    /**
-     * What to do with comments that say nothing but "thanks for the chapter".
-     * `fold` dims them to one line; `hide` removes them from the page.
-     */
+    /** Comments that say nothing but "thanks for the chapter". `fold` dims them
+     *  to one line; `hide` removes them from the page. */
     'comments.thanks': { type: 'enum', default: 'keep', values: ['keep', 'fold', 'hide'] },
-    /**
-     * Extra patterns to fold or hide, one per line, matched case-insensitively.
-     * A line that is not valid regex syntax is matched as a literal phrase.
-     */
+    /** Extra patterns to fold or hide, one per line, matched case-insensitively.
+     *  A line that is not valid regex syntax is matched as a literal phrase. */
     'comments.foldPatterns': { type: 'string', default: '', maxLength: 2000 },
-    /**
-     * What matching those patterns does. Deliberately its own setting rather
-     * than sharing the acknowledgement rule's action: that defaults to "leave
-     * alone", and a pattern box that does nothing until an unrelated dropdown
-     * is also changed reads as broken. Defaulting to `fold` means typing in the
-     * box has an effect, which is what a box implies.
-     */
+    /** What matching those patterns does. Its own setting rather than sharing
+     *  the acknowledgement rule's action: that defaults to "leave alone", and a
+     *  pattern box that does nothing until an unrelated dropdown is also changed
+     *  reads as broken. */
     'comments.patternAction': { type: 'enum', default: 'fold', values: ['keep', 'fold', 'hide'] },
-    /**
-     * Comments whose whole body is a Royal Road emoticon and nothing else.
-     *
-     * Its own setting rather than part of the acknowledgement rule, because the
-     * two do not travel together: plenty of readers who want "tyfc" gone are
-     * happy to keep the emoticons, which carry a reaction that words did not.
-     * It also cannot share the machinery, since these comments have no text at
-     * all and every text rule sees an empty string.
-     */
+    /** Comments whose whole body is a Royal Road emoticon and nothing else. Its
+     *  own setting because the two do not travel together: plenty of readers who
+     *  want "tyfc" gone keep the emoticons, which carry a reaction words did
+     *  not. It cannot share the machinery either - these have no text at all,
+     *  and every text rule sees an empty string. */
     'comments.emotes': { type: 'enum', default: 'keep', values: ['keep', 'fold', 'hide'] },
-    /**
-     * Whether the rules above are allowed to reach the author's own comments.
-     *
-     * Off by default: on a chapter page the author is the one person whose
-     * short reply is worth reading, and "Thanks!" from them means something
-     * different from the same word from anyone else. Hiding never reaches them
-     * whatever this is set to; see `actionForComment`.
-     */
+    /** Whether the rules above may reach the author's own comments. Off by
+     *  default: on a chapter page the author is the one person whose short reply
+     *  is worth reading, and "Thanks!" from them means something different.
+     *  Hiding never reaches them whatever this is set to; see `actionForComment`. */
     'comments.foldAuthors': { type: 'bool', default: false },
 
     // ── fiction page ──────────────────────────────────────────────────────
@@ -282,10 +216,8 @@
     'fiction.reviewsAutoLoad': { type: 'bool', default: false },
   };
 
-  /**
-   * v1 shipped these six as bare keys. Reading them keeps existing installs'
-   * settings intact through the upgrade; nothing writes them any more.
-   */
+  /** v1 shipped these six as bare keys. Reading them keeps existing installs'
+   *  settings intact through the upgrade; nothing writes them any more. */
   const LEGACY_KEYS = {
     expandAll: 'list.expandAll',
     hoverExpand: 'list.hoverExpand',
@@ -326,16 +258,12 @@
         return spec.maxLength ? value.slice(0, spec.maxLength) : value;
       }
 
-      /**
-       * Like a string, but a bare hex value gets its `#` put back.
-       *
-       * "7FFFD4" is what people copy out of a colour picker, and it is not
-       * valid CSS, so without this the field silently does nothing. Adding the
-       * hash is unambiguous: a CSS colour keyword would have to be spelled with
-       * only the letters a to f to be confused with a hex value, and none of
-       * the 148 of them is. Anything that is not bare hex is passed through
-       * untouched, so "red", "rgb(1 2 3)" and "" all still work.
-       */
+      /** Like a string, but a bare hex value gets its `#` put back. "7FFFD4" is
+       *  what people copy out of a colour picker and is not valid CSS, so
+       *  without this the field silently does nothing. Unambiguous: no CSS
+       *  colour keyword is spelled with only the letters a to f. Anything that
+       *  is not bare hex passes through untouched, so "red", "rgb(1 2 3)" and ""
+       *  all still work. */
       case 'color': {
         if (typeof value !== 'string') return spec.default;
         const text = value.trim();
@@ -367,10 +295,8 @@
     return out;
   }
 
-  /**
-   * Coerce anything into a complete, valid settings object. Unknown keys are
-   * dropped; v1's bare keys are read once and folded into their v2 names.
-   */
+  /** Coerce anything into a complete, valid settings object. Unknown keys are
+   *  dropped; v1's bare keys are read once and folded into their v2 names. */
   function normalizeSettings(raw) {
     const src = raw && typeof raw === 'object' ? raw : {};
 

@@ -1,11 +1,9 @@
 'use strict';
 
 /**
- * document_end. Owns the pieces CSS cannot do: the toolbar, the per-card
- * controls, and keeping both alive as Royal Road swaps content in.
- *
- * Hiding itself stays in boot.js's generated stylesheet - this file only feeds
- * it fresh ids.
+ * document_end. Owns what CSS cannot: the toolbar, the per-card controls, and
+ * keeping both alive as Royal Road swaps content in. Hiding itself stays in
+ * boot.js's generated stylesheet - this file only feeds it fresh ids.
  */
 (function (root) {
   const RRX = root.RRX;
@@ -31,10 +29,8 @@
     setSettings,
   };
 
-  /**
-   * Which Royal Road page this is. Features declare the pages they belong to, so
-   * chapter-only work never runs on a list and the other way round.
-   */
+  /** Features declare the pages they belong to, so chapter-only work never runs
+   *  on a list and the other way round. */
   const detectPage = () => RRX.pageFromPath(root.location.pathname);
 
   // --- state ---------------------------------------------------------------
@@ -58,7 +54,7 @@
     return setSettings({ [key]: value });
   }
 
-  /** Commit several settings at once: the filter panel applies ~20 in one go. */
+  /** Batched: the filter panel applies ~20 settings in one go. */
   async function setSettings(patch) {
     adoptState({ ...ctx.settings, ...patch }, ctx.hidden);
     applyState(); // optimistic: the UI must not wait on storage
@@ -94,23 +90,17 @@
 
   // --- toolbar -------------------------------------------------------------
 
-  /**
-   * Prepended into `.fiction-list`, the one wrapper every list page shares (see
-   * selectors.js for why the paginate skeleton cannot be used). On pages that do
-   * page content in via AJAX this gets swapped out with the list; the observer
-   * puts it straight back.
-   */
+  /** `.fiction-list` is the one wrapper every list page shares (selectors.js says
+   *  why the paginate skeleton cannot be used). AJAX paging swaps it out along
+   *  with the list; the observer puts the toolbar back. */
   function toolbarAnchor() {
     return document.querySelector(SEL.listRoot);
   }
 
-  /**
-   * Everything the rendered toolbar depends on, so identical rebuilds can be
-   * skipped. Settings go in wholesale rather than per-feature: a feature's
-   * visibility can hinge on a setting that is not its own (`showHidden` hides
-   * itself when `hideEnabled` is off), and missing one of those would leave a
-   * stale button on screen.
-   */
+  /** Everything the toolbar depends on, so identical rebuilds can be skipped.
+   *  Settings go in wholesale because a feature's visibility can hinge on a
+   *  setting that is not its own (`showHidden` hides itself when `hideEnabled` is
+   *  off), and missing one would leave a stale button on screen. */
   function toolbarSignature() {
     return JSON.stringify([
       ctx.settings,
@@ -130,14 +120,13 @@
     const anchor = toolbarAnchor();
     if (!anchor) return;
 
-    // Royal Road's ad slots mutate constantly; rebuilding the toolbar on every
-    // sweep would churn the DOM and steal focus mid-click.
+    // Ad slots mutate constantly; a rebuild every sweep would churn the DOM and
+    // steal focus mid-click.
     const signature = toolbarSignature();
     if (existing && existing.dataset.rrxSig === signature && existing.isConnected) return;
 
-    // The filter panel lives inside the toolbar, so a rebuild destroys it. It
-    // must still be a rebuild though - skipping it left stale labels on the
-    // other buttons - so re-open the panel afterwards instead of bailing out.
+    // A rebuild destroys the filter panel inside it. Bailing out instead left
+    // stale labels on the other buttons, so rebuild and re-open the panel.
     const panelWasOpen = RRX.panel && RRX.panel.isOpen();
 
     const buttons = [];
@@ -179,7 +168,7 @@
         title: 'Open settings and the hidden-fiction list',
         iconName: 'manage',
         // The background listener sends no reply, which some browsers surface as
-        // a rejected promise; there is nothing to recover from either way.
+        // a rejected promise.
         onClick: () =>
           Promise.resolve(RRX.ext.runtime.sendMessage({ type: 'rrx:open-options' })).catch(() => {}),
       })
@@ -225,14 +214,9 @@
 
   // --- keeping up with Royal Road ------------------------------------------
 
-  /**
-   * Royal Road pages content in server-side (swapping .rr-paginate-content) and
-   * renders the fiction-page recommendations with React well after load, so a
-   * one-shot pass is not enough.
-   *
-   * Debounced rather than run per-mutation: the ad slots on these pages mutate
-   * more or less continuously, and a sweep per mutation would be pure waste.
-   */
+  /** Royal Road pages content in server-side (swapping .rr-paginate-content) and
+   *  renders fiction-page recommendations with React well after load, so one pass
+   *  is not enough. Debounced because the ad slots mutate continuously. */
   const SWEEP_DEBOUNCE_MS = 200;
 
   function observe() {
@@ -243,21 +227,15 @@
       renderToolbar();
       syncCards(document);
     };
-    /**
-     * Only element insertions can bring in new cards, and only Royal Road's
-     * insertions can bring in cards at all.
-     *
-     * Our own controls carry `rrx-ui`, and treating those as relevant is how a
-     * sweep feeds itself: sweep injects a control, the observer sees it,
-     * another sweep is scheduled, forever. Individual features guard against
-     * writing when nothing changed, but excluding our own markup here means one
-     * that forgets to cannot spin the whole page up.
-     */
+    /** Our own controls carry `rrx-ui`, and counting those as relevant is how a
+     *  sweep feeds itself: sweep injects a control, the observer sees it, another
+     *  sweep is scheduled, forever. Features guard against writing when nothing
+     *  changed, but excluding our markup here means one that forgets to cannot
+     *  spin the whole page up. */
     const isOurs = (node) => node.classList && node.classList.contains(RRX.UI_CLASS);
     const observer = new MutationObserver((records) => {
-      // A sweep is already booked, so nothing the records say can change the
-      // outcome. Checked first: this fires constantly on pages with ad slots,
-      // and walking every record to reach the same answer is pure waste.
+      // A sweep is already booked; nothing the records say changes that. Checked
+      // before walking them because this fires constantly on ad-slot pages.
       if (timer) return;
       const relevant = records.some((r) =>
         [...r.addedNodes].some((n) => n.nodeType === Node.ELEMENT_NODE && !isOurs(n))
@@ -268,11 +246,8 @@
     observer.observe(document.body, { childList: true, subtree: true });
   }
 
-  /**
-   * Royal Road is actively changing this UI. If the page clearly is a fiction
-   * list but nothing matches our card selector, say so once and name the file to
-   * fix rather than failing silently.
-   */
+  /** Royal Road is actively changing this UI. A list page with nothing matching
+   *  the card selector names the file to fix rather than failing silently. */
   function healthCheck() {
     if (!ctx.isListPage) return;
     if (document.querySelector(SEL.listCard)) return;
@@ -284,27 +259,22 @@
 
   async function init() {
     if (!document.querySelector(SEL.newUiProbe)) {
-      // Not the redesign, so nothing below will run. Say so before leaving, and
-      // release the pre-paint guard: boot.js sets it from the URL alone, which
-      // cannot tell the two layouts apart, and the legacy layout has a
-      // `.fiction-list` of its own. Left set, that list is blanked with nothing
-      // remaining to reveal it. Telling boot.js as well as clearing the class
-      // matters, because its second, authoritative apply lands after this and
-      // would otherwise put the guard straight back.
+      // Not the redesign. Release the pre-paint guard: boot.js sets it from the
+      // URL alone, which cannot tell the two layouts apart, and legacy has a
+      // `.fiction-list` of its own that stays blanked with nothing left to reveal
+      // it. Set boot.legacy too, or boot's later authoritative apply puts the
+      // guard straight back.
       RRX.boot.legacy = true;
       document.documentElement.classList.remove(RRX.ROOT_CLASS.filtersPending);
 
-      // Two things still matter on this layout, and nothing else does.
       const { settings, hidden } = await RRX.boot.ready;
 
-      // Write the boot mirror even here: it is the only way a legacy page can
-      // leave behind what the next one needs to switch before it paints.
+      // The mirror is the only way a legacy page leaves behind what the next one
+      // needs to switch before it paints.
       RRX.store.writeMirror(settings, hidden);
 
-      // And react to the layout choice changing in the popup, so this tab
-      // follows straight away rather than at the next navigation. Without it the
-      // popup appears to do nothing on the page you are looking at, which is the
-      // page you changed it for.
+      // Follow a layout change from the popup straight away, or the popup appears
+      // to do nothing on the page you changed it for.
       RRX.store.onChange(({ settings: next }) => RRX.boot.enforceDesign(next));
       return;
     }
@@ -318,8 +288,8 @@
 
     // Options page, popup, or another tab changed something.
     RRX.store.onChange(({ settings: s, hidden: h }) => {
-      // Asking for the old layout has to work from here too, and it ends this
-      // page, so it comes before anything that would restyle a page about to go.
+      // Switching to the old layout ends this page, so it comes before anything
+      // that would restyle a page about to go.
       if (RRX.boot.enforceDesign(s)) return;
       adoptState(s, h);
       applyState();

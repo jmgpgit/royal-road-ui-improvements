@@ -2,47 +2,33 @@
 
 /**
  * What sits between Royal Road's furniture and the chapter text, and in what
- * order.
+ * order. The recap arrives after a fetch, so left alone the reading, tab and
+ * screen-reader order would depend on a cache hit; each block asks for a slot.
  *
- * Two features now want a block up there, and one of them - the recap - arrives
- * after a fetch, so insertion order is whatever the network decided that day.
- * Left alone, that puts the reading order, the tab order and the screen-reader
- * order at the mercy of a cache hit. Each block therefore asks for a slot, and
- * this module keeps them in slot order.
- *
- * Deliberately NO wrapper element. An earlier version put them in one, which
- * broke the layout: the parent of `.chapter-content` is
- * `div.chapter.flex.flex-col.items-center`, so a wrapper with no width of its
- * own shrink-wraps its contents and is then re-centred - and the recap changes
- * width when it opens, which slid every other block sideways with it. As
- * separate children each block is sized and centred on its own, exactly as the
- * recap was before any of this existed.
- *
- * The blocks are siblings of `.chapter-content`, which is also where Royal Road
- * puts the author notes and its own cards, so they inherit that column's
- * spacing (`gap-4`) for free.
+ * No wrapper element: one broke the layout. The parent of `.chapter-content`
+ * is `div.chapter.flex.flex-col.items-center`, so a wrapper with no width of
+ * its own shrink-wraps and gets re-centred, and the recap changes width when
+ * it opens - which slid every other block sideways. As separate children the
+ * blocks size and centre on their own, in the same column as the author notes
+ * and Royal Road's own cards, so they inherit its `gap-4`.
  */
 (function (root) {
   const RRX = root.RRX;
   if (!RRX) return;
   const { SEL } = RRX;
 
-  /**
-   * Lower sorts higher up the page. Gaps left between them so a later block can
-   * land in the middle without renumbering anything.
-   */
+  /** Lower sorts higher up the page. Gaps left so a later block can land in
+   *  the middle without renumbering. */
   const SLOTS = { resume: 5, meta: 10, recap: 20 };
 
-  /** Marks a block as ours *and* records where it belongs. */
+  /** Marks a block as ours and records where it belongs. */
   const SLOT_ATTR = 'data-rrx-slot';
 
   /**
-   * The chapter this page is *about*.
-   *
-   * Not simply the first `.chapter-content`: continuous reading can prepend
-   * earlier chapters above this one, and each carries its own. Anything nested
-   * inside an appended chapter is skipped. This rule used to live in recap.js;
-   * it is here so that two callers cannot come to different answers.
+   * The chapter this page is *about*. Not the first `.chapter-content`:
+   * continuous reading prepends earlier chapters, each carrying its own, so
+   * anything inside an appended `.rrx-chapter` is skipped. Moved here from
+   * recap.js so two callers cannot come to different answers.
    */
   function content() {
     const el = [...document.querySelectorAll(SEL.chapterContent)].find(
@@ -56,11 +42,8 @@
     [...parent.children].filter((el) => el.hasAttribute(SLOT_ATTR) && el !== except);
 
   /**
-   * Put `node` above the chapter at `slot`, replacing whatever holds that slot
-   * already.
-   *
-   * Replacing rather than removing and re-adding: two mutation records where
-   * one will do, and the sweep those records feed is debounced, not free.
+   * Put `node` above the chapter at `slot`, replacing whatever holds it - one
+   * mutation record instead of two, and the sweep they feed is debounced.
    *
    * @param {Element} node must carry `rrx-ui` itself - main.js tests the node
    *   that was added, not the element it was added to
@@ -81,8 +64,7 @@
       return true;
     }
 
-    // Before the first block that belongs below this one, and before the
-    // chapter itself when there is none.
+    // Before the first block that belongs below this one, or before the chapter.
     const after = others.find((el) => Number(el.getAttribute(SLOT_ATTR)) > slot);
     parent.insertBefore(node, after || where);
     return true;

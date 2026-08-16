@@ -2,12 +2,10 @@
 
 /**
  * Persistence. `browser.storage.local` is the source of truth; a compact copy is
- * mirrored into the page's own localStorage so document_start can read it
- * synchronously (see model.js -> buildMirror for why).
- *
- * The mirror lives in royalroad.com's origin, so only content scripts can write
- * it. Options/popup changes reach it via `storage.onChanged` in any open Royal
- * Road tab, and boot.js repairs it from the authoritative store on the next load.
+ * mirrored into royalroad.com's own localStorage so document_start can read it
+ * synchronously (model.js -> buildMirror). Only content scripts can write that
+ * origin, so options/popup changes reach it via `storage.onChanged` in an open
+ * Royal Road tab, and boot.js repairs it from the store on the next load.
  */
 (function (root) {
   const RRX = (root.RRX = root.RRX || {});
@@ -18,10 +16,7 @@
   const KEY_HIDDEN = 'hidden';
   const KEY_CHAPTERS = 'chapters';
 
-  /**
-   * The scratchpad the scroll handler writes to, in royalroad.com's own
-   * localStorage. See `writePosition`.
-   */
+  /** Scroll scratchpad, in royalroad.com's own localStorage. See `writePosition`. */
   const POS_KEY = 'rrx:v1:pos';
   const POS_MAX = 300;
 
@@ -33,23 +28,17 @@
     };
   }
 
-  /**
-   * Reading progress, deliberately NOT part of `load()`.
-   *
-   * Every page pays for `load()`, and only chapter pages have any use for this.
-   * It is also the one map with no ceiling, so keeping it out means a list page
-   * never deserialises thousands of records to render a toolbar.
-   */
+  /** Reading progress, deliberately not part of `load()`: every page pays for that
+   *  one, only chapter pages need this, and it is the one map with no ceiling - a
+   *  list page should not deserialise thousands of records to draw a toolbar. */
   async function loadChapters() {
     const raw = await ext.storage.local.get(KEY_CHAPTERS);
     return RRX.normalizeChapters(raw[KEY_CHAPTERS]);
   }
 
   /**
-   * Merge one chapter's record. A merge rather than a replace, and re-read
-   * inside the call the way `hide` is, so a long-lived tab holding a stale copy
-   * cannot resurrect records another tab has pruned.
-   *
+   * Merges rather than replaces, and re-reads inside the call the way `hide` does,
+   * so a long-lived tab holding a stale copy cannot resurrect pruned records.
    * @param {number} chapterId
    * @param {{f?:number,a?:number,p?:number,o?:number,n?:number,len?:number}} patch
    */
@@ -59,24 +48,16 @@
 
     const chapters = await loadChapters();
     const now = Math.floor(Date.now() / 1000);
-    // Every write stamps the record, which is what makes an expiry possible at
-    // all: without it there is no telling how old a watermark is.
+    // Stamped on every write; without it there is no telling how old a record is.
     const merged = { ...chapters, [id]: { ...(chapters[id] || {}), a: now, ...(patch || {}) } };
     const next = RRX.pruneChapters(RRX.normalizeChapters(merged), { now, seenMaxAgeS });
     await ext.storage.local.set({ [KEY_CHAPTERS]: next });
     return next[id] || null;
   }
 
-  /**
-   * Drop where the reader was in a chapter, and nothing else.
-   *
-   * A record holds two unrelated things - a reading position and the comment
-   * watermark - with two different lifetimes. Finishing a chapter ends the
-   * position; it says nothing about which comments have been seen, and someone
-   * who reads a chapter, reads its comments, and then moves on must not come
-   * back to find the whole conversation unread again. The record goes only when
-   * both halves are gone.
-   */
+  /** Drops the reading position, not the comment watermark: the two halves of a
+   *  record have different lifetimes. Finishing a chapter says nothing about which
+   *  comments were seen, so the record goes only when both halves are gone. */
   async function forgetPosition(chapterId) {
     const id = Number(chapterId);
     const chapters = await loadChapters();
@@ -155,33 +136,23 @@
     };
   }
 
-  /**
-   * Settings, and only settings.
-   *
-   * Reset used to go through `replaceAll`, which meant every future key had to
-   * be remembered and threaded through it or be quietly dropped from the
-   * returned state. This has no opinion about anything but settings, so it
-   * cannot forget one.
-   */
+  /** Settings only. Reset went through `replaceAll` for a while, which meant every
+   *  future key had to be threaded through it or be silently dropped. */
   async function resetSettings() {
     const next = RRX.normalizeSettings({});
     await ext.storage.local.set({ [KEY_SETTINGS]: next });
     return next;
   }
 
-  /**
-   * Subscribe to changes from any context (other tabs, options page, popup).
-   * @returns {() => void} unsubscribe
-   */
+  /** Changes from any context - other tabs, options page, popup.
+   *  @returns {() => void} unsubscribe */
   function onChange(callback) {
     const listener = (changes, area) => {
       if (area !== 'local') return;
-      // `chapters` is deliberately absent. Its subscriber would be main.js,
-      // which reacts by rebuilding the toolbar, re-syncing every card and
-      // re-entering every feature's onPage - in EVERY open Royal Road tab. That
-      // is the right response to a settings change and an absurd one to somebody
-      // scrolling a chapter, which is what writes this key. Nothing else needs
-      // to hear about it: the next page load reads the truth.
+      // `chapters` is deliberately absent: its subscriber would be main.js, which
+      // rebuilds the toolbar, re-syncs every card and re-enters every feature's
+      // onPage in every open Royal Road tab - absurd for somebody scrolling a
+      // chapter, which is what writes this key. The next page load reads the truth.
       if (!(KEY_SETTINGS in changes) && !(KEY_HIDDEN in changes)) return;
       load().then(callback);
     };
@@ -189,11 +160,8 @@
     return () => ext.storage.onChanged.removeListener(listener);
   }
 
-  /**
-   * Write the synchronous boot mirror. Only meaningful from a content script,
-   * where localStorage belongs to royalroad.com. Failures (private browsing,
-   * quota, disabled storage) are non-fatal: we just lose the no-flicker path.
-   */
+  /** The boot mirror. Only meaningful from a content script, where localStorage
+   *  belongs to royalroad.com; failure costs the no-flicker path, not correctness. */
   function writeMirror(settings, hidden) {
     try {
       const payload = JSON.stringify(RRX.buildMirror(settings, hidden));
@@ -206,13 +174,10 @@
   }
 
   // --- the scroll scratchpad -------------------------------------------------
-  //
-  // Positions are written while the reader scrolls, which is far too often for
-  // storage.local: every write there re-serialises the whole chapter map, and
-  // it is async, so the last one before the tab closes may never land. This is
-  // synchronous, per-origin, and small - the same trade the boot mirror makes.
-  // storage.local still gets one write per visit, on the way out, and whatever
-  // did not make it is reconciled from here on the next load.
+  // Scroll writes are too frequent for storage.local: each re-serialises the whole
+  // chapter map, and is async, so the last before the tab closes may never land.
+  // storage.local gets one write per visit on the way out; whatever did not make
+  // it is reconciled from here on the next load.
 
   function readPositions() {
     try {
@@ -229,14 +194,12 @@
       const pos = readPositions();
       pos[Number(chapterId)] = position;
 
-      // Oldest out first. Bounded because this shares royalroad.com's origin
-      // budget with the boot mirror, and it is only a scratchpad.
-      //
-      // The timestamp is `a`, the same short name the stored record uses. It
-      // read `.at` here for a while, which no writer has ever set: every
-      // comparison came out 0, the sort held its input order, and integer-like
-      // keys enumerate ascending - so the cap dropped the LOWEST chapter id
-      // rather than the oldest. It stayed hidden because the cap still worked.
+      // Oldest out first, bounded because this shares royalroad.com's origin
+      // budget with the boot mirror. The timestamp is `a`, the same short name the
+      // stored record uses; it read `.at` here for a while, which no writer sets,
+      // so every comparison came out 0, the sort held its input order, and
+      // integer-like keys enumerate ascending - the cap dropped the lowest chapter
+      // id rather than the oldest. It stayed hidden because the cap still worked.
       const keys = Object.keys(pos);
       if (keys.length > POS_MAX) {
         keys
