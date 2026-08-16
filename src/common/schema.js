@@ -40,6 +40,20 @@
   const bound = (min, max) => ({ type: 'number', default: null, nullable: true, min, max });
 
   const SCHEMA = {
+    // ── which of Royal Road's two layouts to use ──────────────────────────
+    /**
+     * Which of Royal Road's two layouts to insist on.
+     *
+     * Three states rather than a switch, for the same reason the fiction-page
+     * sections have three: "leave alone" has to be the default, because
+     * installing an extension should not change which version of a site
+     * somebody sees, and a plain on/off would make "off" mean both "I have not
+     * chosen" and "put me back on the old one". Those need to be different.
+     * Royal Road remembers the choice in a cookie, so "off" cannot undo it by
+     * doing nothing - only actively clearing it puts somebody back.
+     */
+    'design.mode': { type: 'enum', default: 'leave', values: ['leave', 'new', 'old'] },
+
     // ── fiction list pages ────────────────────────────────────────────────
     'list.expandAll': { type: 'bool', default: false },
     'list.hoverExpand': { type: 'bool', default: false },

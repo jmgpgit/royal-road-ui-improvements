@@ -96,10 +96,13 @@ test('both extension pages load the schema before anything that reads it', () =>
   }
 });
 
-test('the page is three boxes, in the order the site is used', () => {
+test('the page is four boxes, in the order the site is used', () => {
+  // The design box comes first because it decides whether any of the rest apply:
+  // on Royal Road's legacy layout every other setting on this page does nothing.
+  // The three that follow are in the order somebody moves through the site.
   assert.deepEqual(
     SECTIONS.map((s) => s.title),
-    ['Fiction lists', 'Fiction pages', 'Chapter pages']
+    ['Royal Road’s design', 'Fiction lists', 'Fiction pages', 'Chapter pages']
   );
   for (const section of SECTIONS) {
     assert.ok(section.groups.length > 0, `${section.title}: no groups`);

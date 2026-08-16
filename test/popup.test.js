@@ -148,3 +148,35 @@ test('changing a control writes that setting and nothing else', async () => {
   assert.equal(saved['filters.enabled'], false);
   w.close();
 });
+
+test('the design row is there whichever page you open the popup over', async () => {
+  // It is the setting everything else depends on, and it stays visible on the
+  // new design too: somebody who wants the old layout back has to be able to
+  // switch it off. A control that only appears while you agree with it is not a
+  // control.
+  for (const url of [
+    'https://www.royalroad.com/fictions/rising-stars',
+    'https://www.royalroad.com/fiction/21220/mother-of-learning',
+    'https://www.royalroad.com/fiction/21220/x/chapter/301778/y',
+    'https://www.royalroad.com/home',
+  ]) {
+    const w = await open(url);
+    const row = w.document.getElementById('p-design');
+    assert.ok(row && !row.hidden, `${url}: the design row is missing`);
+    assert.ok(
+      w.document.querySelector('#p-design [data-setting="design.mode"]'),
+      `${url}: the design row has no control`
+    );
+  }
+});
+
+test('the design row sits above the page sections', () => {
+  // Below them it would read as belonging to whichever section happened to show.
+  const doc = new JSDOM(html).window.document;
+  const design = doc.getElementById('p-design');
+  const first = doc.querySelector('section[data-page]');
+  assert.ok(
+    design.compareDocumentPosition(first) & 4 /* DOCUMENT_POSITION_FOLLOWING */,
+    'the design row comes first'
+  );
+});

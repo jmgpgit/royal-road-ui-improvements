@@ -22,6 +22,17 @@ in `sessionStorage` on royalroad.com, so that moving back and forth does not fet
 chapter twice. It is the page's own words, it belongs to that one tab, and it dies with the
 tab. See [`src/content/features/recap.js`](src/content/features/recap.js).
 
+One cookie on royalroad.com is written, and only when you ask for it. Royal Road decides
+which of its two layouts to serve you with a `beta-ui-v2` cookie, and this extension only
+works on the newer one. Choosing **Always the new design** sets that cookie and reloads;
+choosing **Always the old design** deletes it and reloads. On the default, *Leave it to Royal
+Road*, the extension reads that one cookie to see whether anything needs doing and never
+writes it. It writes no other cookie and reads no other cookie. It records a preference
+about Royal Road's own appearance and nothing about you; it is Royal Road's cookie, of the
+kind the site sets itself, and Royal Road's own "Revert To Legacy UI" link overwrites it. The
+extension writes no other cookie and reads no cookie except this one.
+See [`src/common/design.js`](src/common/design.js).
+
 Nothing is stored anywhere else. There is no account, no sync, and no identifier of any kind.
 
 ## What is sent
@@ -53,7 +64,9 @@ browser would already send to royalroad.com.
 
 - It never writes to your Royal Road account: no follow, no favourite, no rating, no comment,
   no bookmark, no setting. Hiding a fiction is local to this extension and is not Royal Road's
-  own server-side "hide".
+  own server-side "hide". The layout cookie described above is the one thing it writes that
+  Royal Road can see, and that is a cookie in your browser rather than anything stored against
+  an account: it works, and is written the same way, whether or not you are signed in.
 - It never requests your account pages (`/my/follows`, `/my/favorites`, `/my/readlater`).
   Everything it knows about what you follow is read from the page you are already looking at.
 - It contains no analytics, no telemetry, no crash reporting and no third-party code.

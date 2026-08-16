@@ -58,6 +58,7 @@ is written to be checkable against the source, so every claim in it names the fi
 npm install
 npm test           # the whole suite, no browser needed
 npm start          # launches Firefox on royalroad.com, already on the redesign
+npm start -- --legacy   # ...on the OLD layout instead, to test the design switch
 ```
 
 You need Node 20 or newer. There are two dependencies, `jsdom` and `web-ext`, and no build
@@ -69,6 +70,13 @@ kept. The dev script below re-sets it and reloads once on the first page of each
 is the flicker you will see. Add `-- --fresh` for a throwaway profile, which is what you want
 when testing first-run behaviour. Any other flag goes through to `web-ext run`, so
 `npm start -- --devtools` works.
+
+`-- --legacy` does the opposite: it removes the opt-in cookie so Royal Road serves the legacy
+layout, which is the only way to test **Always use Royal Road's new design** from a profile
+that has already opted in — which `.dev-profile` becomes after one ordinary launch. It clears
+the cookie **once per tab**, deliberately: clearing it on every load would fight the
+extension's own switch, each undoing the other in a reload loop. So the first load is legacy,
+and whatever the extension does next is left alone for you to watch.
 
 It runs from a generated copy of the tree in `dist/dev/`, not from `src/` directly, because it
 adds one dev-only content script that sets the cookie below. That script exists only in

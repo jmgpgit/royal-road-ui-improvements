@@ -18,6 +18,27 @@
       page reads them from.
     -->
 
+    <!--
+      Above the page sections, and never hidden by page type.
+
+      Royal Road serves two layouts and this extension only works on the newer
+      one, so this is the setting every other control here depends on. It stays
+      visible on the new design too, deliberately: somebody who wants to go back
+      to the old layout has to be able to switch this off, even though doing so
+      means the rest of the extension stops working for them. A control that
+      appears only while you disagree with it is not a control.
+    -->
+    <section id="p-design">
+      <label class="row row--stack" for="p-designMode">
+        <span>Royal Road design</span>
+        <select id="p-designMode" class="select" data-setting="design.mode"></select>
+      </label>
+      <p class="note">
+        Everything below is built on the new design. Choosing the old one means the rest of
+        this extension does nothing.
+      </p>
+    </section>
+
     <section data-page="list" hidden>
       <h1>This list</h1>
 
