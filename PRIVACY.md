@@ -7,20 +7,36 @@ the source rather than taken on trust. Every claim below names the file that imp
 
 ## What is stored, and where
 
-Two things, both in `browser.storage.local`, which is local to your browser profile:
+Three things, all in `browser.storage.local`, which is local to your browser profile:
 
 - **Your settings.** The list in [`src/common/schema.js`](src/common/schema.js) is exhaustive.
 - **Your hidden fictions.** For each one: its Royal Road id, title, cover URL and the time you
   hid it, so the manager can list them. See [`src/common/store.js`](src/common/store.js).
+- **Where you stopped reading**, once you switch that on. For each chapter you have opened: its
+  Royal Road id, its fiction's id, when you last had it open, and how far down you were — as a
+  paragraph number, not a scrolled distance. No chapter text and no titles.
+  See [`src/common/model.js`](src/common/model.js) for the exact shape.
 
-A compact copy of both is mirrored into `localStorage` on royalroad.com. This exists only so
-the extension can read your settings before the page paints, which is what stops hidden
-fictions flashing up before they are hidden. It is the same data, on the same machine.
+A compact copy of your settings and the ids of your hidden fictions is mirrored into
+`localStorage` on royalroad.com. This exists only so the extension can read your settings
+before the page paints, which is what stops hidden fictions flashing up before they are
+hidden. It is the same data, on the same machine.
 
 With the previous-chapter recap switched on, the closing text of each chapter it reads is kept
 in `sessionStorage` on royalroad.com, so that moving back and forth does not fetch the same
 chapter twice. It is the page's own words, it belongs to that one tab, and it dies with the
 tab. See [`src/content/features/recap.js`](src/content/features/recap.js).
+
+With the chapter count switched on, the same place holds the list of chapter ids for each
+fiction you have opened a chapter of, so the count costs one request per fiction rather than
+one per chapter. Ids only: no titles, and nothing about you.
+See [`src/content/features/chapter-meta.js`](src/content/features/chapter-meta.js).
+
+With "come back to where you stopped" switched on, your place in the chapter you are reading is
+also written to `localStorage` on royalroad.com as you scroll. Writing it straight to the
+extension's own storage would mean rewriting the whole reading record every second or so; this
+is the same paragraph number, and it is copied across when you leave the page.
+See [`src/common/store.js`](src/common/store.js).
 
 One cookie on royalroad.com is written, and only when you ask for it. Royal Road decides
 which of its two layouts to serve you with a `beta-ui-v2` cookie, and this extension only
@@ -38,7 +54,7 @@ Nothing is stored anywhere else. There is no account, no sync, and no identifier
 ## What is sent
 
 The extension has no server. It never contacts any host except royalroad.com, and it makes
-exactly four kinds of request, all of them ordinary page loads you could make yourself:
+exactly five kinds of request, all of them things the site itself asks for when you use it:
 
 1. **Adding the next page of a list.** Reaching the bottom of a fiction list fetches the next
    page of that same list (`?page=N`) and adds it underneath. This is on by default, and any
@@ -56,8 +72,14 @@ exactly four kinds of request, all of them ordinary page loads you could make yo
    is off by default; while it is off nothing is fetched. It only ever follows the "previous
    chapter" link already on the page.
    See [`src/content/features/recap.js`](src/content/features/recap.js).
+5. **The fiction's chapter list, for the chapter count.** With the count switched on, opening a
+   chapter fetches `/fictions/chapterlist?id=…` once per fiction, to say which chapter of the
+   fiction this is and how many come after it. This is the same request Royal Road's own
+   "Select a chapter" dropdown makes when you open it, and it is about 3 KB for a hundred
+   chapters. It is off by default; while it is off nothing is fetched.
+   See [`src/content/features/chapter-meta.js`](src/content/features/chapter-meta.js).
 
-All four are GETs for public pages. None carries anything about you beyond the cookies your
+All five are GETs for public pages. None carries anything about you beyond the cookies your
 browser would already send to royalroad.com.
 
 ## What it never does
@@ -77,7 +99,7 @@ browser would already send to royalroad.com.
 
 | Permission | Why |
 |---|---|
-| `storage` | To save your settings and hidden list on this device. |
+| `storage` | To save your settings, hidden list and reading progress on this device. |
 | `*://www.royalroad.com/*` | To read and restyle Royal Road pages. This is the whole extension. |
 
 There are no optional permissions, and the host permission cannot be narrowed: the extension
@@ -86,11 +108,13 @@ unhidden content.
 
 ## Your data is yours
 
-Options -> Backup exports everything the extension holds as a JSON file, and imports it back.
-Removing the extension removes its stored settings with it. The `localStorage` copy described
+Options -> Backup exports everything the extension holds — settings, hidden fictions and
+reading progress — as a JSON file, and imports it back. Resetting the settings leaves the other
+two alone.
+Removing the extension removes everything it has stored with it. The `localStorage` copy described
 above lives under royalroad.com rather than under the extension, so clearing site data for
-royalroad.com is what removes that one. The recap cache goes when you close the tab, and
-clearing site data for royalroad.com removes it too.
+royalroad.com is what removes that one. The recap and chapter-list caches go when you close the
+tab, and clearing site data for royalroad.com removes them too.
 
 ## Changes
 

@@ -18,6 +18,22 @@ no analytics, no server of its own, and no write to your Royal Road account.
 > until a DOM probe confirms the redesign. The only thing it does on the legacy layout is
 > switch you to the redesign, if you have asked it to.
 
+## What it will never do
+
+- **Cost an author their income.** Patreon and Ko-fi links, the Support block, Royal Road's
+  advertising and the promotion authors run for each other are left alone. Where you can
+  collapse something that carries promotion, such as a shoutout inside an author's note, it is
+  off until you turn it on, nothing is deleted, and a chip always puts it back.
+- **Hammer Royal Road.** Every request it makes is one you could have made by opening a page,
+  it makes them one at a time, and it caches what it fetches. Nothing runs on a timer or in the
+  background.
+- **Send your reading anywhere.** No server, no analytics, no telemetry, no third-party code.
+  Your settings and hidden list stay on your device, and the only site it ever contacts is
+  royalroad.com. [`PRIVACY.md`](PRIVACY.md) names the file behind every claim.
+
+It also never writes to your Royal Road account — no follow, favourite, rating or comment — and
+never hides an author's own comments. [`CONTRIBUTING.md`](CONTRIBUTING.md) has the full list and what enforces each one.
+
 ## What it does
 
 **On the fiction lists** (`/fictions/rising-stars`, `trending`, `best-rated`,
@@ -44,6 +60,16 @@ no analytics, no server of its own, and no write to your Royal Road account.
 
 - Line height, justification with hyphenation, text colour, an arbitrary local font, and a
   reading width past Royal Road's ceiling: all things its own Reading Preferences omit.
+- **The facts about a chapter, above it**: when it was posted, and how long it is — a word
+  count, an estimated reading time at a speed you set, or both. Royal Road prints the date
+  below the chapter, past the author notes, where it cannot tell you how old something is
+  before you start it, and it never prints the length at all.
+- **How many chapters you have left**: "Chapter 89 of 95 (6 to catch up)", on that same line.
+  The numbering is Royal Road's own — the same list its "Select a chapter" dropdown uses —
+  fetched once per fiction and kept for the tab.
+- **Come back to where you stopped**: reopening a chapter offers to return you to the paragraph
+  you were on, or takes you straight there. Following a link to a particular comment goes to
+  that comment instead. Off by default, and nothing is recorded while it is off.
 - **Author notes**: collapse cross-promotion ("shoutouts") while keeping the real note, or
   collapse notes entirely, or per-author. Nothing is deleted: a chip always puts it back.
 - Hide the About-author panel.
@@ -90,9 +116,12 @@ chapter pages.
 
 ## Install
 
-Not yet on addons.mozilla.org or the Chrome Web Store. Until then, install from source.
+**Chrome / Edge**: on the Chrome Web Store, currently 1.2.0.
 
-**Firefox** (temporary, until the browser restarts)
+**Firefox**: not yet. 1.2.0 is with addons.mozilla.org for review; until it is approved, the
+only way onto Firefox is from source, below.
+
+**Firefox from source** (temporary, until the browser restarts)
 
 ```sh
 npm install
@@ -293,11 +322,14 @@ naming what is missing; `test/fixtures/README.md` documents how to re-capture ea
 ## Privacy
 
 Everything is stored on the device, in `browser.storage.local`. The extension has no
-analytics and talks to no server other than royalroad.com. It makes three kinds of request,
-all of them ordinary page loads you could make yourself: the `?page=N` fetch that adds the
-next page of a list as you scroll, the same for comments and reviews, and a single request
-for the tag vocabulary the first time you open the filter panel. It never writes to your
-Royal Road account, and never reads your account pages.
+analytics and talks to no server other than royalroad.com. It makes five kinds of request,
+all of them things the site itself asks for when you use it: the `?page=N` fetch that adds the
+next page of a list as you scroll, the same for comments and reviews, a single request for
+the tag vocabulary the first time you open the filter panel, and — only once you switch them
+on — the chapter before the one you are reading, and the fiction's chapter list behind Royal
+Road's own "Select a chapter" dropdown. It never writes to your Royal Road
+account, and never goes and fetches your account pages: what it knows about what you follow
+is read from the page already in front of you.
 
 See [PRIVACY.md](PRIVACY.md) for the full statement.
 

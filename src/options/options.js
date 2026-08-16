@@ -12,7 +12,7 @@
   const { SCHEMA, COPY, SECTIONS } = RRX;
   const $ = (id) => document.getElementById(id);
 
-  let state = { settings: RRX.normalizeSettings(null), hidden: {} };
+  let state = { settings: RRX.normalizeSettings(null), hidden: {}, chapters: {} };
   let filter = '';
 
   /**
@@ -166,6 +166,9 @@
     'reader.maxWidthPx': () => state.settings['reader.enabled'],
     'comments.foldPatterns': () => state.settings['comments.patternAction'] !== 'keep',
     'recap.paragraphs': () => state.settings['recap.mode'] !== 'off',
+    // Only the estimate uses it; a word count does not.
+    'chapter.wpm': () =>
+      state.settings['chapter.wordCount'] === 'time' || state.settings['chapter.wordCount'] === 'both',
     'comments.separators': () => state.settings['comments.threading'],
     'comments.dividerOpacity': () =>
       state.settings['comments.threading'] && state.settings['comments.separators'],
@@ -283,7 +286,7 @@
   }
 
   $('export').addEventListener('click', () => {
-    const backup = RRX.buildBackup(state.settings, state.hidden, Date.now());
+    const backup = RRX.buildBackup(state, Date.now());
     const url = URL.createObjectURL(
       new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
     );
@@ -306,11 +309,16 @@
       const parsed = RRX.parseBackup(await file.text());
       const incoming = RRX.hiddenIds(parsed.hidden).length;
       const current = RRX.hiddenIds(state.hidden).length;
+      // Reading progress is replaced too, so it has to be named: "replace my
+      // settings" and "replace where I am in every chapter" deserve different
+      // levels of consent.
+      const read = Object.keys(state.chapters || {}).length;
+      const alsoRead = read ? ` and where you had got to in ${read} chapter${read === 1 ? '' : 's'}` : '';
       if (
-        current &&
+        (current || read) &&
         !confirm(
-          `Replace your current settings and ${current} hidden fiction${current === 1 ? '' : 's'} ` +
-            `with the ${incoming} in this file?`
+          `Replace your current settings, ${current} hidden fiction${current === 1 ? '' : 's'}` +
+            `${alsoRead} with what is in this file?`
         )
       ) {
         setStatus('Import cancelled.');
@@ -325,10 +333,12 @@
   });
 
   $('reset').addEventListener('click', async () => {
-    if (!confirm('Reset every setting to its default? Your hidden fictions are kept.')) return;
-    state = await RRX.store.replaceAll({ settings: {}, hidden: state.hidden });
+    if (!confirm('Reset every setting to its default? Your hidden fictions and reading progress are kept.')) {
+      return;
+    }
+    state.settings = await RRX.store.resetSettings();
     render();
-    setStatus('Settings reset to defaults. Your hidden fictions are kept.', 'ok');
+    setStatus('Settings reset to defaults. Your hidden fictions and reading progress are kept.', 'ok');
   });
 
   $('unhide-all').addEventListener('click', async () => {
@@ -349,13 +359,16 @@
   // --- boot ------------------------------------------------------------------
 
   // Keep this page honest if a Royal Road tab or the popup changes something.
+  // `onChange` carries settings and hidden only - reading progress is not in its
+  // guard, on purpose - so the chapters we already hold are kept rather than
+  // overwritten with undefined.
   RRX.store.onChange((next) => {
-    state = next;
+    state = { ...state, ...next };
     render();
   });
 
-  RRX.store.load().then((next) => {
-    state = next;
+  Promise.all([RRX.store.load(), RRX.store.loadChapters()]).then(([next, chapters]) => {
+    state = { ...next, chapters };
     render();
   });
 })();

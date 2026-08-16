@@ -39,6 +39,22 @@
   }
 
   /**
+   * Extract a chapter id from any Royal Road URL.
+   *
+   * Matches /chapter/3766643 and /chapter/3766643/slug, relative or absolute,
+   * so a full /fiction/149588/slug/chapter/3766643/x answers both this and
+   * `fictionIdFromHref` - which is exactly what a chapter page needs.
+   *
+   * Deliberately does NOT match /fiction/149588: a fiction is not a chapter,
+   * and a caller that conflated the two would look up nonsense.
+   */
+  function chapterIdFromHref(href) {
+    if (typeof href !== 'string') return null;
+    const m = /\/chapter\/(\d+)(?=[/?#]|$)/.exec(href);
+    return m ? Number(m[1]) : null;
+  }
+
+  /**
    * Which kind of Royal Road page a path is.
    *
    * Lives here, in the pure module, because boot.js needs it at document_start
@@ -100,6 +116,86 @@
 
   const hiddenIds = (hidden) => normalizeIds(Object.keys(normalizeHidden(hidden)));
 
+  // --- reading progress -----------------------------------------------------
+  //
+  // `{ [chapterId]: { f, a, p, o, n, len } }`, one record per chapter opened.
+  //
+  //   f   the fiction it belongs to, 0 when unknown
+  //   a   when it was last open, unix SECONDS (milliseconds cost three bytes a
+  //       record for precision nothing here needs)
+  //   p   index of the block in `.chapter-content` at the top of the viewport
+  //   o   how far into that block, 0..1
+  //   n   how many blocks the chapter had, and
+  //   len how long its text was - together, the edit detector: a chapter that
+  //       has been rewritten under a saved position must not be restored to a
+  //       paragraph that is now a different scene
+  //   d   how much of the chapter's TEXT had been on screen, 0..1. Measured
+  //       against the chapter box rather than the page, which grows when the
+  //       comments load, and reported to the reader as a percentage
+  //
+  // Short names because this is the one map that grows without a ceiling and is
+  // re-serialised whole on every write. It is machine-read and never hand-edited;
+  // the legend is here and nowhere else.
+
+  /** Keep the newest, and drop the emptiest first. */
+  const CHAPTERS_MAX = 20000;
+  const CHAPTERS_KEEP = 18000;
+
+  function normalizeChapters(raw) {
+    const src = raw && typeof raw === 'object' ? raw : {};
+    const out = {};
+    for (const key of Object.keys(src)) {
+      const id = Number(key);
+      if (!isValidId(id)) continue;
+      const rec = src[key] && typeof src[key] === 'object' ? src[key] : {};
+
+      const int = (value, min) => {
+        const n = Number(value);
+        return Number.isFinite(n) && n >= min ? Math.floor(n) : null;
+      };
+
+      const record = { f: int(rec.f, 1) || 0, a: int(rec.a, 0) || 0 };
+      const p = int(rec.p, 0);
+      if (p !== null) {
+        record.p = p;
+        const o = Number(rec.o);
+        record.o = Number.isFinite(o) ? Math.min(1, Math.max(0, o)) : 0;
+        const n = int(rec.n, 0);
+        const len = int(rec.len, 0);
+        if (n !== null) record.n = n;
+        if (len !== null) record.len = len;
+        const d = Number(rec.d);
+        if (Number.isFinite(d)) record.d = Math.min(1, Math.max(0, d));
+      }
+
+      // A record whose every field was junk still keeps its key: the key is
+      // itself the fact that this chapter was opened, and throwing it away
+      // would lose real reading history to one bad number.
+      out[id] = record;
+    }
+    return out;
+  }
+
+  /**
+   * Trim the map when it passes `max`, oldest first, and bare records - opened
+   * but never scrolled - before ones carrying a position.
+   */
+  function pruneChapters(chapters, max = CHAPTERS_MAX, keep = CHAPTERS_KEEP) {
+    const entries = Object.entries(chapters || {});
+    if (entries.length <= max) return chapters;
+
+    entries.sort((a, b) => {
+      const aHas = a[1] && a[1].p !== undefined ? 1 : 0;
+      const bHas = b[1] && b[1].p !== undefined ? 1 : 0;
+      if (aHas !== bHas) return bHas - aHas;
+      return (b[1].a || 0) - (a[1].a || 0);
+    });
+
+    const out = {};
+    for (const [id, rec] of entries.slice(0, keep)) out[id] = rec;
+    return out;
+  }
+
   // --- synchronous boot mirror --------------------------------------------
   // browser.storage.local is async, which races first paint. Content scripts run
   // in the page's origin, so localStorage gives us a synchronous read at
@@ -124,13 +220,24 @@
 
   // --- backup --------------------------------------------------------------
 
-  function buildBackup(settings, hidden, now) {
+  /**
+   * `BACKUP_VERSION` does NOT move when a section is added. parseBackup only
+   * refuses files *newer* than itself, so bumping would make an older install
+   * reject a whole file it could have restored the settings and hidden list
+   * from perfectly well. Bump it when an existing field changes meaning.
+   *
+   * Takes the state object rather than one argument per section, so the next
+   * thing worth backing up does not change this signature again.
+   */
+  function buildBackup(state, now) {
+    const src = state && typeof state === 'object' ? state : {};
     return {
       format: BACKUP_FORMAT,
       version: BACKUP_VERSION,
       exportedAt: new Date(Number(now) || 0).toISOString(),
-      settings: normalizeSettings(settings),
-      hidden: normalizeHidden(hidden),
+      settings: normalizeSettings(src.settings),
+      hidden: normalizeHidden(src.hidden),
+      chapters: normalizeChapters(src.chapters),
     };
   }
 
@@ -152,6 +259,9 @@
     return {
       settings: normalizeSettings(data.settings),
       hidden: normalizeHidden(data.hidden),
+      // Absent in a backup written before reading progress existed, which
+      // normalises to {} rather than failing the import.
+      chapters: normalizeChapters(data.chapters),
     };
   }
 
@@ -162,11 +272,15 @@
     // Re-exported from schema.js so callers only ever reach for one namespace.
     normalizeSettings,
     fictionIdFromHref,
+    chapterIdFromHref,
     fictionIdFromBlurbId,
     pageFromPath,
     normalizeIds,
     normalizeHidden,
     hiddenIds,
+    normalizeChapters,
+    pruneChapters,
+    CHAPTERS_MAX,
     buildMirror,
     parseMirror,
     buildBackup,
