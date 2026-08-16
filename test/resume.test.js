@@ -323,3 +323,37 @@ test('a scratchpad newer than storage wins, because the last flush may not have 
   assert.ok(chip);
   assert.match(chip.textContent, /\(80%\)/, 'the older storage record was used');
 });
+
+// --- sharing a record with the comment watermark ------------------------------
+
+test('finishing a chapter forgets your place in it, not which comments you saw', async () => {
+  const { w, ctx } = load({ settings: { 'chapter.resume': 'jump' } });
+  const previous = 3766600;
+
+  // One record, two features. Resume owns p/o/n/len/d; comments-new owns s.
+  w.__chapters[previous] = { f: 149588, a: 1700000000, p: 10, o: 0.5, n: 88, len: 11870, s: 1699999999 };
+
+  const link = w.document.querySelector('[data-vt-direction="prev"]');
+  link.setAttribute('href', `/fiction/149588/x/chapter/${previous}/y`);
+  Object.defineProperty(w.document, 'referrer', {
+    value: `https://www.royalroad.com/fiction/149588/x/chapter/${previous}/y`,
+    configurable: true,
+  });
+
+  w.RRX.resume.apply(ctx);
+  await settle();
+
+  const kept = w.__chapters[previous];
+  assert.ok(kept, 'the whole record went, taking the comment watermark with it');
+  assert.equal(kept.p, undefined, 'the reading position should be gone');
+  assert.equal(kept.s, 1699999999, 'the comment watermark is not resume’s to delete');
+});
+
+test('a record with nothing left in it is dropped', async () => {
+  const { w } = load();
+  const id = 3766601;
+  w.__chapters[id] = { f: 149588, a: 1700000000, p: 4, o: 0, n: 88, len: 11870 };
+
+  await w.RRX.store.forgetPosition(id);
+  assert.equal(id in w.__chapters, false, 'an empty record was kept');
+});

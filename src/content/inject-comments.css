@@ -241,20 +241,35 @@ html.rrx-comments [data-comment-id]:hover > .rrx-thread-toggle,
    on whether anyone happened to reply.
    ========================================================================== */
 
-/* --- no replies: the whole comment folds or goes ---
+/* `.rrx-comment-seen` means "posted before your last visit", NOT "you read it":
+   Royal Road ranks its comments rather than ordering them by time, so a comment
+   on page eight that nobody ever scrolled to is still older than the newest one
+   on page one. The copy says older, never read, for exactly this reason.
+
+   It rides the same rules as a folded low-value comment: same
+   look, same hover-to-open, same two shapes for with and without replies.
+   Widening the selectors rather than repeating them, because four `:has()`
+   branches maintained twice would drift apart. Specificity is unchanged -
+   `:is()` takes its most specific argument, and both are single classes.
+
+   Note what it is NOT added to: the `-hidden` rule below. A comment you have
+   already read is not one you asked to have removed, and the reply under it may
+   be the new one. There is no hide mode for seen comments and there must not be.
+
+   --- no replies: the whole comment folds or goes ---
    "Has replies" means either container. Testing only `.comment-replies` would
    read a deep comment as childless and hide it outright, taking a chain of
    answers with it. */
 
-.rrx-comment-thanks:not(:has(.comment-replies, [data-rr-deep-replies])) {
+:is(.rrx-comment-thanks, .rrx-comment-seen):not(:has(.comment-replies, [data-rr-deep-replies])) {
   max-height: 1.6rem;
   overflow: hidden;
   opacity: 0.4;
   transition: max-height 0.15s ease, opacity 0.15s ease;
 }
 
-.rrx-comment-thanks:not(:has(.comment-replies, [data-rr-deep-replies])):hover,
-.rrx-comment-thanks:not(:has(.comment-replies, [data-rr-deep-replies])):focus-within {
+:is(.rrx-comment-thanks, .rrx-comment-seen):not(:has(.comment-replies, [data-rr-deep-replies])):hover,
+:is(.rrx-comment-thanks, .rrx-comment-seen):not(:has(.comment-replies, [data-rr-deep-replies])):focus-within {
   max-height: 40rem;
   opacity: 1;
 }
@@ -272,7 +287,7 @@ html.rrx-comments [data-comment-id]:hover > .rrx-thread-toggle,
    div that sits alongside the body row, so it is excluded by what it contains
    rather than by what it is. */
 
-.rrx-comment-thanks:has(.comment-replies, [data-rr-deep-replies])
+:is(.rrx-comment-thanks, .rrx-comment-seen):has(.comment-replies, [data-rr-deep-replies])
   > :not(.rrx-thread-toggle)
   > :not(.comment-replies):not(:has([data-rr-deep-replies])) {
   max-height: 1.6rem;
@@ -281,10 +296,10 @@ html.rrx-comments [data-comment-id]:hover > .rrx-thread-toggle,
   transition: max-height 0.15s ease, opacity 0.15s ease;
 }
 
-.rrx-comment-thanks:has(.comment-replies, [data-rr-deep-replies]):hover
+:is(.rrx-comment-thanks, .rrx-comment-seen):has(.comment-replies, [data-rr-deep-replies]):hover
   > :not(.rrx-thread-toggle)
   > :not(.comment-replies):not(:has([data-rr-deep-replies])),
-.rrx-comment-thanks:has(.comment-replies, [data-rr-deep-replies]):focus-within
+:is(.rrx-comment-thanks, .rrx-comment-seen):has(.comment-replies, [data-rr-deep-replies]):focus-within
   > :not(.rrx-thread-toggle)
   > :not(.comment-replies):not(:has([data-rr-deep-replies])) {
   max-height: 40rem;
@@ -299,3 +314,96 @@ html.rrx-comments [data-comment-id]:hover > .rrx-thread-toggle,
   }
 }
 
+
+/* ==========================================================================
+   New since your last visit
+   ========================================================================== */
+
+/* Two marks, because one was not enough.
+   -----------------------------------------------------------------------
+   The accent is drawn as a positioned pseudo-element OUTSIDE the padding box,
+   not as an inset shadow: a comment's children paint their own backgrounds
+   over anything inset, which made the first attempt invisible. Royal Road also
+   tints that same left edge by reputation tier, so a colour alone would be one
+   more variant of something that already means something else - hence the word
+   as well. */
+.rrx-comment-new {
+  position: relative;
+}
+
+.rrx-comment-new::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -0.55rem;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--color-primary, #4b7bec);
+  z-index: 1;
+}
+
+/* A nested new reply gets its own accent; the parent's must not run down the
+   whole chain as well, or a single new reply looks like ten. */
+.rrx-comment-new .rrx-comment-new::before {
+  opacity: 0.9;
+}
+
+.rrx-comment-newpill {
+  display: inline-block;
+  margin: 0 0 0.35rem;
+  padding: 0.05rem 0.4rem;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.6;
+  color: var(--color-on-primary, #fff);
+  background: var(--color-primary, #4b7bec);
+  border-radius: 9999px;
+}
+
+/* A new reply can sit inside a collapsed "N more replies" chain, where its own
+   accent is not rendered at all. Dot the control that would reveal it - and
+   leave the expanding to the reader. */
+.rrx-has-new [data-rr-comment-expand-deep]::after {
+  content: '';
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-left: 0.4rem;
+  border-radius: 50%;
+  background: var(--color-primary, #4b7bec);
+}
+
+/* "Only new" is a view control, not a setting: it lives on <html> for the life
+   of the page and is deliberately absent from MANAGED_CLASSES, so a settings
+   change cannot clear it out from under the reader. */
+html.rrx-comments-onlynew .rrx-comment-seen:not(:has(.comment-replies, [data-rr-deep-replies])) {
+  max-height: 1.2rem;
+  opacity: 0.25;
+}
+
+.rrx-comments-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 0.8125rem;
+  color: var(--color-on-surface-muted, #8a8a8a);
+}
+
+.rrx-comments-bar__count {
+  margin-right: auto;
+}
+
+/* Appended into Royal Road's own "Showing 31 to 40 of 137 comments" line, so it
+   reads as part of that sentence rather than as a second one. Quieter than the
+   text it joins: it is a footnote about the reader's own rules. */
+.rrx-hidden-count {
+  opacity: 0.7;
+  font-style: italic;
+}
