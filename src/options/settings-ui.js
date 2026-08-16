@@ -1,15 +1,11 @@
 'use strict';
 
 /**
- * How the settings are presented, which box each one lives in, what it is
- * called, and what the explanatory line under it says.
+ * Which box each setting lives in, what it is called, and the note under it.
+ * Boxes follow the parts of the site touched: lists, fiction pages, chapters.
  *
- * The options page builds itself from this rather than from hand-written HTML.
- * With this many settings, hand-written markup drifts: a key added to schema.js
- * and forgotten here fails a test instead of quietly becoming unreachable.
- *
- * Three boxes, matching the three parts of the site the extension touches:
- * fiction lists, fiction pages, chapter pages.
+ * Built from this rather than hand-written HTML so a key added to schema.js and
+ * forgotten here fails a test instead of quietly becoming unreachable.
  */
 (function (root, factory) {
   const api = factory();
@@ -296,10 +292,8 @@
     },
   };
 
-  /**
-   * The three boxes, and what goes in each. `groups` splits a box into labelled
-   * runs, so a long box still reads as a few short lists.
-   */
+  /** The boxes and what goes in each. `groups` splits a box into labelled runs,
+   *  so a long box reads as a few short lists. */
   const SECTIONS = [
     {
       id: 'design',
@@ -403,10 +397,8 @@
   /** Every key the page renders, flattened. */
   const sectionKeys = () => SECTIONS.flatMap((s) => s.groups.flatMap((g) => g.keys));
 
-  /**
-   * Settings the options page deliberately does not show, with the reason.
-   * Every schema key must be in a section or here, or the options test fails.
-   */
+  /** Deliberately not shown, with the reason. Every schema key must be in a
+   *  section or here, or the options test fails. */
   const NOT_IN_OPTIONS = {
     'notes.blockedAuthors': 'a list of author ids, set by editing an exported settings file',
   };

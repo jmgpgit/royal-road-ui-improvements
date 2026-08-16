@@ -3,13 +3,10 @@
 /**
  * Royal Road's tag vocabulary, for the filter panel's tag pickers.
  *
- * Typing tag slugs by hand is error-prone: `romance` is the slug for "Romance
- * Subplot", `harem` for "Multiple Lovers", so the panel offers the real list.
- *
- * The list is not hardcoded, because Royal Road adds tags. It comes from the
- * `#tagsAdd` select on `/fictions/search`, which carries every tag with its
- * slug and label. Harvested for free when you happen to be on the search page,
- * fetched once otherwise, and cached for a week.
+ * Slugs do not match labels - `romance` is "Romance Subplot", `harem` is
+ * "Multiple Lovers" - so the panel offers the real list. Royal Road adds tags,
+ * so it is read from the `#tagsAdd` select on `/fictions/search`: free when we
+ * are already there, fetched otherwise, cached for a week.
  */
 (function (root) {
   const RRX = root.RRX;
@@ -19,7 +16,7 @@
   const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
   const SOURCE_URL = '/fictions/search';
 
-  /** In-memory copy, so the panel can render synchronously once warmed. */
+  /** In-memory copy, so the panel renders synchronously once warmed. */
   let catalogue = [];
   let fetching = null;
 
@@ -36,7 +33,7 @@
 
   const byLabel = (a, b) => a.label.localeCompare(b.label);
 
-  /** Merge into the catalogue by slug; later entries do not overwrite earlier labels. */
+  /** Merge into the catalogue by slug; earlier labels win. */
   async function save(tags) {
     const bySlug = new Map(catalogue.map((t) => [t.slug, t]));
     for (const tag of tags) if (!bySlug.has(tag.slug)) bySlug.set(tag.slug, tag);
@@ -44,20 +41,14 @@
     try {
       await RRX.ext.storage.local.set({ [CACHE_KEY]: { at: Date.now(), tags: catalogue } });
     } catch {
-      /* a failed cache write just means we fetch again next week */
+      /* a failed write just means we fetch again next week */
     }
     return catalogue;
   }
 
-  /**
-   * Every tag chip on the current page, as slug + label.
-   *
-   * This is not redundant with the select: Royal Road's `#tagsAdd` list holds 72
-   * *tags* but no *genres*, while a card chips both under the same `tagsAdd`
-   * parameter, so "Adventure", "Mystery" and the rest exist as filters but not
-   * in the select. The cards are the only place both appear together, and
-   * reading them costs nothing.
-   */
+  /** Every tag chip on the page, as slug + label. Not redundant with the select:
+   *  `#tagsAdd` holds 72 *tags* but no *genres*, while a card chips both under the
+   *  same `tagsAdd` parameter - "Adventure" and the rest filter but are not in it. */
   function harvestChips(scope = document) {
     const found = new Map();
     for (const a of scope.querySelectorAll('a[href*="tagsAdd="]')) {
@@ -86,13 +77,10 @@
     return save(tags);
   }
 
-  /**
-   * Best available list, refreshing in the background when stale.
-   * Never throws: an empty list just means the pickers fall back to free text.
-   */
+  /** Best available list, refreshing in the background when stale. Never throws:
+   *  an empty list just means the pickers fall back to free text. */
   async function load() {
-    // Always fold in the current page's chips - they are free, and on a list
-    // page they carry the genres the select omits.
+    // Page chips are free, and on a list page they carry the genres the select omits.
     harvest();
     if (catalogue.length >= 72) return catalogue;
 

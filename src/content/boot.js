@@ -1,24 +1,17 @@
 'use strict';
 
 /**
- * document_start. Runs before Royal Road's deferred module scripts and before
- * first paint.
+ * document_start: before Royal Road's deferred module scripts and before first
+ * paint. Applies the <html> classes and hide stylesheet from the synchronous
+ * localStorage mirror, then repairs both from browser.storage.local when it
+ * resolves - normally well before a ~1.8 MB list page finishes parsing.
  *
- * Reads the synchronous localStorage mirror and applies the <html> classes plus
- * the generated hide stylesheet immediately, then repairs both from the
- * authoritative browser.storage.local as soon as that resolves (normally well
- * before a ~1.8 MB list page has finished parsing).
- *
- * There is no old-UI check here, and that is deliberate. At document_start the
- * only thing parsed is <html>, and the two UIs are not distinguishable from it:
- * the old layout's `class="ie8 no-js"` lives inside an IE conditional comment,
- * so in a real browser its <html> is as bare as the redesign's.
- *
- * Nothing needs the distinction this early. Both things this file does - the
- * <html> classes and the generated stylesheet - are written against hooks that
- * exist only in the redesign, so they are inert on the old UI whether we can
- * tell or not (test/css.test.js enforces that). main.js makes the real call with
- * SEL.newUiProbe once there is a DOM to look at, before any UI is injected.
+ * No old-UI check: only <html> is parsed this early, and the old layout's
+ * `class="ie8 no-js"` sits inside an IE conditional comment, so in a real browser
+ * its <html> is as bare as the redesign's. Nothing here needs the distinction -
+ * the classes and stylesheet target redesign-only hooks, so they are inert on the
+ * old UI (test/css.test.js enforces it). main.js probes with SEL.newUiProbe once
+ * there is a DOM.
  */
 (function (root) {
   const RRX = root.RRX;
@@ -27,8 +20,7 @@
   const html = document.documentElement;
   const STYLE_ID = 'rrx-hide-style';
 
-  // Which kind of page this is, from the URL alone, so page-scoped CSS works
-  // before there is a DOM to look at.
+  // Page kind from the URL alone, so page-scoped CSS works before there is a DOM.
   html.classList.add(`rrx-page-${RRX.pageFromPath(root.location.pathname)}`);
 
   function styleEl() {
@@ -53,25 +45,18 @@
     for (const cls of RRX.MANAGED_CLASSES) html.classList.toggle(cls, wanted.has(cls));
 
     // Filters need parsed numbers off each card, so they cannot run this early.
-    // Hide the list until the first pass lands, but only where a pass is
-    // actually coming: only when a filter is set, and only on a fiction list.
-    //
-    // The page check is not cosmetic. The rule this gates hides `.fiction-list`
-    // wherever it appears, and /home has four of them while the legacy layout
-    // has one of its own. Without it, a saved filter blanks lists on pages the
-    // filter feature never runs on, and nothing is left to reveal them.
-    //
-    // `legacy` is the other half of it. The URL alone cannot tell the two Royal
-    // Road layouts apart, and the legacy one has a `.fiction-list` too, so
-    // main.js sets this the moment its DOM probe says which layout this is.
-    // `apply` runs twice, once synchronously and once from storage, and the
-    // second one lands after that probe: without this it would put the guard
-    // straight back on a page that has nothing left to take it off again.
+    // Hide the list until the first pass lands, but only where a pass is coming:
+    // the rule hides every `.fiction-list`, and /home has four while the legacy
+    // layout has one of its own - a saved filter would blank lists on pages the
+    // filter never runs on, with nothing left to reveal them. The URL cannot tell
+    // the layouts apart, so main.js sets `legacy` after its DOM probe; `apply`
+    // runs twice and the second run lands after that probe, which would otherwise
+    // put the guard back with nothing left to take it off.
     const onList = !RRX.boot.legacy && RRX.pageFromPath(root.location.pathname) === 'list';
     html.classList.toggle(RRX.ROOT_CLASS.filtersPending, onList && RRX.hasActiveFilters(s));
 
-    // Set what the settings call for, and clear any rrx var they no longer do,
-    // so turning a reader override off actually drops its value.
+    // Clear any --rrx var the settings no longer set, so turning a reader
+    // override off actually drops its value.
     const vars = RRX.rootVarsFor(s);
     for (const name of [...html.style].filter((n) => n.startsWith('--rrx-') && !(n in vars))) {
       html.style.removeProperty(name);
@@ -107,10 +92,9 @@
   };
 
   /**
-   * Put Royal Road on the layout the reader asked for, and reload into it.
-   *
-   * The reload is the point: the cookie decides what the *server* sends, so on
-   * its own it changes nothing about the page already in front of somebody.
+   * Put Royal Road on the layout the reader asked for, and reload into it. The
+   * cookie only decides what the *server* sends, so without the reload nothing
+   * about the page already on screen changes.
    *
    * @param {boolean} wantNew
    */
@@ -122,9 +106,8 @@
       return false; // cookies blocked outright; nothing here can work
     }
 
-    // Confirm before reloading. A cookie write can silently do nothing - blocked
-    // storage, or a delete whose domain does not match the one that wrote it -
-    // and reloading then just fetches the same page again for no reason.
+    // A cookie write can silently do nothing (blocked storage; a delete whose
+    // domain does not match the writer's), leaving the reload pointless.
     if (RRX.usesNewDesign(document.cookie) !== wantNew) {
       RRX.warn(`could not switch to Royal Road's ${wantNew ? 'new' : 'old'} design`);
       return false;
@@ -136,21 +119,14 @@
   }
 
   /**
-   * Enforce the layout choice, before first paint, on every load.
+   * Enforce the layout choice, before first paint, on every load - the cookie
+   * outlives the tab, so the old layout has to keep clearing a cookie Royal Road
+   * may set again, and a reload, hard ones included, must land on the layout
+   * asked for. "leave" touches nothing, which makes it safe as the default.
    *
-   * Every load, not just when something changes, because the cookie outlives the
-   * tab: choosing the old layout has to keep clearing a cookie Royal Road may
-   * have set again, or the choice would hold once and then quietly stop. It is
-   * also why this reads the setting rather than reacting to it being changed -
-   * a reload, including a hard one, must land on the layout that was asked for.
-   *
-   * "leave" touches nothing at all, which is what makes it safe as the default:
-   * installing this extension does not decide which version of a site anybody
-   * sees until they say so.
-   *
-   * The flag makes a change that does not take cost one reload instead of an
-   * endless loop, and is cleared as soon as the layout matches, so a later
-   * disagreement - Royal Road's own revert link, say - is corrected next time.
+   * The flag makes a change that does not take cost one reload instead of a loop;
+   * it clears once the layout matches, so a later disagreement - Royal Road's own
+   * revert link, say - is corrected next time.
    */
   function enforceDesign(settings) {
     const mode = settings['design.mode'];
@@ -180,9 +156,8 @@
   const booted = mirrored ? mirrored.settings : RRX.DEFAULT_SETTINGS;
   apply(booted, mirrored ? mirrored.ids : []);
 
-  // Before anything is painted: if this is not the layout that was asked for,
-  // swap it now. Everything below is wasted work on a page about to be replaced,
-  // so this returns rather than falling through.
+  // Everything below is wasted work on a page about to be replaced, so a swap
+  // returns rather than falling through.
   if (RRX.boot.enforceDesign(booted)) return;
 
   // 2. Authoritative. Also repairs the mirror when the options page or another
@@ -194,14 +169,13 @@
       const hidden = RRX.normalizeHidden(raw.hidden);
       apply(settings, RRX.hiddenIds(hidden));
 
-      // Again, now that the authoritative answer is in. The mirror is written
-      // only by a content script that got as far as running, which never happens
-      // on the legacy layout - so somebody who has only ever seen the old design
-      // has an empty mirror, and the pre-paint attempt above had nothing to go
-      // on. That is precisely the reader this setting exists for. This lands
-      // after first paint rather than before it, which costs a flash of the
-      // wrong layout once; the mirror written below makes every later load the
-      // fast path. `tried` keeps the two attempts from becoming two reloads.
+      // Again, now the authoritative answer is in. The mirror is only written by
+      // a content script that ran, which never happens on the legacy layout - so
+      // a reader who has only seen the old design has an empty mirror, and the
+      // pre-paint attempt had nothing to go on. That is exactly the reader this
+      // setting exists for. Costs one flash of the wrong layout; the mirror below
+      // makes later loads the fast path, and `tried` keeps the two attempts from
+      // becoming two reloads.
       RRX.boot.enforceDesign(settings);
       try {
         root.localStorage.setItem(RRX.MIRROR_KEY, JSON.stringify(RRX.buildMirror(settings, hidden)));

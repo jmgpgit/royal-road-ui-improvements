@@ -1,12 +1,8 @@
 'use strict';
 
-/**
- * Options page: the settings sections (built from the schema), the
- * hidden-fiction manager, and JSON backup.
- *
- * Writes go to the same browser.storage.local every Royal Road tab reads, so
- * open tabs pick changes up through storage.onChanged without a reload.
- */
+/** Options page: schema-built settings sections, the hidden-fiction manager, and
+ *  JSON backup. Writes go to the browser.storage.local every Royal Road tab
+ *  reads, so open tabs pick changes up through storage.onChanged, no reload. */
 (function () {
   const RRX = globalThis.RRX;
   const { SCHEMA, COPY, SECTIONS } = RRX;
@@ -15,12 +11,8 @@
   let state = { settings: RRX.normalizeSettings(null), hidden: {}, chapters: {} };
   let filter = '';
 
-  /**
-   * The hidden-fiction manager belongs with the list settings, but it is
-   * hand-written markup rather than a generated row, so it is moved into that
-   * box on render rather than built there. It stays in the document until then,
-   * so the listeners set up further down still find their elements.
-   */
+  /** Hand-written markup rather than a generated row, so render moves it into the
+   *  list settings box. It lives here until then, so the listeners below find it. */
   const hiddenSection = $('hidden-section');
 
   // --- element helpers -------------------------------------------------------
@@ -94,8 +86,7 @@
       min: spec.min,
       max: copy.max !== undefined ? copy.max : spec.max,
       step: copy.step || (spec.type === 'int' ? 1 : 'any'),
-      // Nullable settings show empty for "no constraint", which is not the same
-      // as 0, so the field is left blank rather than filled with a default.
+      // Empty means "no constraint", which is not 0, so nullable fields stay blank.
       placeholder: spec.nullable ? 'default' : '',
       onChange: (e) => {
         const raw = e.target.value.trim();
@@ -115,7 +106,7 @@
   }
 
   function stringRow(key, copy) {
-    // A pattern list needs room to breathe; everything else is a one-liner.
+    // Pattern lists get a textarea; everything else is a one-liner.
     const input = copy.multiline
       ? el('textarea', {
           id: `opt-${key}`,
@@ -153,7 +144,7 @@
     return null; // lists are edited in context, not here
   }
 
-  /** Grey out a control whose master switch is off, so the hierarchy is visible. */
+  /** Controls greyed out while their master switch is off. */
   const DEPENDENCIES = {
     'list.hoverExpand': () => !state.settings['list.expandAll'],
     'list.hoverDelayMs': () => state.settings['list.hoverExpand'] && !state.settings['list.expandAll'],
@@ -179,7 +170,7 @@
 
   function renderSections() {
     const host = $('sections');
-    // Lift it clear before the wipe, or re-rendering would destroy it.
+    // Lift it clear before the wipe, or the re-render destroys it.
     hiddenSection.remove();
     host.textContent = '';
     for (const section of SECTIONS) {
@@ -229,7 +220,7 @@
     const needle = filter.trim().toLowerCase();
     const visible = ids
       .map((id) => ({ id, ...state.hidden[id] }))
-      // Most recently hidden first: that is what you are most likely undoing.
+      // Most recently hidden first - that is what you are most likely undoing.
       .sort((a, b) => b.hiddenAt - a.hiddenAt)
       .filter((rec) => !needle || rec.title.toLowerCase().includes(needle));
 
@@ -310,9 +301,7 @@
       const parsed = RRX.parseBackup(await file.text());
       const incoming = RRX.hiddenIds(parsed.hidden).length;
       const current = RRX.hiddenIds(state.hidden).length;
-      // Reading progress is replaced too, so it has to be named: "replace my
-      // settings" and "replace where I am in every chapter" deserve different
-      // levels of consent.
+      // Reading progress is replaced too, so the prompt has to name it.
       const read = Object.keys(state.chapters || {}).length;
       const alsoRead = read ? ` and where you had got to in ${read} chapter${read === 1 ? '' : 's'}` : '';
       if (
@@ -359,10 +348,9 @@
 
   // --- boot ------------------------------------------------------------------
 
-  // Keep this page honest if a Royal Road tab or the popup changes something.
-  // `onChange` carries settings and hidden only - reading progress is not in its
-  // guard, on purpose - so the chapters we already hold are kept rather than
-  // overwritten with undefined.
+  // `onChange` carries settings and hidden only - reading progress is left out of
+  // its guard on purpose - so the spread keeps the chapters we already hold rather
+  // than overwriting them with undefined.
   RRX.store.onChange((next) => {
     state = { ...state, ...next };
     render();

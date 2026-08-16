@@ -2,8 +2,8 @@
 
 **UI Improvements for Royal Road collects nothing, sends nothing, and has no server.**
 
-This document is the privacy policy for the extension, and is written to be checkable against
-the source rather than taken on trust. Every claim below names the file that implements it.
+This policy is written to be checked against the source rather than taken on trust. Every claim
+below names the file that implements it.
 
 ## What is stored, and where
 
@@ -16,17 +16,18 @@ Four things, all in `browser.storage.local`, which is local to your browser prof
   For each chapter you have opened: its Royal Road id, its fiction's id, when you last had it
   open, how far down you were — as a paragraph number, not a scrolled distance — and the time
   of the newest comment you had seen on it. No chapter text, no comment text, no titles. The
-  comment date is forgotten after 60 days by default, and a reading position is deleted as
-  soon as you finish the chapter, so neither accumulates indefinitely.
-- **Royal Road's list of tags**, cached for a week so the filter panel does not refetch it. This
-  is Royal Road's own public vocabulary — "LitRPG", "Progression", and the rest — and says
-  nothing whatever about you. See [`src/content/tags.js`](src/content/tags.js).
-  See [`src/common/model.js`](src/common/model.js) for the exact shape.
+  comment date is forgotten after 60 days by default, and a reading position is deleted as soon
+  as you finish the chapter, so neither accumulates indefinitely. See
+  [`src/common/model.js`](src/common/model.js) for the exact
+  shape.
+- **Royal Road's list of tags**, cached for a week so the filter panel does not refetch it.
+  This is Royal Road's own public vocabulary — "LitRPG", "Progression", and the rest — and says
+  nothing about you. See [`src/content/tags.js`](src/content/tags.js).
 
 A compact copy of your settings and the ids of your hidden fictions is mirrored into
-`localStorage` on royalroad.com. This exists only so the extension can read your settings
-before the page paints, which is what stops hidden fictions flashing up before they are
-hidden. It is the same data, on the same machine.
+`localStorage` on royalroad.com. This exists only so the extension can read your settings before
+the page paints, which stops hidden fictions flashing up before they are hidden. It is the same
+data, on the same machine.
 
 With the previous-chapter recap switched on, the closing text of each chapter it reads is kept
 in `sessionStorage` on royalroad.com, so that moving back and forth does not fetch the same
@@ -50,19 +51,17 @@ works on the newer one. Choosing **Always the new design** sets that cookie and 
 choosing **Always the old design** deletes it and reloads. On the default, *Leave it to Royal
 Road*, the extension reads that one cookie to see whether anything needs doing and never
 writes it. It records a preference about Royal Road's own appearance and nothing about you; it
-is Royal Road's cookie, of the kind the site sets itself, and Royal Road's own "Revert To
-Legacy UI" link overwrites it. The extension writes no other cookie and reads no cookie except
-this one.
+is Royal Road's cookie, and Royal Road's own "Revert To Legacy UI" link overwrites it. The
+extension writes no other cookie and reads no cookie except this one.
 See [`src/common/design.js`](src/common/design.js).
 
 Nothing is stored anywhere else. There is no account and no identifier of any kind.
 
-Nor is any of it synced. Everything above lives in `browser.storage.local`, which your browser
-does not carry between devices; the extension never uses the `storage.sync` API that would.
-This is a choice about where your data lives, not an interference with your browser: Firefox
-Sync and Chrome sync work exactly as they always did, and the extension neither reads nor
-affects them. Moving settings between machines is done with Options -> Backup, a file you
-export and import yourself.
+Nor is any of it synced. `browser.storage.local` is not carried between devices, and the
+extension never uses the `storage.sync` API that would. This is a choice about where your data
+lives, not interference with your browser: Firefox Sync and Chrome sync work exactly as they
+always did, and the extension neither reads nor affects them. Moving settings between machines
+is done with Options -> Backup, a file you export and import yourself.
 
 ## What is sent
 
@@ -100,8 +99,8 @@ browser would already send to royalroad.com.
 - It never writes to your Royal Road account: no follow, no favourite, no rating, no comment,
   no bookmark, no setting. Hiding a fiction is local to this extension and is not Royal Road's
   own server-side "hide". The layout cookie described above is the one thing it writes that
-  Royal Road can see, and that is a cookie in your browser rather than anything stored against
-  an account: it works, and is written the same way, whether or not you are signed in.
+  Royal Road can see, and it lives in your browser rather than against an account: it works, and
+  is written the same way, whether or not you are signed in.
 - It never requests your account pages (`/my/follows`, `/my/favorites`, `/my/readlater`).
   Everything it knows about what you follow is read from the page you are already looking at.
 - It contains no analytics, no telemetry, no crash reporting and no third-party code.
@@ -124,10 +123,10 @@ unhidden content.
 Options -> Backup exports everything the extension holds — settings, hidden fictions and
 reading progress — as a JSON file, and imports it back. Resetting the settings leaves the other
 two alone.
-Removing the extension removes everything it has stored with it. The `localStorage` copy described
-above lives under royalroad.com rather than under the extension, so clearing site data for
-royalroad.com is what removes that one. The recap and chapter-list caches go when you close the
-tab, and clearing site data for royalroad.com removes them too.
+Removing the extension removes everything it has stored with it. The `localStorage` copy
+described above lives under royalroad.com rather than under the extension; clearing site data
+for royalroad.com removes it, along with the recap and chapter-list caches, which also go when
+you close the tab.
 
 ## Changes
 

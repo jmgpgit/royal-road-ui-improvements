@@ -2,13 +2,11 @@
 
 /**
  * Pure data logic: fiction-id parsing, the hidden-fiction map, the synchronous
- * boot mirror, and backup import/export.
+ * boot mirror, and backup import/export. Settings validation lives in schema.js
+ * and is re-exported here so callers reach for one namespace (`RRX`).
  *
- * Settings validation lives in schema.js; this module only re-exports it so the
- * rest of the codebase has one place (`RRX`) to reach for either.
- *
- * Nothing here touches extension APIs or the network, so it is all unit-testable
- * under `node --test` (see test/model.test.js).
+ * No extension APIs and no network, so it is all unit-testable under
+ * `node --test` (test/model.test.js).
  */
 (function (root, factory) {
   const schema = typeof module !== 'undefined' && module.exports
@@ -26,11 +24,9 @@
   const { normalizeSettings } = schema;
 
   /**
-   * Extract a fiction id from any Royal Road URL.
-   *
-   * Matches /fiction/181303, /fiction/181303/slug, /fiction/181303/read,
-   * /fiction/181303/slug/chapter/123/x and absolute forms of the same.
-   * Deliberately does NOT match /fictions/... (the list pages).
+   * Extract a fiction id from any Royal Road URL: /fiction/181303,
+   * /fiction/181303/slug, /fiction/181303/read, /fiction/181303/slug/chapter/123/x
+   * and absolute forms. Deliberately not /fictions/... (the list pages).
    */
   function fictionIdFromHref(href) {
     if (typeof href !== 'string') return null;
@@ -39,14 +35,11 @@
   }
 
   /**
-   * Extract a chapter id from any Royal Road URL.
-   *
-   * Matches /chapter/3766643 and /chapter/3766643/slug, relative or absolute,
-   * so a full /fiction/149588/slug/chapter/3766643/x answers both this and
-   * `fictionIdFromHref` - which is exactly what a chapter page needs.
-   *
-   * Deliberately does NOT match /fiction/149588: a fiction is not a chapter,
-   * and a caller that conflated the two would look up nonsense.
+   * Extract a chapter id from any Royal Road URL: /chapter/3766643 and
+   * /chapter/3766643/slug, relative or absolute. A full
+   * /fiction/149588/slug/chapter/3766643/x answers this and `fictionIdFromHref`,
+   * which is what a chapter page needs. Deliberately not /fiction/149588: a
+   * caller that conflated the two would look up nonsense.
    */
   function chapterIdFromHref(href) {
     if (typeof href !== 'string') return null;
@@ -55,11 +48,9 @@
   }
 
   /**
-   * Which kind of Royal Road page a path is.
-   *
-   * Lives here, in the pure module, because boot.js needs it at document_start
-   * (before there is a DOM to inspect) and main.js needs the same answer later.
-   * Two copies of this would drift.
+   * Which kind of Royal Road page a path is. Here, in the pure module, because
+   * boot.js needs it at document_start (before there is a DOM to inspect) and
+   * main.js needs the same answer later; two copies would drift.
    *
    * @returns {'list'|'chapter'|'fiction'|'home'|'other'}
    */
@@ -92,11 +83,9 @@
     return [...out].sort((a, b) => a - b);
   }
 
-  /**
-   * The hidden store is `{ [fictionId]: { title, url, cover, hiddenAt } }`.
-   * Metadata is captured off the card at hide time so the manager can render
-   * covers and titles without hitting the network.
-   */
+  /** `{ [fictionId]: { title, url, cover, hiddenAt } }`. Metadata is captured off
+   *  the card at hide time so the manager renders covers and titles without
+   *  hitting the network. */
   function normalizeHidden(raw) {
     const src = raw && typeof raw === 'object' ? raw : {};
     const out = {};
@@ -121,39 +110,31 @@
   // `{ [chapterId]: { f, a, p, o, n, len } }`, one record per chapter opened.
   //
   //   f   the fiction it belongs to, 0 when unknown
-  //   a   when it was last open, unix SECONDS (milliseconds cost three bytes a
+  //   a   when it was last open, unix SECONDS (ms would cost three bytes a
   //       record for precision nothing here needs)
   //   p   index of the block in `.chapter-content` at the top of the viewport
   //   o   how far into that block, 0..1
   //   n   how many blocks the chapter had, and
-  //   len how long its text was - together, the edit detector: a chapter that
-  //       has been rewritten under a saved position must not be restored to a
-  //       paragraph that is now a different scene
-  //   s   the newest comment already seen on this chapter, unix seconds. Kept
-  //       here rather than in its own key because it is the same grain and the
-  //       same write: one record per chapter, one flush on the way out
-  //   d   how much of the chapter's TEXT had been on screen, 0..1. Measured
-  //       against the chapter box rather than the page, which grows when the
-  //       comments load, and reported to the reader as a percentage
+  //   len how long its text was - the edit detector: a chapter rewritten under a
+  //       saved position must not be restored to what is now a different scene
+  //   s   newest comment already seen on this chapter, unix seconds. Kept in this
+  //       record rather than its own key: same grain, same write
+  //   d   how much of the chapter's text had been on screen, 0..1. Measured
+  //       against the chapter box, not the page, which grows when the comments
+  //       load; shown to the reader as a percentage
   //
-  // Short names because this is the one map that grows without a ceiling and is
-  // re-serialised whole on every write. It is machine-read and never hand-edited;
-  // the legend is here and nowhere else.
+  // Short names because this map grows without a ceiling and is re-serialised
+  // whole on every write. Machine-read, never hand-edited; the legend lives here
+  // and nowhere else.
 
   /** Keep the newest, and drop the emptiest first. */
   const CHAPTERS_MAX = 20000;
   const CHAPTERS_KEEP = 18000;
 
-  /**
-   * How long a comment watermark is worth keeping, in seconds.
-   *
-   * Two reasons, and they point the same way. Coming back to a chapter after
-   * two months, "what is new since June" is not a useful question and the
-   * comments are worth seeing afresh. And a watermark is the one thing here
-   * that would otherwise accumulate forever: a reading position deletes itself
-   * when the chapter is finished, but a watermark would be kept for every
-   * chapter whose comments were ever loaded.
-   */
+  /** How long a comment watermark is worth keeping, in seconds. Two months on,
+   *  "what is new since June" is not a useful question. And unlike a reading
+   *  position - which deletes itself when the chapter is finished - a watermark
+   *  would otherwise be kept for every chapter whose comments ever loaded. */
   const SEEN_MAX_AGE_S = 60 * 24 * 60 * 60;
 
   function normalizeChapters(raw) {
@@ -185,28 +166,21 @@
         if (Number.isFinite(d)) record.d = Math.min(1, Math.max(0, d));
       }
 
-      // A record whose every field was junk still keeps its key: the key is
-      // itself the fact that this chapter was opened, and throwing it away
-      // would lose real reading history to one bad number.
+      // All-junk fields still keep the key: the key is itself the fact that the
+      // chapter was opened, and dropping it loses real history to one bad number.
       out[id] = record;
     }
     return out;
   }
 
   /**
-   * Drop what is no longer worth keeping.
-   *
-   * Two passes, because the two things a record holds have different lifetimes.
-   *
-   * A watermark expires after `SEEN_MAX_AGE_S` (see there). A reading position
-   * does not: somebody who put a chapter down half way through last spring
-   * still wants it back, and unlike a watermark it deletes itself as soon as
-   * they finish the chapter, so it cannot pile up the same way. A record left
-   * holding neither is dropped: its only remaining fact is that the chapter was
-   * once opened, which nothing reads.
-   *
-   * The cap is the backstop after that, oldest first, and records with no
-   * position before ones that have one.
+   * Drop what is no longer worth keeping. A watermark expires after
+   * `SEEN_MAX_AGE_S`; a reading position does not - somebody who put a chapter
+   * down half way through last spring still wants it back, and it deletes itself
+   * once they finish the chapter, so it cannot pile up the same way. A record
+   * left holding neither goes: all it still says is that the chapter was opened,
+   * which nothing reads. The cap is the backstop after that, oldest first and
+   * positionless records before ones with a position.
    *
    * @param {number} now unix SECONDS, passed in because this module has no clock
    */
@@ -221,8 +195,7 @@
       const record = { ...rec };
       const stale = now && record.a && now - record.a > seenMaxAgeS;
       if (stale) delete record.s;
-      // `p` is the position; without it and without a watermark there is
-      // nothing here anybody asks for.
+      // No position (`p`) and no watermark: nothing left anybody asks for.
       if (record.p === undefined && record.s === undefined && stale) continue;
       out[id] = record;
     }
@@ -244,10 +217,9 @@
 
   // --- synchronous boot mirror --------------------------------------------
   // browser.storage.local is async, which races first paint. Content scripts run
-  // in the page's origin, so localStorage gives us a synchronous read at
-  // document_start - before Royal Road's deferred module scripts run. That kills
-  // the flash of soon-to-be-hidden cards AND means Embla never measures the
-  // carousel slides we are about to hide.
+  // in the page's origin, so localStorage reads synchronously at document_start,
+  // before Royal Road's deferred module scripts: no flash of soon-to-be-hidden
+  // cards, and Embla never measures the carousel slides we are about to hide.
 
   function buildMirror(settings, hidden) {
     return { v: 1, settings: normalizeSettings(settings), ids: hiddenIds(hidden) };
@@ -267,10 +239,10 @@
   // --- backup --------------------------------------------------------------
 
   /**
-   * `BACKUP_VERSION` does NOT move when a section is added. parseBackup only
-   * refuses files *newer* than itself, so bumping would make an older install
-   * reject a whole file it could have restored the settings and hidden list
-   * from perfectly well. Bump it when an existing field changes meaning.
+   * `BACKUP_VERSION` does not move when a section is added: parseBackup only
+   * refuses files newer than itself, so bumping would make an older install
+   * reject a whole file it could have restored settings and the hidden list from.
+   * Bump it when an existing field changes meaning.
    *
    * Takes the state object rather than one argument per section, so the next
    * thing worth backing up does not change this signature again.
@@ -305,8 +277,8 @@
     return {
       settings: normalizeSettings(data.settings),
       hidden: normalizeHidden(data.hidden),
-      // Absent in a backup written before reading progress existed, which
-      // normalises to {} rather than failing the import.
+      // Absent in a backup written before reading progress existed; normalises
+      // to {} rather than failing the import.
       chapters: normalizeChapters(data.chapters),
     };
   }
@@ -315,7 +287,6 @@
     MIRROR_KEY,
     BACKUP_FORMAT,
     BACKUP_VERSION,
-    // Re-exported from schema.js so callers only ever reach for one namespace.
     normalizeSettings,
     fictionIdFromHref,
     chapterIdFromHref,

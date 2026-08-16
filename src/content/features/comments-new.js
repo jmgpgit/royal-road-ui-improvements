@@ -1,21 +1,16 @@
 'use strict';
 
 /**
- * Which comments have arrived since you were last here.
+ * Which comments have arrived since you were last here. Royal Road has no
+ * notion of a previous visit.
  *
- * Coming back to a chapter you follow, the question is never "what are the
- * comments" but "what is new". Royal Road answers neither: it shows the same
- * ranked list every time, with no notion of a previous visit.
+ * It fetches the list as `?sorting=top`, so the list is ranked, not
+ * chronological - a "new since your last visit" divider would land in an
+ * arbitrary place. So there is no line; every comment carries its own verdict,
+ * computed from its own timestamp.
  *
- * The shape of this is decided by one fact about that list. Royal Road fetches
- * it as `?sorting=top`, so it is RANKED, not chronological - a "new since your
- * last visit" divider would land in an arbitrary place, with old comments below
- * it and new ones above. So there is no line. Every comment carries its own
- * verdict, computed from its own timestamp.
- *
- * Nothing is ever hidden here. Seen comments fold to a line that opens again on
- * hover, and there is deliberately no hide option: a comment you have read is
- * not a comment you wanted removed, and the reply under it may be the new one.
+ * Nothing is hidden, only folded to a line that opens on hover: a comment you
+ * have read is not one you wanted removed, and the reply under it may be new.
  */
 (function (root) {
   const RRX = root.RRX;
@@ -31,30 +26,19 @@
   const SHOW_ALL_CLASS = 'rrx-show-all';
   const ONLY_NEW_CLASS = 'rrx-comments-onlynew';
 
-  /**
-   * How long the comments have to be on screen before this visit counts as
-   * having read them. Short enough to catch a real look, long enough that
-   * scrolling past on the way to the next chapter does not.
-   */
+  /** Time on screen before this visit counts as having read them. Long enough
+   *  that scrolling past on the way to the next chapter does not. */
   const DWELL_MS = 3000;
 
-  /**
-   * How long a reload still counts as the same sitting.
-   *
-   * Long enough to cover a refresh, a tab restore, or coming back from the
-   * kitchen; short enough that returning tomorrow folds what you read today.
-   */
+  /** How long a reload still counts as the same sitting: covers a refresh or a
+   *  tab restore, but returning tomorrow folds what you read today. */
   const SAME_SITTING_S = 15 * 60;
 
   const chapterId = () => RRX.chapterIdFromHref(location.pathname);
 
-  /**
-   * A comment's own timestamp, in unix seconds.
-   *
-   * Through `ownParts`, because a comment contains its replies and every one of
-   * them carries a `<time>` of its own - the first one found by a plain query
-   * is as likely to belong to a reply as to the comment asking.
-   */
+  /** A comment's own timestamp, in unix seconds. Filtered to this comment: a
+   *  comment contains its replies, each carrying a `<time>` of its own, so a
+   *  plain query is as likely to find a reply's. */
   function timeOf(comment) {
     const own = [...comment.querySelectorAll(SEL.commentTime)].filter(
       (el) => el.closest(SEL.comment) === comment
@@ -75,13 +59,9 @@
 
   // --- state ------------------------------------------------------------------
 
-  /**
-   * The watermark, read once and PINNED for the visit.
-   *
-   * Advancing it as you read would make the marks evaporate under you: a
-   * comment you were part way through reading would stop being new while you
-   * were looking at it. It moves on the way out, and nowhere else.
-   */
+  /** The watermark, read once and pinned for the visit. Advancing it as you
+   *  read would make a comment stop being new while you were looking at it. It
+   *  moves on the way out, and nowhere else. */
   let seenAt = null;
   let dwelt = false;
   /** The newest comment already written, so a later page can still advance it. */
@@ -101,12 +81,11 @@
   /**
    * Whether the record has been read yet.
    *
-   * Load-bearing, and easy to lose: `syncCards` runs during main.js's own
-   * startup and again on every sweep, so `apply` is reached long before an
-   * async storage read can finish. Resolving a watermark from a record that is
-   * not in yet gives 0 - "never visited" - and pinning that, as the watermark
-   * must be pinned, makes it 0 for the rest of the page view. Every return to
-   * a chapter then looks like the first one, and nothing ever folds.
+   * `syncCards` runs during main.js's own startup and on every sweep, so
+   * `apply` is reached long before the async storage read can finish. Resolving
+   * from a record that is not in yet gives 0 - "never visited" - and that gets
+   * pinned for the page view, so every return looks like the first one and
+   * nothing ever folds.
    */
   let loaded = false;
 
@@ -129,11 +108,9 @@
   /**
    * The watermark to judge against, given how long the reader keeps them.
    *
-   * Past the expiry the chapter reads as one never visited: coming back after
-   * two months, "new since June" is not a useful question and the conversation
-   * is worth seeing whole again. Resolved here rather than when the record is
-   * read, because the setting is only in hand once `onPage` runs - and it is
-   * pinned afterwards, so the marks cannot evaporate mid-visit.
+   * Past the expiry the chapter reads as one never visited: two months on, "new
+   * since June" is not a useful question. Resolved here rather than when the
+   * record is read, because the setting is only in hand once `onPage` runs.
    */
   function resolveSeen(settings) {
     const maxAge = maxAgeFor(settings);
@@ -145,13 +122,9 @@
     return seenAt;
   }
 
-  /**
-   * Move the watermark to the newest comment ON THE PAGE, not to now.
-   *
-   * `now` would mark as read a comment posted while the tab sat open but never
-   * loaded, and would write off page two when only page one was ever fetched.
-   * The newest thing actually rendered is the only claim that is true.
-   */
+  /** Move the watermark to the newest comment on the page, not to now: `now`
+   *  would mark as read a comment posted while the tab sat open but never
+   *  loaded, and write off page two when only page one was ever fetched. */
   function commit({ force = false } = {}) {
     if (!dwelt && !force) return;
     const id = chapterId();
@@ -166,8 +139,7 @@
   function watchDwell() {
     if (observer || typeof root.IntersectionObserver !== 'function') return;
     // Same fallback as the bar: a chapter with few comments has no pagination
-    // block, and watching only that would mean its comments could never be
-    // marked as read.
+    // block, and watching only that would never mark its comments as read.
     const anchor =
       document.querySelector(SEL.commentsPaginate) || document.querySelector(SEL.commentsContainer);
     if (!anchor) return;
@@ -177,11 +149,10 @@
       if (showing && !dwellTimer) {
         dwellTimer = setTimeout(() => {
           dwelt = true;
-          // Written here rather than only on the way out. A storage write from
-          // a pagehide handler is async against a page being torn down and
-          // frequently never lands, which left the next visit thinking it was
-          // the first. The pagehide call below still runs, and picks up
-          // anything that loaded after this.
+          // A storage write from a pagehide handler is async against a page
+          // being torn down and frequently never lands, which left the next
+          // visit thinking it was the first. The pagehide call below still
+          // runs, and picks up anything that loaded after this.
           commit();
         }, DWELL_MS);
       } else if (!showing && dwellTimer) {
@@ -204,16 +175,10 @@
   /**
    * A word, not just a colour.
    *
-   * The first version marked a new comment with an inset shadow down its left
-   * edge, and it was invisible: the comment's own children paint their
-   * backgrounds over an inset shadow, and Royal Road already tints that same
-   * edge by reputation tier, so even where it showed it read as one more
-   * variant of a colour that means something else. A badge cannot be painted
-   * over, survives any theme, and says what it means.
-   *
-   * Placed as the comment's own first child, like the collapse toggle, and
-   * scoped with `:scope >` so a reply's badge is never mistaken for its
-   * parent's.
+   * An inset shadow down the left edge was invisible: the comment's own
+   * children paint their backgrounds over it, and Royal Road already tints that
+   * same edge by reputation tier. `:scope >` so a reply's badge is never
+   * mistaken for its parent's.
    */
   function badge(comment, isNew) {
     const existing = comment.querySelector(`:scope > .${PILL_CLASS}`);
@@ -228,28 +193,21 @@
     );
   }
 
-  /**
-   * Decide, then write - in that order, and never interleaved.
-   *
-   * The protection pass is why: a comment is only folded if nothing new lives
-   * anywhere beneath it, and that cannot be known while walking the list. A
-   * fold-then-unfold would also fight itself on the next sweep.
-   */
+  /** Decide, then write, never interleaved: a comment is only folded if nothing
+   *  new lives anywhere beneath it, which cannot be known while walking the
+   *  list, and a fold-then-unfold would fight itself on the next sweep. */
   function mark(scope, mode) {
     const comments = [...(scope || document).querySelectorAll(SEL.comment)];
     if (!comments.length) return { total: 0, fresh: 0 };
 
-    // No watermark means no previous visit, and on a first visit NOTHING is
-    // already seen. Folding the lot here would be the feature's first
-    // impression: a whole page of comments collapsed for a reader who has read
-    // none of them.
+    // No watermark means no previous visit, so nothing is already seen. Folding
+    // here would collapse a whole page for a reader who has read none of it.
     const known = !!seenAt;
 
     // Reading the comments is what sets the watermark, so a reload a moment
     // later is correct to call them all seen - and collapsing the page you were
-    // just looking at is still the wrong thing to do. Inside the window this
-    // counts as the same sitting: comments are still marked, so anything new
-    // that arrives is still pointed at, but nothing folds.
+    // just looking at is still wrong. Inside the window comments are still
+    // marked, so anything new is pointed at, but nothing folds.
     const sinceVisit = record && record.a ? Math.floor(Date.now() / 1000) - record.a : Infinity;
     const foldable = known && sinceVisit > SAME_SITTING_S;
 
@@ -260,9 +218,8 @@
       comment.dataset.rrxNew = known && timeOf(comment) > seenAt ? '1' : '0';
     }
 
-    // Every new comment, and every comment above one. A reply is the most
-    // likely thing to be new, and folding the conversation it answers would
-    // hide the question.
+    // Every new comment, and every comment above one: a reply is the likeliest
+    // thing to be new, and folding what it answers would hide the question.
     const keep = new Set();
     for (const comment of comments) {
       if (comment.dataset.rrxNew !== '1') continue;
@@ -290,26 +247,23 @@
       comment.classList.toggle(SEEN_CLASS, fold);
       // A new reply can be buried in a collapsed "N more replies" chain, where
       // its own mark is invisible. Flag the owner so the CSS can dot the
-      // control - but never expand it unasked.
+      // control; never expand it unasked.
       comment.classList.toggle(
         HAS_NEW_CLASS,
         !isNew && keep.has(comment) && !!comment.querySelector(SEL.commentDeepReplies)
       );
     }
 
-    // What the low-effort rules are suppressing. comments.js owns both classes
-    // and applies them whether or not "show everything" is on, so these stay
-    // countable while the control is pressed - which is what lets it keep a
-    // stable label instead of renaming itself the moment it is used.
+    // What the low-effort rules are suppressing. comments.js applies both
+    // classes whether or not "show everything" is on, so these stay countable
+    // while the control is pressed, which keeps its label stable.
     //
-    // Counted separately because they are not the same promise: a folded
-    // comment is a dimmed line you can already open by hovering, while a hidden
-    // one is gone from the page with nothing to hover. Only the second needs a
-    // control to exist at all.
-    // `folded` stays separate from these: it means "folded for having been
-    // read", which only makes sense with a previous visit behind it. Adding the
-    // low-effort folds into it made the bar claim a watermark date on a chapter
-    // nobody had opened, and `new Date(0)` reads as 1 January 1970.
+    // Counted separately: a folded comment is a dimmed line you can open by
+    // hovering, a hidden one is gone from the page with nothing to hover, and
+    // only the second needs a control to exist at all. `folded` stays out of
+    // both - it means "folded for having been read", and mixing the low-effort
+    // folds in made the bar claim a watermark date on a chapter nobody had
+    // opened, where `new Date(0)` reads as 1 January 1970.
     const lowEffort = document.querySelectorAll('.rrx-comment-thanks').length;
     const hidden = document.querySelectorAll('.rrx-comment-thanks-hidden').length;
     return { total: comments.length, fresh, folded, lowEffort, hidden };
@@ -329,28 +283,19 @@
   }
 
   /**
-   * The bar exists only when there is something new to say.
+   * What the bar says. Only shown when something is new or folded - a
+   * first-visit greeting or a "nothing new" line every chapter would just be
+   * furniture. How many comments the reader's own rules hid is said on Royal
+   * Road's own count line instead - see comments.js.
    *
-   * No first-visit greeting and no "nothing new" line: both state the obvious
-   * at the top of every chapter's comments, which is how furniture stops being
-   * read at all. How many comments the reader's own rules hid is said on Royal
-   * Road's own count line instead, where it belongs - see comments.js.
-   */
-  /**
-   * What the bar says.
+   * The folded case has to be spelled out and dated: a page that collapses most
+   * of its own comments with no explanation looks broken rather than tidied.
    *
-   * The folded case has to be spelled out, and dated: a page that collapses
-   * most of its own comments with no explanation looks broken rather than
-   * tidied, and the reader cannot check the arithmetic without being told the
-   * boundary.
-   *
-   * The date is the newest comment that was here last time, NOT the date of
-   * that visit - and the wording has to say so, because they are usually
-   * different. Read a chapter on the 16th whose last comment was posted on the
-   * 15th and the boundary is the 15th; a comment posted late on the 15th, after
-   * the ones that had loaded, is then genuinely new despite the visit being
-   * later. Labelling that "since you were last here on the 16th" would make
-   * correct behaviour look broken.
+   * The date is the newest comment that was here last time, not the date of
+   * that visit, and the wording has to say so. Read a chapter on the 16th whose
+   * last comment was posted on the 15th and the boundary is the 15th; a comment
+   * posted late on the 15th, after the ones that had loaded, is then genuinely
+   * new despite the visit being later.
    */
   function label(counts) {
     // Nothing dated without a watermark to date it from.
@@ -382,8 +327,8 @@
         ui.el('span', {
           class: 'rrx-comments-bar__count',
           text: label(counts),
-          // Spelling out the boundary, because the date is not the date of the
-          // visit and somebody will reasonably wonder why it is a day early.
+          // The date is not the date of the visit, and somebody will
+          // reasonably wonder why it is a day early.
           title:
             'Dated by the newest comment that was here when you last read this chapter, ' +
             'which is what anything newer is measured against.',
@@ -403,14 +348,12 @@
               },
             })
           : null,
-        // Only worth offering while something is actually folded. Each folded
-        // comment already opens on hover; this is for reading the lot.
+        // Each folded comment already opens on hover; this is for reading the lot.
         counts.folded || counts.lowEffort || counts.hidden || showAll
           ? ui.toggleButton({
               id: 'showAll',
-              // Named for the more surprising half of what it does. Somebody
-              // whose comments are being hidden has nothing on screen to hover,
-              // so "Unfold" would describe the one case they cannot see.
+              // Somebody whose comments are being hidden has nothing on screen
+              // to hover, so "Unfold" would name the one case they cannot see.
               label: counts.hidden ? 'Show hidden' : 'Unfold',
               title: counts.hidden
                 ? `Show every comment in full for this visit, including the ${counts.hidden} being hidden`
@@ -419,11 +362,11 @@
               pressed: showAll,
               onClick: () => {
                 showAll = !showAll;
-                // Both kinds of folding, not just the one this file owns. The
-                // button says "show every comment in full", and a reader who
-                // presses it and still sees "tftc" collapsed is right to call
-                // that broken. The low-effort folding lives in comments.js and
-                // is driven by CSS, so an <html> class is what reaches it.
+                // Both kinds of folding, not just the one this file owns: a
+                // reader who presses "show every comment in full" and still
+                // sees "tftc" collapsed is right to call that broken. The
+                // low-effort folding lives in comments.js and is driven by CSS,
+                // so an <html> class is what reaches it.
                 document.documentElement.classList.toggle(SHOW_ALL_CLASS, showAll);
                 apply(lastCtx);
               },
@@ -452,11 +395,10 @@
       return;
     }
 
-    // `#comments-pagination` first: it is server-rendered, it carries the fetch
-    // URL, and Royal Road leaves it alone. But a chapter with few enough
-    // comments to need no pages does not have one, so fall back to sitting
-    // above the container. Never INSIDE the container - Royal Road's own AJAX
-    // replaces that wholesale, taking anything in it with no warning.
+    // `#comments-pagination` first: server-rendered, carries the fetch URL, and
+    // Royal Road leaves it alone. A chapter with too few comments to need pages
+    // has none, so fall back to above the container. Never inside the container
+    // - Royal Road's own AJAX replaces that wholesale, with no warning.
     const paginate = document.querySelector(SEL.commentsPaginate);
     if (paginate) {
       paginate.prepend(bar);
@@ -477,21 +419,18 @@
     if (mode === 'off') return;
 
     // Nothing until the record is in - see `loaded`. `onPage` re-enters as soon
-    // as it is, and every sweep after that finds it waiting.
+    // as it is.
     if (!loaded) return;
 
     resolveSeen(ctx.settings);
     const counts = mark(document, mode);
     const existing = document.getElementById(BAR_ID);
-    // Something new to point at, or something folded to explain. With neither -
-    // a first visit, or nothing having happened since - the bar would only be
-    // stating that nothing has changed.
-    // `hidden` belongs here as much as the other two, and is the easiest to
-    // forget: a hidden comment is gone from the page, so the bar is the only
-    // route back to it. Without this a chapter you have already read - nothing
-    // new, nothing folded as seen - loses that route entirely, and infinite
-    // scroll makes it worse, because the first page can be clean while a later
-    // one hides plenty.
+    // Something new to point at, or something folded or hidden to explain; with
+    // none of those the bar would only state that nothing has changed.
+    // `hidden` is the easy one to forget: a hidden comment is gone from the
+    // page, so the bar is the only route back to it, and on an already-read
+    // chapter it is the only reason the bar exists. Infinite scroll makes that
+    // worse - the first page can be clean while a later one hides plenty.
     if (!counts.fresh && !counts.folded && !counts.lowEffort && !counts.hidden && !showAll) {
       if (existing) existing.remove();
       return;
@@ -504,7 +443,7 @@
     const mode = ctx.settings['comments.seen'];
     if (mode === 'off') return;
 
-    // main.js does NOT wrap syncCards in a try/catch, and a throw here would
+    // main.js does not wrap syncCards in a try/catch, so a throw here would
     // kill the sweep for every other feature. Warned once, so a real bug still
     // surfaces without filling the console.
     try {

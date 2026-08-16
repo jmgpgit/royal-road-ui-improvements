@@ -1,21 +1,18 @@
 'use strict';
 
 /**
- * Which of Royal Road's two layouts a page is being served in, and how to ask
- * for the other one.
+ * Which of Royal Road's two layouts a page is served in, and how to ask for the
+ * other one.
  *
- * Royal Road keeps the choice in a cookie. Setting it to `always` returns the
- * redesign, and that works whether or not you are signed in: the redesign is
- * not account-only, it is cookie-only. Setting it is the whole mechanism, so
- * this file is three lines of logic and a lot of explanation.
+ * The choice lives in a cookie. Setting it to `always` returns the redesign,
+ * signed in or not - the redesign is cookie-only, not account-only.
  *
- * Pure, and separate from the code that touches `document.cookie`, so the
- * parsing can be tested without a DOM.
+ * Pure, and separate from the code that touches `document.cookie`, so parsing
+ * can be tested without a DOM.
  *
- * The extension needs this because it only works on the redesign: on the legacy
- * layout main.js finds no `SEL.newUiProbe` and stops, so every feature is
- * silently inert. Reading the cookie is how it can tell someone that, and offer
- * a way out, instead of just doing nothing.
+ * The extension only works on the redesign: on the legacy layout main.js finds
+ * no `SEL.newUiProbe` and stops, so every feature is silently inert. Reading the
+ * cookie is how it can say so and offer a way out.
  */
 (function (root, factory) {
   const isNode = typeof module !== 'undefined' && module.exports;
@@ -33,12 +30,9 @@
   /** A year. Long enough that nobody is asked twice, short enough to lapse. */
   const DESIGN_MAX_AGE = 60 * 60 * 24 * 365;
 
-  /**
-   * One cookie's value out of a `document.cookie` string, or null.
-   *
-   * Names are matched exactly rather than by prefix, so a future
-   * `beta-ui-v2-something` cannot be mistaken for this one.
-   */
+  /** One cookie's value out of a `document.cookie` string, or null. Names match
+   *  exactly, not by prefix, so a future `beta-ui-v2-something` cannot be taken
+   *  for this one. */
   function cookieValue(cookies, name) {
     for (const part of String(cookies || '').split(';')) {
       const at = part.indexOf('=');
@@ -55,31 +49,22 @@
   /** Everything but the lifetime, shared so the two directives cannot drift. */
   const SCOPE = 'path=/; domain=.royalroad.com; samesite=lax';
 
-  /**
-   * The assignment that asks for the redesign.
-   *
-   * `domain` is set one level up so the choice holds across Royal Road's
-   * subdomains, matching what Royal Road's own switch does, and `samesite=lax`
-   * so it survives arriving from a link somewhere else.
-   */
+  /** Asks for the redesign. `domain` one level up so the choice holds across
+   *  Royal Road's subdomains, as their own switch does; `samesite=lax` so it
+   *  survives arriving from an outside link. */
   const switchDirective = () =>
     `${DESIGN_COOKIE}=${DESIGN_NEW}; ${SCOPE}; max-age=${DESIGN_MAX_AGE}`;
 
   /**
-   * The assignments that give the choice back to Royal Road, which serves the
-   * old layout to anyone who has not opted in.
+   * Gives the choice back to Royal Road, which serves the old layout to anyone
+   * who has not opted in. Deleted rather than set to another value: "no opinion"
+   * is a state their server already understands.
    *
-   * The cookie is deleted rather than set to some other value, because "no
-   * opinion" is a state Royal Road already understands, and inventing a value
-   * for it would be guessing at somebody else's server.
-   *
-   * There are two of them, and that is the whole point. A cookie written with a
-   * `domain` and one written without are *different cookies* that can both
-   * exist under the same name, and a delete only removes the one whose domain
-   * it matches. We write ours with a domain; Royal Road may well write its own
-   * without. Clearing only our shape would leave theirs behind, the server would
-   * go on seeing the opt-in, and the reader would be stuck on a layout they
-   * asked to leave with no way to tell why.
+   * Two directives because a cookie written with a `domain` and one written
+   * without are different cookies under the same name, and a delete only removes
+   * the one whose domain it matches. We write ours with a domain; Royal Road may
+   * write its own without. Clearing only our shape leaves theirs behind and the
+   * server goes on seeing the opt-in.
    */
   const clearDirectives = () => [
     `${DESIGN_COOKIE}=; ${SCOPE}; max-age=0`,

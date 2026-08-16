@@ -3,22 +3,10 @@
 /**
  * Infinite scroll for Royal Road's `clientfetch` paginators.
  *
- * Comments and reviews use the same machinery: a `[data-rr-paginate]` root
- * carrying a `data-rr-paginate-fetch-url`, whose responses are a run of
- * `[data-rr-paginate-item]` blocks. Royal Road *replaces* the list with each
- * page, so its "next" moves you forward and loses everything behind, which is
- * the whole reason this exists. We fetch the same URL and append instead.
- *
- * Royal Road's own page controls are hidden once something has been appended,
- * and not before. After an append they are both wrong and a trap: clicking "2"
- * lands you in its replace-the-list world halfway through our run, with the two
- * disagreeing about what page you are on. Before one, they are correct and are
- * the only way through the list, so they stay.
- *
- * Nothing is fetched for a section that is not on screen. A collapsed accordion
- * reports a zero-size box, and a bottom of zero satisfies any "near the end?"
- * test, so an unguarded pager quietly downloads the whole list into something
- * nobody can see.
+ * Comments and reviews share one mechanism: a `[data-rr-paginate]` root carrying
+ * `data-rr-paginate-fetch-url`, whose responses are a run of
+ * `[data-rr-paginate-item]` blocks. Royal Road replaces the list with each page,
+ * losing everything behind it; we fetch the same URL and append instead.
  */
 (function (root) {
   const RRX = root.RRX;
@@ -54,32 +42,25 @@
       if (!base) return null;
       const url = new URL(base, root.location.origin);
       url.searchParams.set('page', String(page));
-      // Royal Road's fetch URL carries the ordering it was rendered with, and it
-      // does not always rewrite it when the reader changes the sort. Fetching
-      // page 2 of the wrong order returns rows that are already on screen: they
-      // all deduplicate away, the pager concludes there is nothing left, and
-      // stops for good having added nothing. Whoever owns the sort says so here.
+      // The fetch URL carries the ordering it was rendered with, and Royal Road
+      // does not always rewrite it when the reader changes the sort. Page 2 of
+      // the wrong order returns rows already on screen: they all deduplicate
+      // away and the pager stops for good, having added nothing.
       for (const [key, value] of Object.entries((params && params()) || {})) {
         url.searchParams.set(key, String(value));
       }
       return `${url.pathname}${url.search}`;
     }
 
-    /**
-     * Suppress Royal Road's own page numbers, but only once we have actually
-     * appended something.
-     *
-     * Hiding them as soon as the feature is switched on takes away the working
-     * control and replaces it with nothing: if the trigger never fires, because
-     * the panel is collapsed or you simply never scroll that far, the section
-     * has no pagination and no auto-loading, which reads as broken. Until the
-     * first append Royal Road's numbers are both correct and the only way
-     * through, so they stay.
-     */
+    /** Royal Road's page numbers go away only once something has been appended.
+     *  After an append they are a trap: clicking "2" drops you into its
+     *  replace-the-list world halfway through our run. Before one they are
+     *  correct and the only way through, and hiding them early leaves a section
+     *  with no pagination and no auto-loading whenever the trigger never fires -
+     *  collapsed panel, or never scrolled that far. */
     function hideFooter(on) {
       const el = rootEl();
-      // Compared before writing, because this is now called from `check`, which
-      // runs on every scroll event.
+      // Compared before writing: `check` calls this on every scroll event.
       if (el && el.classList.contains('rrx-endless') !== on) el.classList.toggle('rrx-endless', on);
     }
 
@@ -147,12 +128,10 @@
     }
 
     function check() {
-      // Re-assert, rather than trusting the one write in `loadNext`. Royal
-      // Road's pagination re-renders on its own account, and that takes the
-      // class with it: the page numbers reappear under a list we are still
-      // appending to, and nothing puts them away again, because the only thing
-      // that ever set the class was a load. Once every page is in, `state.done`
-      // is true and no load will ever run again, so it would be permanent.
+      // Re-assert rather than trust the one write in `loadNext`: Royal Road's
+      // pagination re-renders on its own account and takes the class with it.
+      // Once every page is in, `state.done` is true and no load ever runs
+      // again to put the numbers away, so the reappearance would be permanent.
       if (state.added > 0) hideFooter(true);
       if (state.busy || state.done) return;
       if (ready && !ready()) {
@@ -163,11 +142,10 @@
       if (!anchor) return;
 
       const box = anchor.getBoundingClientRect();
-      // An element with no box is not on screen: it is inside a collapsed
-      // accordion, or display:none. Its rect reads as all zeroes, and a bottom
-      // of 0 satisfies any "are we near the end?" test, so without this the
-      // pager fetches page after page into something nobody can see, from the
-      // moment the page loads and without anyone scrolling.
+      // No box means not on screen: collapsed accordion, or display:none. The
+      // rect reads all zeroes, and a bottom of 0 satisfies the "near the end?"
+      // test, so without this the pager downloads the whole list on page load,
+      // into something nobody can see, without anyone scrolling.
       if (!box.width && !box.height) return;
 
       if (box.bottom > root.innerHeight * TRIGGER_MARGIN) return;
@@ -180,8 +158,8 @@
       root.addEventListener('scroll', check, { passive: true });
       root.addEventListener('resize', check, { passive: true });
       if (prime) prime();
-      // The list often appears asynchronously, so a scroll listener alone can
-      // sit idle forever on a short page.
+      // The list often appears asynchronously, so scroll events alone can sit
+      // idle forever on a short page.
       const poll = setInterval(() => {
         if (state.done) return clearInterval(poll);
         check();

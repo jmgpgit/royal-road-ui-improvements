@@ -3,12 +3,11 @@
 /**
  * Applies the filters to the cards on a list page.
  *
- * Filtering is JavaScript, unlike hiding: it needs parsed numbers off each card,
- * which CSS cannot do. That means it cannot run before first paint, so `boot.js`
- * puts `rrx-filters-pending` on <html> when any filter is active - which hides
- * the list with `visibility` (not `display`, so no reflow) until the first pass
- * completes. A watchdog clears it regardless, because a page that never un-hides
- * is far worse than a brief flash.
+ * Filtering needs numbers parsed off each card, so it cannot be CSS and cannot run
+ * before first paint. boot.js puts `rrx-filters-pending` on <html> while a filter is
+ * active, hiding the list with `visibility` (not `display`, so no reflow) until the
+ * first pass lands. A watchdog clears it regardless: a flash beats a list that never
+ * un-hides.
  */
 (function (root) {
   const RRX = root.RRX;
@@ -20,7 +19,7 @@
   const REVEAL_WATCHDOG_MS = 1000;
 
   const FILTERED_CLASS = 'rrx-filtered';
-  /** Where the parsed record is cached: a property, so the DOM stays clean. */
+  /** Cached on a property rather than a data attribute, to keep the DOM clean. */
   const DATA_KEY = '__rrxCard';
 
   let watchdog = null;
@@ -33,7 +32,7 @@
     document.documentElement.classList.remove(RRX.ROOT_CLASS.filtersPending);
   }
 
-  /** Parsed once per card and cached; re-reading 50 cards on every sweep is waste. */
+  /** Cached per card; re-parsing 50 cards on every sweep is waste. */
   function dataFor(card) {
     if (!card[DATA_KEY]) {
       const id = card.dataset.rrxFid ? Number(card.dataset.rrxFid) : null;
@@ -75,8 +74,7 @@
     label: 'Filters',
     title: 'Narrow this list by rating, size, tags, status or date',
     iconName: 'filters',
-    // Pressed reflects "something is narrowing", not the master switch, so the
-    // button reads as on exactly when the list is actually filtered.
+    // Pressed means "something is narrowing", not the master switch.
     isPressed: (ctx) => RRX.hasActiveFilters(ctx.settings),
     badge: (ctx) => RRX.countActiveFilters(ctx.settings) || undefined,
     onClick: (ctx, event) => {
@@ -87,15 +85,11 @@
     syncCards,
   });
 
-  // If something goes wrong before the first pass - a thrown feature, a page
-  // shape we did not expect - the list must still become visible.
-  //
-  // Armed unconditionally, NOT only when the class is already present. boot.js
-  // sets it twice: synchronously from the localStorage mirror, then again from
-  // the authoritative storage read, which resolves after this module body has
-  // run. On a first load there is no mirror yet, so the class arrives after
-  // this point, and a guarded watchdog would never have been set for the one
-  // case that needs it most.
+  // Armed unconditionally, not only when the class is already present. boot.js sets
+  // it twice: synchronously from the localStorage mirror, then from the authoritative
+  // storage read, which resolves after this module body runs. On a first load there is
+  // no mirror yet, so the class arrives after this point, and a guarded watchdog would
+  // never be set for the case that needs it most.
   watchdog = setTimeout(reveal, REVEAL_WATCHDOG_MS);
 
 })(globalThis);

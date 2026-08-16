@@ -1,25 +1,16 @@
 'use strict';
 
 /**
- * Infinite scroll for the fiction lists.
+ * Infinite scroll for the fiction lists: reaching the bottom fetches the next
+ * page and appends it, filter on or not. Cards go through the filters and the
+ * hidden list on the way in, so an appended page obeys the same rules as the
+ * one Royal Road served.
  *
- * Reaching the bottom fetches the next page and appends it, so a list reads as
- * one run instead of twenty at a time. With a filter on it matters more, since
- * filtering a single page often leaves a handful of results and a dead end, but
- * it is not conditional on one: a reader who turns this on wants it everywhere.
- *
- * Cards are put through the filters and the hidden list on the way in, so an
- * appended page obeys exactly the same rules as the one Royal Road served.
- *
- * The limits are constants rather than settings, because they exist to be
- * polite to somebody else's servers and that is not a preference:
- *   - one request at a time, never parallel, and never while one is in flight;
- *   - a deliberate gap between them;
- *   - a hard page ceiling, so a broken selector cannot become a request loop;
- *   - it stops for good the moment a page yields nothing new;
- *   - it stops on any non-200, and says so;
- *   - the status line always reports what was scanned, so a run that hits the
- *     ceiling can never be mistaken for "that is everything".
+ * The limits below are constants, not settings; politeness to someone else's
+ * servers is not a preference. One request at a time with a gap, a page ceiling
+ * so a broken selector cannot loop, a stop on the first page that yields
+ * nothing new or on any non-200, and a status line that always says how much
+ * was scanned so the ceiling cannot read as "that is everything".
  */
 (function (root) {
   const RRX = root.RRX;
@@ -29,10 +20,9 @@
 
   const BAR_ID = 'rrx-loadmore';
 
-  /** Internal limits. Not settings: politeness is not a preference. */
   const MAX_PAGES = 25;
   const REQUEST_GAP_MS = 500;
-  /** Start fetching when the end of the list is within this much of the viewport. */
+  /** Fetch when the list's end is within this many viewport heights. */
   const TRIGGER_MARGIN = 1.5;
 
   const state = { pages: 0, added: 0, busy: false, done: '', error: '', watching: false };
@@ -113,7 +103,7 @@
       }
       state.added += addedNow;
 
-      // Let the normal pipeline decorate whatever was just appended.
+      // Let the normal pipeline decorate what was just appended.
       RRX.main.syncCards(document);
     } catch (err) {
       state.error = err.message || 'request failed';
@@ -128,8 +118,8 @@
     state.watching = true;
 
     const check = () => {
-      // Flags first: `eligible` parses a URL and queries the document, and this
-      // runs on every scroll event.
+      // Flags first: `eligible` parses a URL and queries the document, on every
+      // scroll event.
       if (state.busy || state.done || state.error || !eligible(ctx)) return;
       const list = document.querySelector(SEL.listRoot);
       if (!list) return;
@@ -139,23 +129,19 @@
 
     root.addEventListener('scroll', check, { passive: true });
     root.addEventListener('resize', check, { passive: true });
-    // A short filter may leave the whole list above the fold, in which case no
-    // scroll ever fires and the first top-up has to be kicked off here.
+    // A short filter can leave the whole list above the fold, and then no
+    // scroll ever fires.
     setTimeout(check, 300);
   }
 
   /**
-   * Royal Road's own page numbers, once we have appended underneath them.
-   *
-   * Only after the first append, not as soon as the feature is switched on: up
-   * to that point the footer is telling the truth and is still the quickest way
-   * to jump deep into a list. The moment a second page is added it starts
-   * claiming "Showing 1 to 20 of 25090" under five pages of results, and
-   * clicking a number there hands you to Royal Road's replace-the-list
-   * pagination, which disagrees with us about where you are.
-   *
-   * Toggling a class is free to do on every sweep: setting it to the value it
-   * already holds emits no mutation record, so this cannot feed the observer.
+   * Hides Royal Road's page numbers, but only after the first append: until
+   * then the footer is accurate and the quickest way to jump deep into a list.
+   * Once we have appended it claims "Showing 1 to 20 of 25090" over five pages
+   * of results, and its links hand you to Royal Road's replace-the-list
+   * pagination, which disagrees with us about where you are. Setting a class to
+   * the value it already holds emits no mutation record, so this can run on
+   * every sweep without feeding the observer.
    */
   function syncPaginator() {
     const paginate = document.querySelector(SEL.paginateRoot);
@@ -169,10 +155,8 @@
 
     if (!list) return;
 
-    // Nothing more to fetch and nothing to report: take the line down and stop.
-    // Removing it and then carrying on would put it straight back, which is one
-    // mutation per sweep and, since mutations schedule sweeps, a page that never
-    // settles.
+    // Nothing left to fetch and nothing to report: take the line down and stop.
+    // Carrying on would put it straight back, and mutations schedule sweeps.
     if (!eligible(ctx) && !state.error && !state.done) {
       if (existing) existing.remove();
       return;
@@ -187,12 +171,9 @@
 
     const statusClass = `rrx-loadmore__status${state.error ? ' rrx-loadmore__status--error' : ''}`;
 
-    // Rewrite only when the line actually changes.
-    //
-    // This runs on every sweep, and the sweep is driven by a MutationObserver.
-    // Replacing an identical bar each time is a mutation, which schedules the
-    // next sweep, which replaces it again: the page never goes quiet, and it
-    // does so exactly when infinite scroll has grown the list to its largest.
+    // Rewrite only when the line actually changes: replacing an identical bar
+    // is a mutation, and mutations schedule the sweep that replaces it again.
+    // The page would never go quiet, worst once the list has grown largest.
     const status = existing && existing.firstElementChild;
     if (status && status.textContent === text && status.className === statusClass) return;
 
@@ -208,11 +189,9 @@
    * The filter values the current tally was gathered under.
    *
    * `state` latches on purpose: `done` and `error` stop a finished or failed run
-   * from asking again, and `pages` remembers how far it has already read. All
-   * three become wrong the moment the filter changes, and none of them clears
-   * itself, so a relaxed filter would skip every page already scanned and a run
-   * that ended on "no more results" would never start again for the rest of the
-   * session. Nothing said when to let go, so nothing ever did.
+   * from asking again, `pages` remembers how far it has read. Nothing clears
+   * them, so before this a relaxed filter skipped every page already scanned and
+   * a run that ended on "no more results" never started again that session.
    */
   let ranUnder = null;
 
@@ -228,7 +207,6 @@
     reset();
   }
 
-  /** A new filter means the previous run's tally is meaningless. */
   function reset() {
     Object.assign(state, { pages: 0, added: 0, busy: false, done: '', error: '' });
   }

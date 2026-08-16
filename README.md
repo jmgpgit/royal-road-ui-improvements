@@ -1,93 +1,84 @@
 # UI Improvements for Royal Road
 
-A Firefox and Chrome extension that adds optional, individually toggleable improvements to
-the **redesigned** [royalroad.com](https://www.royalroad.com): filters and layouts for the
-fiction lists, permanent per-fiction hiding, chapter typography beyond what the site offers,
-and clearer comment threads.
+A Firefox and Chrome extension for the **redesigned** [royalroad.com](https://www.royalroad.com):
+list filters and layouts, permanent per-fiction hiding, chapter typography the site does not
+offer, and clearer comment threads. Every feature is separate and every one can be switched off.
 
-Everything ships off or set to "leave alone" unless noted. Nothing is sent anywhere: there is
-no analytics, no server of its own, and no write to your Royal Road account.
+Unless noted, settings ship off or are set to "leave alone". Nothing leaves your device: no
+analytics, no server of its own, and no write to your Royal Road account.
 
-> **Not affiliated with Royal Road.** This is an unofficial, independent extension. "Royal
-> Road" is the trademark of its owner and is used here only to say what the extension works
-> on.
+> **Not affiliated with Royal Road.** Unofficial and independent. "Royal Road" is its owner's
+> trademark, used here only to say what this works on.
 
-> **Redesign only.** Royal Road currently runs two UIs. This extension targets the new one:
-> every selector it uses is anchored either to a `data-rr-*` hook that exists only in the
-> redesign or to its own `rrx-` names (enforced by a test), and no visible UI is injected
-> until a DOM probe confirms the redesign. The only thing it does on the legacy layout is
-> switch you to the redesign, if you have asked it to.
+> **Redesign only.** Royal Road runs two UIs and this targets the new one. Every selector is
+> anchored to a `data-rr-*` hook that exists only there, or to its own `rrx-` names, and a test
+> enforces it. No visible UI is injected until a DOM probe confirms the redesign. On the legacy
+> layout it does one thing: switch you across, if you asked it to.
 
 ## What it will never do
 
-- **Cost an author their income.** Patreon and Ko-fi links, the Support block, Royal Road's
-  advertising and the promotion authors run for each other are left alone. Where you can
-  collapse something that carries promotion, such as a shoutout inside an author's note, it is
-  off until you turn it on, nothing is deleted, and a chip always puts it back.
-- **Hammer Royal Road.** Every request it makes is one you could have made by opening a page,
-  it makes them one at a time, and it caches what it fetches. Nothing runs on a timer or in the
-  background.
+- **Cost an author their income.** Patreon and Ko-fi links, the Support block, advertising and
+  authors' promotion of each other are left alone. Where promotion can be collapsed — a
+  shoutout inside an author's note — it is off by default, nothing is deleted, and a chip puts
+  it back.
+- **Hammer Royal Road.** Every request is one you could have made by opening a page. One at a
+  time, cached, never on a timer or in the background.
 - **Send your reading anywhere.** No server, no analytics, no telemetry, no third-party code.
-  Your settings and hidden list stay on your device, and the only site it ever contacts is
-  royalroad.com. [`PRIVACY.md`](PRIVACY.md) names the file behind every claim.
+  Settings and hidden list stay on your device; royalroad.com is the only site it contacts.
+  [`PRIVACY.md`](PRIVACY.md) names the file behind every claim.
 
-It also never writes to your Royal Road account — no follow, favourite, rating or comment — and
-never hides an author's own comments. [`CONTRIBUTING.md`](CONTRIBUTING.md) has the full list and what enforces each one.
+It never writes to your Royal Road account — no follow, favourite, rating, comment or
+bookmark — and never hides an author's own comments.
+[`CONTRIBUTING.md`](CONTRIBUTING.md) has the full list and what enforces each one.
 
 ## What it does
 
 **On the fiction lists** (`/fictions/rising-stars`, `trending`, `best-rated`,
 `latest-updates`, `weekly-popular`, `search`, …)
 
-- **Expand all descriptions**: a sticky toggle that keeps every blurb open.
-- **Expand on hover**: hovering a card opens its blurb after a short settle delay. Click the
-  chevron to pin it.
-- **Hide fictions**: a `−` on every card removes that fiction from every list, permanently,
-  with an undo toast, a browsable manager and an in-place "show hidden" mode.
-- **Filters**: rating, followers, views, pages, chapters, tags in and out, status, type,
-  last-updated / gone-quiet, and hiding what you already follow, favourited or saved for
-  later. None of these exist on Royal Road outside `/fictions/search`.
-- **Infinite scroll**: reaching the bottom of a list adds the next page underneath, so a
-  list reads as one run rather than twenty at a time. Filters and hidden fictions apply to
-  whatever comes in.
-- **Alternative layouts**: cards (Royal Road's own), compact rows, two columns, or a cover
-  grid, and a maximum list width if you want to use more of a wide screen than Royal Road
-  does.
-- **Trim tags out of titles**: "Some Title [LitRPG, Dungeon Core]"
-  becomes "Some Title". Lists only; the full title stays in the tooltip.
+- **Expand all descriptions**, or **expand on hover** after a settle delay. Click the chevron
+  to pin one open.
+- **Hide fictions**: a `−` on every card drops that fiction from every list for good, with an
+  undo toast, a browsable manager, and a "show hidden" mode.
+- **Filters**: rating, followers, views, pages, chapters, tags in and out, status, type, last
+  updated or gone quiet, and hiding what you already follow, favourited or saved for later.
+  None of these exist on Royal Road outside `/fictions/search`.
+- **Infinite scroll**: the next page appends as you reach the bottom. Filters and hidden
+  fictions apply to whatever arrives.
+- **Alternative layouts**: Royal Road's cards, compact rows, two columns, or a cover grid,
+  plus a maximum list width for wide screens.
+- **Trim tags out of titles**: "Some Title [LitRPG, Dungeon Core]" reads as "Some Title". Lists
+  only; the full title stays in the tooltip.
 
 **In a chapter**
 
-- Line height, justification with hyphenation, text colour, an arbitrary local font, and a
-  reading width past Royal Road's ceiling: all things its own Reading Preferences omit.
-- **The facts about a chapter, above it**: when it was posted, and how long it is — a word
-  count, an estimated reading time at a speed you set, or both. Royal Road prints the date
-  below the chapter, past the author notes, where it cannot tell you how old something is
-  before you start it, and it never prints the length at all.
-- **How many chapters you have left**: "Chapter 89 of 95 (6 to catch up)", on that same line.
-  The numbering is Royal Road's own — the same list its "Select a chapter" dropdown uses —
-  fetched once per fiction and kept for the tab.
-- **Come back to where you stopped**: reopening a chapter offers to return you to the paragraph
-  you were on, or takes you straight there. Following a link to a particular comment goes to
-  that comment instead. Off by default, and nothing is recorded while it is off.
-- **Author notes**: collapse cross-promotion ("shoutouts") while keeping the real note, or
-  collapse notes entirely, or per-author. Nothing is deleted: a chip always puts it back.
+- Line height, justified text with hyphenation, colour, a local font of your choosing, and a
+  width past Royal Road's ceiling. Its own Reading Preferences offer none of these.
+- **The facts about a chapter, above it**: when it was posted, and how long it is as a word
+  count, a reading time at your own speed, or both. Royal Road prints the date below the
+  chapter, past the author notes, where it cannot tell you how old something is before you
+  start it, and never prints the length at all.
+- **How far you have to go**: "Chapter 89 of 95 (6 to catch up)", on the same line. The
+  numbering is Royal Road's own, fetched once per fiction and kept for the tab.
+- **Come back to where you stopped.** Reopening a chapter offers to return you to your
+  paragraph, or takes you there. A link to a comment still goes to the comment. Off by default,
+  and nothing is recorded while it is off.
+- **Author notes**: collapse cross-promotion while keeping the note, collapse notes entirely,
+  or do it per author. Nothing is deleted; a chip puts it back.
 - Hide the About-author panel.
-- **A recap of the previous chapter**: the closing paragraphs of the chapter before, at the
-  top of this one, for when you are following several fictions at once and cannot remember
-  how the last one left off. Always visible, behind a click, on hover, or off. Off ships as
-  the default, and while it is off nothing is fetched at all.
-- **New comments since your last visit**: marked, with everything you have already seen
-  optionally folded to one dimmed line. A comment with something new underneath it always
-  stays open, and nothing is ever hidden. A bar above the comments counts them, shows only the
-  new ones, or marks them all as read.
-- **Comments**: a rule between threads and a thread line down each reply chain (colour is
-  yours to pick), a collapse control on any thread with replies, low-content comments
-  ("thanks", "tyfc") or a lone Royal Road emoticon collapsed to one dimmed line or hidden
-  outright, plus your own patterns, one phrase or regular expression per line, and true
-  infinite scroll. Two things are never hidden: a comment that has replies, so the replies
-  under it still make sense, and the author's own comments, which are left alone entirely
-  unless you say otherwise and are only ever collapsed even then.
+- **A recap of the previous chapter** at the top of this one, for when you are following
+  several fictions and cannot remember how the last one ended. Always shown, behind a click, on
+  hover, or off. Off by default, and it fetches nothing while off.
+- **New comments since your last visit**, marked, with what you have read optionally folded to
+  a dimmed line that opens on hover. Anything with a new reply underneath stays open, and
+  nothing is ever hidden. A bar above the comments counts them, filters to just the new ones,
+  or clears the marks.
+- **Comments**: a rule between threads, a thread line down each chain in a colour you pick, a
+  collapse control on any thread with replies, and folding or hiding for low-content comments
+  ("thanks", "tyfc"), lone emoticons, and your own phrases or regular expressions. Plus real
+  infinite scroll. Two things are never hidden: a comment with replies, so the replies still
+  make sense, and the author's own comments, which are left alone unless you say otherwise and
+  are only ever folded even then.
 
 **Everywhere on the site**: none of the above works on Royal Road's legacy layout, so the
 extension's popup carries a choice of layout — leave it to Royal Road, always the new design,
@@ -104,19 +95,18 @@ sort order and their own infinite scroll.
 Most settings ship off or as "leave alone". These do something on first run, and each is one
 toggle away in options:
 
-- **A toolbar above every fiction list**, with the extension's own controls.
-- **Infinite scroll on the lists**: reaching the bottom adds the next page underneath.
-- **A `−` button on every card**, for hiding a fiction. Nothing is hidden until you click one.
+- **A toolbar above every fiction list**, carrying the extension's own controls.
+- **Infinite scroll on the lists.**
+- **A `−` button on every card.** Nothing is hidden until you press one.
 - **Comment threading**: a divider between conversations, a line down each reply chain, and a
-  collapse button on any comment with replies.
-- **Hyphenation**, which only applies if you also turn justified text on.
+  collapse control on any comment with replies.
+- **Hyphenation**, which does nothing unless you also turn on justified text.
 
-Anything that alters an author's words, such as collapsing a note or a shoutout, is opt-in,
-and so is every rule that folds or hides a comment.
+Anything that alters an author's words is opt-in, and so is every rule that folds or hides a
+comment.
 
-The options page is four boxes: which of Royal Road's two layouts to use, then one per part
-of the site — fiction lists (including the hidden-fiction manager), fiction pages, and
-chapter pages.
+The options page is four boxes: which layout to use, then fiction lists (with the hidden-fiction
+manager), fiction pages, and chapter pages.
 
 ## Install
 
@@ -147,23 +137,19 @@ Then `chrome://extensions` -> enable **Developer mode** -> **Load unpacked** -> 
 
 ### Make sure you are on the redesign
 
-Royal Road serves two layouts, and everything here is built on the newer one, so on the
-legacy layout the extension does nothing at all.
+Everything here is built on the newer layout. On the legacy one the extension does nothing.
 
-Pick **Always the new design** under *Royal Road design*, at the top of the extension's popup,
-and it will hold on every page from then on — on the page you are looking at straight away, and
-on later ones before they are painted. The same setting is first in the options page.
+Pick **Always the new design** under *Royal Road design*, at the top of the popup or first in
+options. It applies to the page you are on immediately, and to later ones before they paint.
 
-To go back, pick **Always the old design**. Leaving it on *Leave it to Royal Road* will not
-undo an earlier choice: Royal Road remembers it in a cookie, and only actively asking for the
-old design clears it.
+To go back, pick **Always the old design**. *Leave it to Royal Road* will not undo an earlier
+choice — the choice lives in a cookie, and only asking for the old design clears it.
 
-Two things worth knowing. **It needs no account** — which layout you get is decided by a
-cookie rather than by being signed in, so this works signed out. And **it is reversible**:
-Royal Road's own "Revert To Legacy UI" link still works, though with "always use the new
-design" switched on it will be undone on your next page load, so turn that off first.
+**No account needed**: the layout is decided by that cookie, not by being signed in. Royal
+Road's own "Revert To Legacy UI" link still works, but with "always the new design" on it is
+undone on your next page load, so turn that off first.
 
-If you would rather do it by hand, it is one cookie:
+By hand, it is one cookie:
 
 ```js
 document.cookie = 'beta-ui-v2=always; path=/; domain=.royalroad.com';
@@ -173,56 +159,55 @@ document.cookie = 'beta-ui-v2=always; path=/; domain=.royalroad.com';
 
 A few decisions carry most of the weight.
 
-**The expand features and the comment threading are pure CSS.** Royal Road's "show more" is a
-`sr-only` checkbox plus Tailwind `:has(input:checked)` variants, with the collapsed height as
-a *non-`!important`* inline style; and every comment already carries `data-depth` and
-`data-parent-id`. So both are stylesheets gated behind an `<html>` class: no per-element
-JavaScript, no observer, and they apply to lazily-loaded content for free.
+**Expanding and comment threading are pure CSS.** Royal Road's "show more" is an `sr-only`
+checkbox plus Tailwind `:has(input:checked)` variants, with the collapsed height as a
+*non-`!important`* inline style. Comments already carry `data-depth` and `data-parent-id`. So
+both are stylesheets behind an `<html>` class: no per-element JavaScript, no observer, and they
+cover lazily-loaded content for free.
 
 **Hiding is generated CSS, not DOM removal.** `buildHideCss()` emits one rule per card group,
-each a single `:has()` over an `:is()` list of ids, so rule count stays constant however many
-fictions you hide. Doing it in CSS is what lets hiding reach content rendered after us: AJAX pagination, and the React-rendered recommendations carousel.
+each a single `:has()` over an `:is()` list of ids, so the rule count stays constant however
+many fictions you hide. CSS reaches content rendered after us: AJAX pagination, and the
+React-rendered recommendations carousel.
 
-The rule matches `a[data-vt-trigger="fiction-card"]`, the card's own title link, rather than
-any `/fiction/` link inside it. That distinction is load-bearing: author blurbs routinely
-link to *other* fictions, and matching those would make hiding fiction A quietly delete every
-card whose blurb recommends A.
+The rule matches `a[data-vt-trigger="fiction-card"]`, the card's own title link, not any
+`/fiction/` link inside it. Blurbs routinely link to *other* fictions, so matching those would
+make hiding fiction A delete every card whose blurb recommends A.
 
-**Hidden cards never flash.** `browser.storage.local` is async, which would race first paint.
-Content scripts run in the page's origin, so a compact copy of the hidden list is mirrored
-into `localStorage` and read *synchronously* at `document_start`, before Royal Road's deferred
-module scripts run. That also means Embla never measures the carousel slides we are about to
-hide, so `/home` carousels lay out correctly around them.
+**Hidden cards never flash.** `browser.storage.local` is async and would race first paint.
+Content scripts share the page's origin, so a compact copy of the hidden list is mirrored into
+`localStorage` and read synchronously at `document_start`, before Royal Road's deferred modules
+run. Embla never measures the carousel slides we are about to hide, so `/home` lays out
+correctly around them.
 
-**Infinite scroll appends; Royal Road's own pagination replaces.** Comments and reviews both
-use its `clientfetch` paginator, whose "next" swaps the list out, so page 20 leaves no way
-back to comment 1. The shared `content/pager.js` fetches the same endpoint Royal Road
-declares (`data-rr-paginate-fetch-url`) and appends instead, deduplicating by element id, and
-hides Royal Road's own page numbers while it is running: leaving them visible let you click
-"2" mid-run and land in the replace-the-list world with the two disagreeing about the page.
+**Infinite scroll appends; Royal Road's paginator replaces.** Comments and reviews use its
+`clientfetch` paginator, whose "next" swaps the list out — page 20 leaves no way back to
+comment 1. `content/pager.js` fetches the same endpoint Royal Road declares
+(`data-rr-paginate-fetch-url`), appends, and deduplicates by element id. It hides Royal Road's
+page numbers while running: leaving them visible let you click "2" mid-run and land back in
+replace-the-list, with the two disagreeing about which page you were on.
 
-**Filters cannot do that**, because they need parsed numbers off each card. So they hold the
-list back with `visibility` (not `display`, so no reflow) until the first pass lands, and
-only when a filter is actually set, with a 1 s watchdog, because a page that never appears is
-far worse than a brief flash.
+**Filters cannot do that**: they need parsed numbers off each card. They hold the list back
+with `visibility` (not `display`, so no reflow) until the first pass lands, only when a filter
+is set, with a 1 s watchdog — a page that never appears is worse than a brief flash.
 
 **The multi-column layouts dissolve the card rather than squeeze it.** A Royal Road card is a
 flex *row*: cover left, everything else in a narrow column right. Halve its width and that
-column has no room. The title wraps every other word, stat tiles overlap, buttons get
-crushed. Hiding parts of it did not help, and nor did swapping in the phone layout, because
-both keep the row. So `display: contents` on the card's wrappers promotes cover, title, tags,
-stats, blurb and buttons into direct children of one flex container, which can then be
-ordered and given full width independently. No DOM is moved. Blocks are matched by what they
-contain (`:has(> a > h2)` is the title) rather than by Tailwind classes.
+column has no room: the title wraps every other word, stat tiles overlap, buttons get crushed.
+Hiding parts of it did not help, nor did swapping in the phone layout — both keep the row. So
+`display: contents` on the card's wrappers promotes cover, title, tags, stats, blurb and
+buttons into direct children of one flex container, each then ordered and given full width on
+its own. No DOM is moved. Blocks are matched by what they contain (`:has(> a > h2)` is the
+title), not by Tailwind classes.
 
 **Personal state on a card uses three different mechanisms.** Read Later is a real form whose
 `mark` input says what a click *would* do. Following and Favourited are passive tooltip-wrapped
-icons that Royal Road omits entirely when unset, so their absence is the normal case rather
-than a parse failure. Two logged-in fixtures pin both the present and the absent case.
+icons that Royal Road omits entirely when unset, so absence is the normal case, not a parse
+failure. Two logged-in fixtures pin both the present and the absent case.
 
-**Card extraction is deliberately tolerant.** Anything unreadable becomes `null`, and a
-filter never excludes a card on a `null` field. When Royal Road renames something, a filter
-stops narrowing rather than emptying the page.
+**Card extraction is deliberately tolerant.** Anything unreadable becomes `null`, and a filter
+never excludes a card on a `null` field. When Royal Road renames something, a filter stops
+narrowing rather than emptying the page.
 
 ### Layout
 
@@ -239,9 +224,9 @@ test/                       node:test suites + captured Royal Road HTML in fixtu
 
 Two files are deliberately the only place certain things live:
 
-- **`src/common/selectors.js`**: every Royal Road selector. The site is actively changing;
-  when something breaks it should break there and nowhere else. `main.js` also logs a warning
-  naming the file if a list page stops matching.
+- **`src/common/selectors.js`**: every Royal Road selector. The site changes constantly; when
+  something breaks it should break there and nowhere else. `main.js` logs a warning naming the
+  file if a list page stops matching.
 - **`src/common/schema.js`**: every setting, declared once. One generic normalizer walks it,
   and the options page builds itself from it, so a setting cannot become unreachable.
 
@@ -249,8 +234,8 @@ Two files are deliberately the only place certain things live:
 
 Drop a file in `src/content/features/`, push a descriptor onto `RRX.features.list`
 (`pages: ['chapter']` scopes it), and add it to `manifest.json`. If it is presentational,
-gate it behind an `<html>` class in `rootClassesFor` and write CSS: see `view-modes.js`,
-which is a descriptor and nothing else.
+gate it behind an `<html>` class in `rootClassesFor` and write CSS: see `view-modes.js`, a
+descriptor and nothing else.
 
 ## Development
 
@@ -262,13 +247,13 @@ npm run icons   # redraw icons/*.png
 npm run package # both store zips into web-ext-artifacts/
 ```
 
-The icons are generated rather than checked in as artwork. `tools/icons.mjs` draws each size
-at its own scale, with the geometry snapped to whole pixels for that size, because a 16px
-icon downscaled from a 128px master lands its edges on half pixels and turns into a smudge.
-The shapes live in a 128-unit grid that divides evenly by all five sizes, nothing is thinner
-than 16 units (two pixels at 16px), and every edge sits on a multiple of eight. It has no
-dependencies: shape maths, and `zlib` for the PNG. `--design book` and `--design road` are two
-alternative marks, kept so the icon can be changed without starting from nothing.
+Icons are generated, not checked in as artwork. `tools/icons.mjs` draws each size at its own
+scale, geometry snapped to whole pixels for that size: a 16px icon downscaled from a 128px
+master lands its edges on half pixels and turns into a smudge. The shapes live in a 128-unit
+grid that divides evenly by all five sizes, nothing is thinner than 16 units (two pixels at
+16px), and every edge sits on a multiple of eight. No dependencies: shape maths, and `zlib`
+for the PNG. `--design book` and `--design road` are alternative marks, kept so the icon can
+be changed without starting from nothing.
 
 `npm test` runs four layers, none of which need a browser:
 
@@ -284,39 +269,38 @@ alternative marks, kept so the icon can be changed without starting from nothing
   panel, apply, hide a fiction, check the counts.
 
 Fixtures are gitignored (several MB, re-derivable). Suites that need them skip with a message
-naming what is missing; `test/fixtures/README.md` documents how to re-capture each one.
+naming what is missing; `test/fixtures/README.md` covers how to re-capture each one.
 
 ## Known limitations
 
 - **View modes are the least tested part.** The selectors are known-good, but these cards are
-  built from dense Tailwind utilities and the layouts were verified by reading, not by eye in
-  a browser. Two columns needs a window at least 1280px wide; below that it falls back to one
-  column.
+  dense Tailwind utilities and the layouts were verified by reading, not by eye in a browser.
+  Two columns needs a window at least 1280px wide; below that it falls back to one column.
 - **Forcing an accordion open races Royal Road.** It binds its handlers in a deferred script
-  and then applies its own remembered state, sometimes closing a section the server sent
-  open. The extension therefore watches for the full 8 s rather than stopping as soon as the
-  state looks right, and re-asserts whenever it flips. A real click from you always wins, and
-  ends the watching for good.
+  and then applies its own remembered state, sometimes closing a section the server sent open.
+  So the extension watches the full 8 s rather than stopping when the state looks right, and
+  re-asserts whenever it flips. A real click from you always wins, and ends the watching for
+  good.
 - **Carousel indicators.** Hiding a slide in a `/home` Embla carousel or the react-slick
-  recommendations carousel leaves the dot count based on the original slide count. The slides
+  recommendations carousel leaves the dot count at the original slide count. The slides
   themselves lay out fine.
 - **Shoutout detection is a heuristic**: "a direct child block of the note that links to a
   different fiction". It cannot catch a shoutout with no link, and it will collapse a block
   that merely mentions another fiction in passing. Both cost one click on the chip.
-- **Deep replies start collapsed.** Past depth 2, Royal Road moves the rest of a chain
-  into a container it hides behind a "N more replies" button. The thread line and the
-  collapse control follow the chain into it, but the button is Royal Road's and this
-  extension does not click it for you.
+- **Deep replies start collapsed.** Past depth 2, Royal Road moves the rest of a chain into a
+  container it hides behind a "N more replies" button. The thread line and the collapse
+  control follow the chain into it, but the button is Royal Road's and the extension does not
+  click it for you.
 - **The low-effort comment rules are a guess.** They fire on short comments that are nothing
   but an acknowledgement once the filler is stripped ("thanks", "tyfc", "cheers"), a position
-  claim ("first"), or a single Royal Road emoticon. Anything with something else left in it
-  survives, so "thanks for the chapter, but the pacing dragged" is safe. They dim rather than
-  remove by default, and a dimmed comment opens on hover.
+  claim ("first"), or a single Royal Road emoticon. Anything with more left in it survives:
+  "thanks for the chapter, but the pacing dragged" is safe. They dim rather than remove by
+  default, and a dimmed comment opens on hover.
 - **Fonts are local only.** Royal Road's security policy blocks loading font files from an
   injected stylesheet, so only families already installed on the machine work.
 - **The tag vocabulary costs one request.** Opening the filter panel on a page without Royal
-  Road's own tag `<select>` fetches `/fictions/search` once to learn the tag list, then caches
-  it for a week. On the search page itself it is read from the page for free.
+  Road's own tag `<select>` fetches `/fictions/search` once for the tag list, then caches it
+  for a week. On the search page it is read from the page for free.
 - **Settings changed with no Royal Road tab open** reach the synchronous boot mirror one page
   load late. The authoritative async read corrects it during that same load.
 - **Royal Road has its own `hide`** bookmark, server-side and account-bound, reachable from a
@@ -325,21 +309,20 @@ naming what is missing; `test/fixtures/README.md` documents how to re-capture ea
 
 ## Privacy
 
-Everything is stored on the device, in `browser.storage.local`. The extension has no
-analytics and talks to no server other than royalroad.com. It makes five kinds of request,
-all of them things the site itself asks for when you use it: the `?page=N` fetch that adds the
-next page of a list as you scroll, the same for comments and reviews, a single request for
-the tag vocabulary the first time you open the filter panel, and — only once you switch them
-on — the chapter before the one you are reading, and the fiction's chapter list behind Royal
-Road's own "Select a chapter" dropdown. It never writes to your Royal Road
-account, and never goes and fetches your account pages: what it knows about what you follow
-is read from the page already in front of you.
+Everything is stored on the device, in `browser.storage.local`. No analytics, and no server
+other than royalroad.com. It makes five kinds of request, all of them things the site itself
+asks for: the `?page=N` fetch that adds the next page of a list as you scroll, the same for
+comments and reviews, a single request for the tag vocabulary the first time you open the
+filter panel, and — only once you switch them on — the chapter before the one you are reading,
+and the fiction's chapter list behind Royal Road's own "Select a chapter" dropdown. It never
+writes to your Royal Road account and never fetches your account pages: what it knows about
+what you follow is read from the page in front of you.
 
 See [PRIVACY.md](PRIVACY.md) for the full statement.
 
 ## Contributing
 
-Bug reports and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md) for how to
+Bug reports and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers how to
 run the tests, capture the fixtures they need, and where each kind of change belongs.
 
 Issues: https://github.com/jmgpgit/royal-road-ui-improvements/issues
