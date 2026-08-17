@@ -677,7 +677,9 @@ test('the tag cache ages from when it was fetched, not from when it was last use
     'fictions-rising-stars.new.html',
     'https://www.royalroad.com/fictions/rising-stars'
   );
-  w.__store.tagCatalogue = { at: eightDays, tags: [{ slug: 'litrpg', label: 'LitRPG' }] };
+  // Marked complete, or `load` would rightly go and fetch the rest and the
+  // stamp would move because it really was fetched.
+  w.__store.tagCatalogue = { at: eightDays, full: true, tags: [{ slug: 'litrpg', label: 'LitRPG' }] };
 
   await w.RRX.tags.load();
   assert.equal(
@@ -685,9 +687,6 @@ test('the tag cache ages from when it was fetched, not from when it was last use
     eightDays,
     'using the cache does not make it look freshly fetched'
   );
-  // Whether it refetches is not asserted here: this capture carries 73 distinct
-  // tag slugs on its cards, one over the threshold at which `load` returns
-  // without consulting the cache at all.
 });
 
 test('the stored maps age out even with every feature that fills them off', async () => {
@@ -992,6 +991,11 @@ async function atListBottom(settings) {
 }
 
 const settled = () => new Promise((resolve) => setTimeout(resolve, 900));
+
+/** Requests for the tag vocabulary itself, which is `/fictions/search` with no
+ *  query - the list pager asks the same path for `?page=N`. */
+const catalogueFetches = (w) =>
+  w.__fetched.filter((u) => /\/fictions\/search$/.test(String(u).split('?')[0]) && !String(u).includes('page='));
 
 test('reaching the bottom loads the next page, with no filter set', async () => {
   // This was once gated on having a filter active, which made a setting called
@@ -1720,4 +1724,143 @@ test('after a re-sort the run really does start again, not just reset its counte
 
   assert.ok(w.__fetched.length > before, 'nothing was fetched: the run is still stuck');
   assert.match(w.__fetched[w.__fetched.length - 1], /page=2/, 'and it resumed from page two');
+});
+
+test('a list page teaches the vocabulary without the filter panel being opened', async () => {
+  // The catalogue used to be filled only by `tags.load()`, whose one caller is
+  // the filter panel opening. A reader who never opens it never learnt a single
+  // tag name - and without a name a tag colour cannot reach the home page, where
+  // the chips carry no slug to match on.
+  const { w } = await boot(
+    'fictions-rising-stars.new.html',
+    'https://www.royalroad.com/fictions/rising-stars'
+  );
+  await settled();
+
+  const cached = w.__store.tagCatalogue;
+  assert.ok(cached && Array.isArray(cached.tags), 'nothing was cached by opening a list page');
+  assert.ok(cached.tags.length > 20, `only ${cached.tags && cached.tags.length} tags learnt`);
+  assert.ok(
+    cached.tags.some((t) => t.slug && t.label && t.slug !== t.label),
+    'slugs were stored as their own labels, which is the mismatch the cache exists for'
+  );
+});
+
+test('a page that knows a few tags cannot shrink a cache that knows more', async () => {
+  // Every page harvests now, so a fiction page with six chips runs the same path
+  // as the search page with seventy-two. Merging the page into the cache is
+  // safe; merging the cache into the page would let the smaller one win.
+  const { w } = await boot(
+    'fiction-detail.new.html',
+    'https://www.royalroad.com/fiction/181303/gifted'
+  );
+  const rich = Array.from({ length: 60 }, (_, i) => ({ slug: `s${i}`, label: `Label ${i}` }));
+  w.__store.tagCatalogue = { at: 1, tags: rich };
+
+  await w.RRX.tags.harvest();
+  await settled();
+
+  assert.ok(
+    w.__store.tagCatalogue.tags.length >= rich.length,
+    `the cache shrank from ${rich.length} to ${w.__store.tagCatalogue.tags.length}`
+  );
+  for (const tag of rich.slice(0, 5)) {
+    assert.ok(
+      w.__store.tagCatalogue.tags.some((t) => t.slug === tag.slug),
+      `${tag.slug} was dropped from the cache`
+    );
+  }
+});
+
+test('a harvest that learns nothing new does not rewrite the cache', async () => {
+  // Harvesting runs on every page load, and most pages teach it nothing.
+  const { w } = await boot(
+    'fictions-rising-stars.new.html',
+    'https://www.royalroad.com/fictions/rising-stars'
+  );
+  await settled();
+
+  const before = w.__store.tagCatalogue;
+  const stamp = {};
+  w.__store.tagCatalogue = { ...before, marker: stamp };
+
+  await w.RRX.tags.harvest();
+  await settled();
+
+  assert.equal(
+    w.__store.tagCatalogue.marker,
+    stamp,
+    'the key was rewritten even though the page held nothing new'
+  );
+});
+
+test('the whole published vocabulary is read, genres included', async () => {
+  // `#tagsAdd` is 72 tags and carries no genres at all; the genre buttons are 22
+  // more, not one of which is in the select. Chips are a sample of both.
+  const { w } = await boot(
+    'fictions-search.new.html',
+    'https://www.royalroad.com/fictions/search'
+  );
+  const vocabulary = w.RRX.tags.parseVocabulary(w.document);
+  const genres = w.RRX.tags.parseGenres(w.document);
+  const select = w.RRX.tags.parseSelect(w.document.querySelector(w.RRX.SEL.tagSelect));
+
+  assert.equal(select.length, 72);
+  assert.equal(genres.length, 22);
+  assert.equal(new Set(vocabulary.map((t) => t.slug)).size, 94, 'the two overlap, so one is wrong');
+  assert.ok(
+    genres.every((g) => !select.some((s) => s.slug === g.slug)),
+    'a genre appeared in the select, so they are not disjoint after all'
+  );
+  // The label is the button's own text, not its tooltip paragraph. Compared
+  // field by field: an object built inside jsdom is never deepEqual to one here.
+  const action = genres.find((g) => g.slug === 'action');
+  assert.equal(action.label, 'Action');
+});
+
+test('a busy list page does not pass for the whole vocabulary', async () => {
+  // `load` skipped the fetch on `catalogue.length >= 72`, and rising-stars alone
+  // carries 73 distinct slugs - so the picker offered whatever had been seen and
+  // never learnt the rest. Harvesting on every page made that permanent.
+  const { w } = await boot(
+    'fictions-rising-stars.new.html',
+    'https://www.royalroad.com/fictions/rising-stars'
+  );
+  await settled();
+
+  assert.ok(w.RRX.tags.all().length >= 72, 'this capture no longer clears the old threshold');
+  assert.equal(w.RRX.tags.isFull(), false, 'chips off one list page were taken for the vocabulary');
+  assert.equal(w.__store.tagCatalogue.full, false, 'and the cache was marked complete');
+
+  // Opening the panel therefore still fetches, and that is what completes it.
+  await w.RRX.tags.load();
+  assert.equal(w.RRX.tags.isFull(), true, 'the fetch did not complete the vocabulary');
+  assert.ok(w.RRX.tags.all().length >= 94, `only ${w.RRX.tags.all().length} tags after the fetch`);
+  assert.ok(w.RRX.tags.slugFor('Action'), 'a genre is still missing from the picker');
+});
+
+test('the search page completes the vocabulary without any fetch', async () => {
+  const { w } = await boot(
+    'fictions-search.new.html',
+    'https://www.royalroad.com/fictions/search'
+  );
+  await settled();
+
+  assert.equal(w.RRX.tags.isFull(), true, 'the page that states the vocabulary did not mark it read');
+  // Not just "includes /fictions/search": infinite scroll on this page asks for
+  // `?page=2`, which is a different request entirely.
+  assert.equal(catalogueFetches(w).length, 0, 'it fetched the page it was already on');
+  assert.ok(w.__store.tagCatalogue.full, 'the cache does not record that it is complete');
+});
+
+test('a complete cache is not thrown away by a page that knows less', async () => {
+  const { w } = await boot(
+    'fiction-detail.new.html',
+    'https://www.royalroad.com/fiction/181303/gifted'
+  );
+  w.__store.tagCatalogue = { at: Date.now(), full: true, tags: [{ slug: 'litrpg', label: 'LitRPG' }] };
+
+  await w.RRX.tags.load();
+  assert.equal(w.RRX.tags.isFull(), true, 'a fiction page downgraded a complete cache');
+  assert.equal(catalogueFetches(w).length, 0, 'it refetched a cache that was complete and fresh');
 });

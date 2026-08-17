@@ -128,6 +128,16 @@
     cardStatLabel: '.uppercase',
     /** Tag chips - the slug is in the href. */
     cardTag: 'a[href*="tagsAdd="]',
+
+    /** The published tag vocabulary, on `/fictions/search` only. The select is
+     *  72 tags and carries no genres at all; the genre buttons are the other 22,
+     *  and not one of them appears in the select. Chips off a list page overlap
+     *  both and cover neither, which is why these two are what "the whole
+     *  vocabulary" means. */
+    tagSelect: '#tagsAdd',
+    genreButton: '.genre-tag-btn[data-tag]',
+    /** The button's own text includes its tooltip on some renders. */
+    genreLabel: '.tag-label',
     /** Last-updated. Several per card, all the same timestamp. */
     cardTime: 'time[unixtime]',
     /** Status and type chips: `<span>` with `bg-accent`, sharing the chip row

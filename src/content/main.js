@@ -251,6 +251,14 @@
 
   /** One-shot work a feature wants done per page load (accordions, notes, …). */
   function runOnce() {
+    // Learn the tag vocabulary from the page the reader already opened. A list
+    // page carries ~600 tag links and a fiction page its own handful, so this
+    // costs a querySelectorAll and no request at all. It used to be learnt only
+    // by opening the filter panel, which is optional and which many readers
+    // never do - and until it is learnt, a tag colour has no name recorded and
+    // so cannot reach the home page, where the chips carry no slug.
+    if (RRX.tags) RRX.tags.harvest();
+
     for (const feature of activeFeatures()) {
       if (!feature.onPage) continue;
       try {

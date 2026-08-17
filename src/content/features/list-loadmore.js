@@ -90,7 +90,9 @@
       }
 
       // The next page's chips may name tags the vocabulary has not seen yet.
-      if (RRX.tags) RRX.tags.harvestChips(doc);
+      // `harvestChips` only returns them - `harvest` is the one that records
+      // them, and calling the wrong one meant this line did nothing at all.
+      if (RRX.tags) RRX.tags.harvest(doc);
 
       const container =
         document.querySelector(`${SEL.listRoot} [data-rr-paginate-item]`) ||
