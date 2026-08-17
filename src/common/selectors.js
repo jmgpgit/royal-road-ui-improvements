@@ -87,6 +87,14 @@
      */
     listRoot: '.fiction-list',
     paginateRoot: '[data-rr-paginate]',
+    /** Royal Road's own site-wide tag filters. The button is on every list page
+     *  signed in or out, so finding it proves nothing; the badge inside it
+     *  carries the count, and only appears when there is one. Its dialog is not
+     *  in the DOM until opened. */
+    globalFiltersTrigger: '[data-rr-global-filters-trigger]',
+    /** The fiction's own header, which is where its tags are. Scoping to it
+     *  keeps the tag rules off every other tag row on the page. */
+    fictionHero: '#fiction-hero',
     listCard: '.fiction-card-expanded',
 
     // --- description "show more" widget (pure CSS on RR's side) --------------
@@ -120,6 +128,16 @@
     cardStatLabel: '.uppercase',
     /** Tag chips - the slug is in the href. */
     cardTag: 'a[href*="tagsAdd="]',
+
+    /** The published tag vocabulary, on `/fictions/search` only. The select is
+     *  72 tags and carries no genres at all; the genre buttons are the other 22,
+     *  and not one of them appears in the select. Chips off a list page overlap
+     *  both and cover neither, which is why these two are what "the whole
+     *  vocabulary" means. */
+    tagSelect: '#tagsAdd',
+    genreButton: '.genre-tag-btn[data-tag]',
+    /** The button's own text includes its tooltip on some renders. */
+    genreLabel: '.tag-label',
     /** Last-updated. Several per card, all the same timestamp. */
     cardTime: 'time[unixtime]',
     /** Status and type chips: `<span>` with `bg-accent`, sharing the chip row
@@ -189,6 +207,8 @@
     chapterContainer: '#chapter-page-container',
     commentLoader: '#comment-loader',
     commentsPaginate: '#comments-pagination',
+    /** The comment sort control, `data-reader-preference-binding="commentSorting"`. */
+    commentSortDropdown: '#comment-sort-dropdown',
     /** The list Royal Road's comment AJAX fills, and that we append pages to. */
     commentsContainer: '#comments-container',
     comment: '[data-comment-id]',
@@ -240,8 +260,37 @@
     recommendationsAccordion: '#recommendations-accordion',
     reviewsPaginate: '#reviews-pagination',
     reviewsContainer: '#reviews-pagination [data-rr-paginate-items-container]',
+    /** The sort control. Reading which option is *chosen* from it is a trap and
+     *  was tried: once Royal Road has initialised the dropdown the reviews one
+     *  marks its choice `aria-selected="true"` while leaving
+     *  `data-rr-dropdown-selected="false"` on every option, the comments one
+     *  sets both, and the captures predate initialisation so they show neither.
+     *  The order in effect is on the paginate root's own fetch URL instead. */
     reviewSortDropdown: '#review-sort-dropdown',
     dropdownItem: '[data-rr-dropdown-item]',
+
+    // --- fiction page: the numbers ------------------------------------------
+    /** The Statistics panel. Royal Road ships it *closed*, but its contents are
+     *  server-rendered and in the DOM either way, so they read fine. */
+    statsAccordion: '#stats-accordion',
+    /** Where a readout goes: between the trigger and the collapsing content, so
+     *  it shows whether or not the panel is open and a click on it does not
+     *  toggle the panel. */
+    statsAccordionItem: '#stats-accordion [data-rr-accordion-item]',
+    statsAccordionContent: '#stats-accordion [data-rr-accordion-content]',
+    /** The chapter count, which is not a stat tile: it lives on the table of
+     *  contents, as an attribute. */
+    chaptersCount: '#chapters[data-chapters]',
+    /** Five sit in the panel - the overall score and four sub-scores - each
+     *  beside its own heading, which is how they are told apart. */
+    ratingWidget: '[data-rr-rating-selector]',
+    /** Inside a widget: "4.83 out of 5". The stars and `data-rr-initial-rating`
+     *  are both rounded to 4.8; this is the only place the real figure is. */
+    ratingValue: '[data-rr-tooltip-content]',
+    /** The score as a number, rather than text to parse out of a tooltip. */
+    ratingLd: 'script[type="application/ld+json"]',
+    /** The tooltip beside the title - the one score source outside the panel. */
+    ratingTooltip: '#fiction-rating-tooltip [data-rr-tooltip-content] span.font-semibold',
   };
 
   /**
@@ -269,6 +318,30 @@
     Views: 'views',
   };
 
+  /** The Statistics tiles, by label text, in the order Royal Road lays them out.
+   *  By label because a tile carries no id and no `data-rr-` hook, only Tailwind
+   *  classes: anything positional mispairs silently when one moves. */
+  const FICTION_STATS = {
+    'Total Views': 'v',
+    /** Total views over chapters, so it moves whenever a chapter is posted.
+     *  Tracked anyway: every tile is annotated, and one left blank reads as a
+     *  fault. */
+    'Avg. Views': 'w',
+    Followers: 'f',
+    Favorites: 'm',
+    Ratings: 'r',
+    Pages: 'p',
+  };
+
+  /** The star ratings, by the heading each sits under. */
+  const FICTION_SCORES = {
+    'Overall Score': 's',
+    Style: 'sty',
+    Story: 'sto',
+    Grammar: 'gra',
+    Character: 'cha',
+  };
+
   /** Tooltip text Royal Road uses for the passive status icons. */
   const MINE_TOOLTIPS = {
     Following: 'follow',
@@ -276,5 +349,14 @@
     Favorite: 'favorite', // mobile says "Favorite", desktop "Favorited"
   };
 
-  return { SEL, CARD_GROUPS, CARD_VARIANTS, CARD_STATS, MINE_TOOLTIPS, FICTION_ACCORDIONS };
+  return {
+    SEL,
+    CARD_GROUPS,
+    CARD_VARIANTS,
+    CARD_STATS,
+    FICTION_STATS,
+    FICTION_SCORES,
+    MINE_TOOLTIPS,
+    FICTION_ACCORDIONS,
+  };
 });

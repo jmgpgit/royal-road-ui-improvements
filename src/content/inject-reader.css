@@ -229,6 +229,24 @@ html.rrx-wide .author-note-card {
   margin-bottom: 0.5rem;
 }
 
+/* The chapter's own name, beside the label. The label is uppercased and
+   letter-spaced; a title set in that reads as shouting, so this undoes both.
+   Its separator is CSS so the text stays the title and nothing else - it is
+   what find-in-page and a screen reader get. */
+.rrx-recap__chapter {
+  margin-left: 0.5rem;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.rrx-recap__chapter::before {
+  content: '·';
+  margin-right: 0.5rem;
+  opacity: 0.6;
+}
+
 .rrx-recap__body > p {
   margin: 0 0 0.7rem;
   opacity: 0.85;

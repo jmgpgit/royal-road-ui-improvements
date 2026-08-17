@@ -19,7 +19,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   const STATUSES = ['ONGOING', 'HIATUS', 'COMPLETED', 'STUB', 'DROPPED'];
   const TYPES = ['Original', 'Fan Fiction'];
-  const MINE = ['follow', 'favorite', 'ril'];
+  const MINE = ['follow', 'favorite', 'ril', 'dropped'];
   const VIEWS = ['default', 'compact', 'grid', 'two-col'];
 
   /**
@@ -56,10 +56,27 @@
     /** Widen the fiction lists past Royal Road's own container. */
     'list.maxWidthPx': { type: 'int', default: null, nullable: true, min: 700, max: 4000 },
     'list.view': { type: 'enum', default: 'default', values: VIEWS },
+    'list.tagsExpand': { type: 'enum', default: 'off', values: ['off', 'hover', 'always'] },
+    /** `<slug> <#hex>` per entry. A list rather than a map because the schema
+     *  has no map type, and one more type is a worse trade than one encoding. */
+    'tags.colors': { type: 'list', default: [] },
+    'tags.colorHome': { type: 'bool', default: false },
 
     // ── hiding individual fictions (v1 feature) ───────────────────────────
     'hide.enabled': { type: 'bool', default: true },
     'hide.showHidden': { type: 'bool', default: false },
+
+    /** Mark a fiction as one you tried and stopped reading. Its card dims and
+     *  says so wherever it turns up, but stays where it is and stays clickable -
+     *  changing your mind is the point, and hiding already covers "never show me
+     *  this again".
+     *
+     *  On by default, beside hiding: the two are the same gesture on the same
+     *  card, and a reader who never presses either sees two buttons and nothing
+     *  else happens. Still its own switch, so the drop button can go without
+     *  taking hiding with it. Nothing is marked until a button is pressed, and
+     *  the filter chip works whatever this says. */
+    'drop.enabled': { type: 'bool', default: true },
 
     // ── filters ───────────────────────────────────────────────────────────
     'filters.enabled': { type: 'bool', default: true },
@@ -214,6 +231,12 @@
       values: ['leave', 'top', 'newest', 'oldest', 'upvotes'],
     },
     'fiction.reviewsAutoLoad': { type: 'bool', default: false },
+    /** "Since you last looked: +312 followers". Records the numbers on the page
+     *  as you open it, so the second visit has something to compare against.
+     *  Off by default, and nothing is recorded while it is off - it is the only
+     *  setting here that starts keeping a record of what you looked at. */
+    'fiction.statDeltas': { type: 'bool', default: false },
+    'fiction.tagsExpandAll': { type: 'bool', default: false },
   };
 
   /** v1 shipped these six as bare keys. Reading them keeps existing installs'

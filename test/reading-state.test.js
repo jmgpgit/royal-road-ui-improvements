@@ -150,6 +150,53 @@ test('reading a chapter’s comments, moving on, and coming back leaves them fol
   assert.equal(folded, total, `only ${folded} of ${total} comments folded`);
 });
 
+test('switching either one off stops it recording in the tab you switched it in', async () => {
+  // The listeners are latched on and never removed, so onPage's early return
+  // only takes effect on the *next* page load. In the tab where the reader
+  // flipped the switch, scrolling went on writing positions and leaving the page
+  // went on moving the watermark - against "nothing is recorded while this is
+  // off", which is the promise both settings make.
+  const storage = { chapters: {} };
+  const w = visit({ storage, chapter: CH1 });
+
+  const on = { page: 'chapter', settings: settings(w) };
+  w.RRX.commentsNew.apply(on);
+  w.RRX.resume.apply(on);
+  await settle();
+
+  const off = {
+    page: 'chapter',
+    settings: settings(w, { 'comments.seen': 'off', 'chapter.resume': 'off' }),
+  };
+  w.RRX.commentsNew.apply(off);
+  w.RRX.resume.apply(off);
+
+  // Everything the surviving handlers would call.
+  w.RRX.commentsNew.setDwelt(true);
+  w.RRX.commentsNew.commit();
+  await settle();
+
+  assert.deepEqual(Object.keys(storage.chapters), [], 'nothing was written');
+});
+
+test('and switching resume off does not delete the position it stopped writing', async () => {
+  // The sharper half: `measureNow` calls `forget` for a chapter not worth
+  // keeping, and that is reachable from the same latched scroll handler. With
+  // the guard on the writes only, scrolling in a tab where resume had just been
+  // switched off deleted the saved position and nothing put it back.
+  const storage = { chapters: { [CH1]: { f: 149588, a: 1, p: 12, o: 0.5 } } };
+  const w = visit({ storage, chapter: CH1 });
+
+  w.RRX.resume.apply({ page: 'chapter', settings: settings(w) });
+  await settle();
+  w.RRX.resume.apply({ page: 'chapter', settings: settings(w, { 'chapter.resume': 'off' }) });
+
+  w.RRX.resume.forget(CH1);
+  await settle();
+  assert.ok(storage.chapters[CH1], 'the position survived');
+  assert.equal(storage.chapters[CH1].p, 12);
+});
+
 test('a sweep before the record has loaded does not poison the watermark', async () => {
   const storage = { chapters: {} };
 

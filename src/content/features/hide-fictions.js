@@ -78,7 +78,7 @@
   }
 
   function removeControls(card) {
-    for (const node of card.querySelectorAll(':scope > .rrx-card-btn, :scope > .rrx-hidden-badge')) {
+    for (const node of card.querySelectorAll(':scope > [data-rrx-btn="hide"], :scope > .rrx-hidden-badge')) {
       node.remove();
     }
   }
@@ -96,7 +96,7 @@
     const mode = isHidden ? 'restore' : 'hide';
     card.toggleAttribute('data-rrx-hidden', isHidden);
 
-    const existing = card.querySelector(':scope > .rrx-card-btn');
+    const existing = card.querySelector(':scope > [data-rrx-btn="hide"]');
     if (existing && existing.dataset.rrxMode === mode) {
       syncBadge(card, isHidden);
       return;
@@ -108,6 +108,7 @@
       label: isHidden ? 'Show this fiction again' : 'Hide this fiction from all lists',
       iconName: isHidden ? 'plus' : 'minus',
       modifier: isHidden ? 'rrx-card-btn--restore' : null,
+      name: 'hide',
       onClick: (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -130,15 +131,16 @@
   }
 
   /**
-   * Tag every fiction card under `scope` and attach its control. Safe to call
-   * repeatedly - cards with data-rrx-fid skip the id lookup.
+   * Tag every fiction card under `scope` and hand each to `fn`. Safe to call
+   * repeatedly - cards with data-rrx-fid skip the id lookup. Shared, so a second
+   * per-card feature does not repeat the id resolution or depend on this one
+   * having swept first.
    *
    * @param {ParentNode} scope
-   * @param {object} ctx shared app context from main.js
+   * @param {(card: Element, id: number) => void} fn
    */
-  function syncCards(scope, ctx) {
-    const cards = scope.querySelectorAll(CARD_QUERY);
-    for (const card of cards) {
+  function eachCard(scope, fn) {
+    for (const card of scope.querySelectorAll(CARD_QUERY)) {
       let id = card.dataset.rrxFid ? Number(card.dataset.rrxFid) : null;
       if (!id) {
         if (card.dataset.rrxSkip) continue;
@@ -153,8 +155,13 @@
         id = found;
         card.dataset.rrxFid = String(id);
       }
-      applyControls(card, id, ctx);
+      fn(card, id);
     }
+  }
+
+  /** @param {object} ctx shared app context from main.js */
+  function syncCards(scope, ctx) {
+    eachCard(scope, (card, id) => applyControls(card, id, ctx));
   }
 
   features.list.push({
@@ -169,5 +176,5 @@
     syncCards,
   });
 
-  RRX.hideFictions = { syncCards, readFictionId, readMeta, CARD_QUERY };
+  RRX.hideFictions = { syncCards, eachCard, readFictionId, readMeta, CARD_QUERY };
 })(globalThis);

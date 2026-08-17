@@ -229,7 +229,32 @@ html.rrx-hover-expand .fiction-card-expanded:hover [data-rr-show-more-wrapper] .
   border-color: var(--color-success, #2e7d32);
 }
 
-.rrx-hidden-badge {
+/* The drop control sits to the left of the hide one. Both are absolute, so
+   without this they land on top of each other. */
+.rrx-card-btn[data-rrx-btn='drop'] {
+  right: 2.35rem;
+}
+
+/* ...unless hiding is switched off, when there is no hide button to sit beside
+   and the offset would just leave a gap in the corner. */
+[data-rrx-fid]:not(:has(> [data-rrx-btn='hide'])) > .rrx-card-btn[data-rrx-btn='drop'] {
+  right: 0.4rem;
+}
+
+/* Already dropped: shown without hovering, so the card says what it is, and
+   greened on hover because clicking it undoes the mark. */
+.rrx-card-btn--dropped {
+  opacity: 1;
+}
+
+.rrx-card-btn--dropped:hover {
+  color: var(--color-on-success, #fff);
+  background: var(--color-success, #2e7d32);
+  border-color: var(--color-success, #2e7d32);
+}
+
+.rrx-hidden-badge,
+.rrx-dropped-badge {
   position: absolute;
   top: 0.4rem;
   left: 0.4rem;
@@ -244,6 +269,12 @@ html.rrx-hover-expand .fiction-card-expanded:hover [data-rr-show-more-wrapper] .
   border: 1px solid color-mix(in srgb, var(--color-on-surface, #888) 30%, transparent);
   border-radius: 9999px;
   pointer-events: none;
+}
+
+/* Both badges share the top-left corner, so on a card that is hidden and
+   dropped at once - visible only in "show hidden" - they stack instead. */
+[data-rrx-hidden] > .rrx-dropped-badge {
+  top: 1.9rem;
 }
 
 /* ==========================================================================
@@ -343,4 +374,92 @@ html.rrx-hover-expand .fiction-card-expanded:hover [data-rr-show-more-wrapper] .
 
 .rrx-endless [data-rr-paginate-footer] {
   display: none !important;
+}
+
+/* ==========================================================================
+   "Since you last looked", on a fiction page
+   --------------------------------------------------------------------------
+   Between the Statistics header and its panel, which Royal Road ships closed:
+   so it reads either way, and clicking it does not toggle the panel.
+   ========================================================================== */
+
+.rrx-stat-delta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.9rem;
+  padding: 0 0.75rem 0.6rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--color-on-surface, #8a8a8a);
+}
+
+.rrx-stat-delta__since {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+
+/* One pair of colours for the summary and the figures alike, so the two read
+   as one report seen twice. */
+.rrx-stat-delta__item {
+  color: var(--color-on-surface-strong, #eaeaea);
+}
+
+.rrx-stat-delta__item--up,
+.rrx-stat-cell--up {
+  color: var(--color-success, #2e7d32);
+}
+
+.rrx-stat-delta__item--down,
+.rrx-stat-cell--down {
+  color: var(--color-danger, #c0392b);
+}
+
+/* Unmoved, and said so. Quieter than the figure above it, because "read, and
+   unchanged" is the least interesting thing on the panel - but it has to be
+   there, or that tile reads as one the extension could not make out. */
+.rrx-stat-cell--flat {
+  color: var(--color-on-surface, #8a8a8a);
+  opacity: 0.65;
+}
+
+/* Open, every number is annotated in place, so the summary would say it twice.
+   Only the chapter count stays - it has none in here - and the "since" label,
+   which says what the figures are measured against. CSS because opening an
+   accordion changes an attribute, and the sweep watches childList only. */
+#stats-accordion:has([data-rr-accordion-trigger][aria-expanded='true'])
+  .rrx-stat-delta__item:not([data-rrx-field='c']) {
+  display: none;
+}
+
+/* Before every item, not between: with items hidden in the open state, `+`
+   adjacency would leave the separator on whichever one survived. */
+.rrx-stat-delta__item::before {
+  content: '·';
+  margin-right: 0.9rem;
+  opacity: 0.6;
+}
+
+/* The same figures under Royal Road's own numbers. In the tile's type, a size
+   below it, so each reads as a footnote to the number above rather than a
+   badge. */
+
+.rrx-stat-cell {
+  display: block;
+  margin-top: 0.05rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .rrx-stat-cell {
+    font-size: 0.95rem;
+  }
 }

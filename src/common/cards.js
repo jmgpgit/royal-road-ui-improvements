@@ -86,7 +86,10 @@
    *  `mark="False"` means already marked. Follow and Favourite are tooltip-wrapped
    *  icons Royal Road omits entirely when unset, so absence is normal. */
   function readMine(card) {
-    const mine = { follow: false, favorite: false, ril: false };
+    // `dropped` is ours rather than Royal Road's, so nothing here can read it;
+    // list-filters.js fills it in from the stored list. Declared anyway, so the
+    // record has one shape wherever it is built.
+    const mine = { follow: false, favorite: false, ril: false, dropped: false };
 
     const form = card.querySelector(SEL.cardRilForm);
     if (form) {

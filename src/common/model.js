@@ -83,10 +83,11 @@
     return [...out].sort((a, b) => a - b);
   }
 
-  /** `{ [fictionId]: { title, url, cover, hiddenAt } }`. Metadata is captured off
-   *  the card at hide time so the manager renders covers and titles without
-   *  hitting the network. */
-  function normalizeHidden(raw) {
+  /** `{ [fictionId]: { title, url, cover, <stamp> } }`. Metadata is captured off
+   *  the card when the mark is made, so the manager renders covers and titles
+   *  without hitting the network.
+   *  @param {string} stamp the field holding when it happened, in ms */
+  function normalizeMarks(raw, stamp) {
     const src = raw && typeof raw === 'object' ? raw : {};
     const out = {};
     for (const key of Object.keys(src)) {
@@ -97,13 +98,21 @@
         title: typeof rec.title === 'string' && rec.title ? rec.title : `Fiction ${id}`,
         url: typeof rec.url === 'string' && rec.url ? rec.url : `/fiction/${id}`,
         cover: typeof rec.cover === 'string' ? rec.cover : '',
-        hiddenAt: Number.isFinite(Number(rec.hiddenAt)) ? Number(rec.hiddenAt) : 0,
+        [stamp]: Number.isFinite(Number(rec[stamp])) ? Number(rec[stamp]) : 0,
       };
     }
     return out;
   }
 
+  /** Hidden and dropped are two maps rather than one with a flag: they are
+   *  different answers ("never show me this" against "I read some and stopped"),
+   *  a fiction can be both, and one map would make every read decide which kind
+   *  of record it was looking at. */
+  const normalizeHidden = (raw) => normalizeMarks(raw, 'hiddenAt');
+  const normalizeDropped = (raw) => normalizeMarks(raw, 'droppedAt');
+
   const hiddenIds = (hidden) => normalizeIds(Object.keys(normalizeHidden(hidden)));
+  const droppedIds = (dropped) => normalizeIds(Object.keys(normalizeDropped(dropped)));
 
   // --- reading progress -----------------------------------------------------
   //
@@ -136,6 +145,12 @@
    *  position - which deletes itself when the chapter is finished - a watermark
    *  would otherwise be kept for every chapter whose comments ever loaded. */
   const SEEN_MAX_AGE_S = 60 * 24 * 60 * 60;
+
+  /** A record nothing has touched for this long goes, whatever it holds. A
+   *  position deletes itself when the chapter is finished, but a chapter put
+   *  down and never reopened had no expiry at all: those only ever left through
+   *  the cap, which is a backstop rather than a policy. */
+  const CHAPTERS_MAX_AGE_S = 365 * 24 * 60 * 60;
 
   function normalizeChapters(raw) {
     const src = raw && typeof raw === 'object' ? raw : {};
@@ -186,17 +201,25 @@
    */
   function pruneChapters(
     chapters,
-    { now = 0, seenMaxAgeS = SEEN_MAX_AGE_S, max = CHAPTERS_MAX, keep = CHAPTERS_KEEP } = {}
+    {
+      now = 0,
+      seenMaxAgeS = SEEN_MAX_AGE_S,
+      maxAgeS = CHAPTERS_MAX_AGE_S,
+      max = CHAPTERS_MAX,
+      keep = CHAPTERS_KEEP,
+    } = {}
   ) {
     const src = chapters && typeof chapters === 'object' ? chapters : {};
     const out = {};
 
     for (const [id, rec] of Object.entries(src)) {
       const record = { ...rec };
-      const stale = now && record.a && now - record.a > seenMaxAgeS;
-      if (stale) delete record.s;
+      const age = now && record.a ? now - record.a : 0;
+      if (age > seenMaxAgeS) delete record.s;
+      // Untouched for a year: whatever it holds, nobody is coming back for it.
+      if (age > maxAgeS) continue;
       // No position (`p`) and no watermark: nothing left anybody asks for.
-      if (record.p === undefined && record.s === undefined && stale) continue;
+      if (record.p === undefined && record.s === undefined && age > seenMaxAgeS) continue;
       out[id] = record;
     }
 
@@ -215,22 +238,199 @@
     return capped;
   }
 
+  // --- fiction statistics, and what changed since last time -----------------
+  //
+  // `{ [fictionId]: { now: <reading>, prev: <reading> } }`, where a reading is
+  //
+  //   a  when it was taken, unix SECONDS
+  //   v  total views          w  average views per chapter
+  //   f  followers            m  favourites
+  //   r  how many people rated it                 p  pages
+  //   c  chapters
+  //   s  the overall score out of 5, to two decimals, and its four sub-scores
+  //      the same way: sty style, sto story, gra grammar, cha character
+  //
+  // `now` is the last numbers seen; `prev` is the ones a delta is shown against.
+  // Two slots rather than one because the two questions differ: "what does the
+  // page say" is answered on every load, "what has moved since you last looked"
+  // must survive a refresh. Rolling `prev` forward on every visit would make
+  // reloading the page the way to erase the answer you just read.
+
+  /** The scores, which are the fields carrying a fraction rather than a count. */
+  const STAT_SCORES = ['s', 'sty', 'sto', 'gra', 'cha'];
+
+  /** Every field of a reading but its timestamp, in the order Royal Road lays
+   *  them out: the tiles, the scores below them, then the chapter count, which
+   *  is on the table of contents. The summary reads in this order too. */
+  const STAT_FIELDS = ['v', 'w', 'f', 'm', 'r', 'p', ...STAT_SCORES, 'c'];
+
+  const isScore = (field) => STAT_SCORES.includes(field);
+
+  /** How long a look lasts. Inside it a reload compares against the same
+   *  baseline; past it, the numbers on screen become the next baseline.
+   *
+   *  It governs when the baseline moves, never whether there is one: gating both
+   *  on it meant a second visit inside twelve hours only overwrote the last
+   *  reading, so the day somebody switched the feature on it could not answer. */
+  const LOOK_WINDOW_S = 12 * 60 * 60;
+
+  /** How far back "since you last looked" may reach. Visits closer together
+   *  than the window chain into one look that never ends, so somebody opening a
+   *  fiction every few hours stayed measured against a baseline set weeks
+   *  earlier and the figures grew without bound. Past this the baseline
+   *  re-anchors even mid-look. */
+  const MAX_SPAN_S = 7 * 24 * 60 * 60;
+
+  /** Past this a baseline answers a question nobody asked, and it bounds a map
+   *  that would otherwise grow for every fiction ever opened. */
+  const STATS_MAX_AGE_S = 365 * 24 * 60 * 60;
+  const STATS_MAX = 2000;
+  const STATS_KEEP = 1500;
+
+  function normalizeReading(raw) {
+    const src = raw && typeof raw === 'object' ? raw : null;
+    if (!src) return null;
+    const at = Number(src.a);
+    const out = { a: Number.isFinite(at) && at > 0 ? Math.floor(at) : 0 };
+    for (const field of STAT_FIELDS) {
+      const n = Number(src[field]);
+      if (!Number.isFinite(n) || n < 0) continue;
+      out[field] = isScore(field) ? Math.round(n * 100) / 100 : Math.floor(n);
+    }
+    return out;
+  }
+
+  function normalizeStats(raw) {
+    const src = raw && typeof raw === 'object' ? raw : {};
+    const out = {};
+    for (const key of Object.keys(src)) {
+      const id = Number(key);
+      if (!isValidId(id)) continue;
+      const entry = src[key] && typeof src[key] === 'object' ? src[key] : {};
+      const now = normalizeReading(entry.now);
+      // Without a current reading there is nothing to compare next time, so the
+      // record says nothing at all.
+      if (!now) continue;
+      const prev = normalizeReading(entry.prev);
+      out[id] = prev ? { now, prev } : { now };
+    }
+    return out;
+  }
+
+  /**
+   * Fold a fresh reading into a fiction's record.
+   *
+   * @param {object|null} entry what is stored for this fiction, if anything
+   * @param {object} reading the numbers on the page now, without a timestamp
+   * @param {{now:number, windowS?:number}} opts `now` in unix SECONDS
+   */
+  function rollStats(entry, reading, { now, windowS = LOOK_WINDOW_S, maxSpanS = MAX_SPAN_S } = {}) {
+    const taken = normalizeReading({ ...reading, a: now });
+    if (!taken) return null;
+
+    const previous = entry && typeof entry === 'object' ? normalizeStats({ 1: entry })[1] : null;
+    // Nothing seen before: this visit is the first thing to compare against.
+    if (!previous) return { now: taken };
+
+    // Second visit ever, whenever it comes. The comparison starts as soon as
+    // there is an earlier reading to make it against - waiting for the window
+    // here is what made the feature silent for its first half-day.
+    if (!previous.prev) return { now: taken, prev: previous.now };
+
+    // A new look: a real gap since the last visit. What was on screen last time
+    // becomes what this one is measured against, and it is at least a window
+    // old, which is what stops a burst of visits collapsing the span.
+    if (now - previous.now.a >= windowS) return { now: taken, prev: previous.now };
+
+    // Same look, so keep the baseline: a reload must not quietly answer its own
+    // question. Except once the span has outgrown what "since you last looked"
+    // can honestly mean - visits closer together than the window would otherwise
+    // chain into a single look with no end.
+    if (now - previous.prev.a >= maxSpanS) return { now: taken, prev: previous.now };
+
+    return { now: taken, prev: previous.prev };
+  }
+
+  /**
+   * What has changed since the reader last looked.
+   *
+   * Every field that can be compared, zeros included: each is written under its
+   * own figure, and one left blank among annotated neighbours reads as a figure
+   * the extension failed to read. A field missing from either reading is left
+   * out entirely - that one really was not compared.
+   *
+   * @returns {{since:number, changes:Array<[string, number]>}|null} null on a
+   *   first visit, and null when nothing moved at all - there is no line worth
+   *   drawing to say a fiction is exactly where you left it.
+   */
+  function statsDelta(entry) {
+    const record = entry && typeof entry === 'object' ? normalizeStats({ 1: entry })[1] : null;
+    if (!record || !record.prev) return null;
+
+    const changes = [];
+    let moved = false;
+    for (const field of STAT_FIELDS) {
+      const before = record.prev[field];
+      const after = record.now[field];
+      if (before === undefined || after === undefined) continue; // unread, not zero
+      const change = isScore(field) ? Math.round((after - before) * 100) / 100 : after - before;
+      if (change) moved = true;
+      changes.push([field, change]);
+    }
+    return moved ? { since: record.prev.a, changes } : null;
+  }
+
+  /** Oldest out first, and anything whose newest reading has gone stale. The
+   *  order is asserted in the tests: a cap that drops the wrong records still
+   *  looks like it is working. */
+  function pruneStats(
+    stats,
+    { now = 0, maxAgeS = STATS_MAX_AGE_S, max = STATS_MAX, keep = STATS_KEEP } = {}
+  ) {
+    const src = normalizeStats(stats);
+    const out = {};
+    for (const [id, record] of Object.entries(src)) {
+      if (now && record.now.a && now - record.now.a > maxAgeS) continue;
+      out[id] = record;
+    }
+
+    const entries = Object.entries(out);
+    if (entries.length <= max) return out;
+
+    entries.sort((a, b) => (b[1].now.a || 0) - (a[1].now.a || 0));
+    const capped = {};
+    for (const [id, record] of entries.slice(0, keep)) capped[id] = record;
+    return capped;
+  }
+
   // --- synchronous boot mirror --------------------------------------------
   // browser.storage.local is async, which races first paint. Content scripts run
   // in the page's origin, so localStorage reads synchronously at document_start,
   // before Royal Road's deferred module scripts: no flash of soon-to-be-hidden
   // cards, and Embla never measures the carousel slides we are about to hide.
 
-  function buildMirror(settings, hidden) {
-    return { v: 1, settings: normalizeSettings(settings), ids: hiddenIds(hidden) };
+  function buildMirror(settings, hidden, dropped) {
+    return {
+      v: 1,
+      settings: normalizeSettings(settings),
+      ids: hiddenIds(hidden),
+      dropped: droppedIds(dropped),
+    };
   }
 
-  /** Never throws - a corrupt mirror just means we boot with defaults. */
+  /** Never throws - a corrupt mirror just means we boot with defaults. `v` does
+   *  not move when a field is added: absent reads as empty, and an install that
+   *  has not run since the field existed still gets its settings and hidden ids
+   *  before paint rather than none of it. */
   function parseMirror(rawJson) {
     try {
       const data = JSON.parse(rawJson);
       if (!data || data.v !== 1) return null;
-      return { settings: normalizeSettings(data.settings), ids: normalizeIds(data.ids) };
+      return {
+        settings: normalizeSettings(data.settings),
+        ids: normalizeIds(data.ids),
+        dropped: normalizeIds(data.dropped),
+      };
     } catch {
       return null;
     }
@@ -255,7 +455,9 @@
       exportedAt: new Date(Number(now) || 0).toISOString(),
       settings: normalizeSettings(src.settings),
       hidden: normalizeHidden(src.hidden),
+      dropped: normalizeDropped(src.dropped),
       chapters: normalizeChapters(src.chapters),
+      stats: normalizeStats(src.stats),
     };
   }
 
@@ -277,9 +479,11 @@
     return {
       settings: normalizeSettings(data.settings),
       hidden: normalizeHidden(data.hidden),
-      // Absent in a backup written before reading progress existed; normalises
-      // to {} rather than failing the import.
+      // Absent in a backup written before their feature existed; normalise to
+      // {} rather than failing the import.
+      dropped: normalizeDropped(data.dropped),
       chapters: normalizeChapters(data.chapters),
+      stats: normalizeStats(data.stats),
     };
   }
 
@@ -294,11 +498,24 @@
     pageFromPath,
     normalizeIds,
     normalizeHidden,
+    normalizeDropped,
     hiddenIds,
+    droppedIds,
     normalizeChapters,
     pruneChapters,
     CHAPTERS_MAX,
     SEEN_MAX_AGE_S,
+    CHAPTERS_MAX_AGE_S,
+    STAT_FIELDS,
+    STAT_SCORES,
+    LOOK_WINDOW_S,
+    MAX_SPAN_S,
+    STATS_MAX,
+    STATS_MAX_AGE_S,
+    normalizeStats,
+    rollStats,
+    statsDelta,
+    pruneStats,
     buildMirror,
     parseMirror,
     buildBackup,

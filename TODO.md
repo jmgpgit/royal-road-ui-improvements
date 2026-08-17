@@ -4,10 +4,10 @@ Not promises and not a schedule. Ideas with enough reasoning attached that picki
 not mean starting from nothing. Everything here is subject to the three rules in
 [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
-Shipped as of 1.4.0: list filters and layouts, permanent hiding, chapter typography, the
-previous-chapter recap, the design switch, chapter facts (posted date, length, catch-up
-count), resume where you stopped, and
-comments posted since your last visit.
+Shipped as of 1.5.0: list filters and layouts, permanent hiding, tried-and-dropped marks,
+stat deltas on fiction pages, chapter typography, the previous-chapter recap, the design switch,
+chapter facts (posted date, length, catch-up count), resume where you stopped, and comments
+posted since your last visit.
 
 ## How to judge anything here
 
@@ -27,23 +27,6 @@ has 60 days.
 **Can it be answered from the page already open?** That is always the better version of a
 feature, and usually a smaller one.
 
-## Next up
-
-**Tried and dropped** — a per-fiction mark for something you sampled and stopped: the card dims,
-it does not disappear. Hiding is permanent and silent; this is not. Design settled: generated
-CSS beside `buildHideCss`, one rule per card group, **no** `display: none`, **no**
-`pointer-events: none` — a dropped fiction stays clickable, because changing your mind is the
-point. The control is a second `.rrx-card-btn`, so `hide-fictions.js` must select
-`[data-rrx-btn="hide"]`, not `:scope > .rrx-card-btn`, or whichever runs first deletes the
-other's button. Filtering rides `filters.hideMine`, not a new key.
-
-**Stat deltas on fiction pages** — "since you last looked: +312 followers, +0.02 rating". Read
-the six stat tiles by label text, icon as fallback (that page renders FontAwesome under five
-different family prefixes, so the glyph is the layer that churns). Take the score from the
-tooltip's `4.83`, not the widget's rounded `4.8` — "+0.02" is invisible at one decimal. Two
-snapshot slots with a freshness window: a refresh repeats the same answer, tomorrow rolls the
-baseline. Nothing on a first visit, nothing when nothing moved.
-
 ## Fiction lists
 
 - **Saved filter presets.** A dozen fields, no memory beyond the last state. "Rising Stars,
@@ -53,8 +36,10 @@ baseline. Nothing on a first visit, nothing when nothing moved.
 - **"You are N chapters behind"** on cards for fictions you are reading. The chapter records
   know where you got to, the card carries the current count: a list becomes a reading queue with
   no fetching.
-- **Stat deltas from your own history** — "+312 followers since you last saw this". Nobody else
-  can offer it: the history is local and never leaves the device.
+- **Stat deltas on the cards themselves** — "+312 followers since you last saw this", on a list
+  rather than a fiction page. The fiction-page version already stores the readings and the
+  comparison; what is missing is that a card carries fewer numbers than a fiction page, so the
+  two records would not be comparable field for field.
 - **Hide everything by an author** — the same local mechanism as hiding a fiction, keyed by
   author id, for when a whole catalogue is not for you.
 - **Sort a list locally.** Royal Road offers the orders it offers; the cards carry ratings,

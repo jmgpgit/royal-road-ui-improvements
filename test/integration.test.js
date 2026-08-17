@@ -59,12 +59,24 @@ nodeTest.after(() => {
  * Boot the extension over a fixture.
  * @param {object} [settings] seeded into the fake storage
  */
-async function boot(fixtureName, url, settings = {}, hidden = {}) {
+async function boot(fixtureName, url, settings = {}, hidden = {}, dropped = {}, stats = {}) {
+  // These documents run to 1.8 MB each and the suite booted one per test, all
+  // held until the file finished - which eventually exhausted the heap rather
+  // than failing any single test. Tests in a file run one at a time, so anything
+  // from a finished one is dead weight; `after` still sweeps what is left.
+  while (windows.length > 1) {
+    try {
+      windows.shift().close();
+    } catch {
+      /* already gone */
+    }
+  }
+
   const dom = new JSDOM(fixture(fixtureName), { url, runScripts: 'outside-only' });
   const w = dom.window;
   windows.push(w);
 
-  const store = { settings, hidden };
+  const store = { settings, hidden, dropped, stats };
   w.eval(`globalThis.__store = ${JSON.stringify(store)};`);
   w.eval(`globalThis.browser = {
     storage: {
@@ -153,13 +165,17 @@ test('the toolbar renders with the expected controls', async () => {
   );
 });
 
-test('every card gets a hide button and a parsed record', async () => {
+test('every card gets both card buttons and a parsed record', async () => {
+  // Hiding and dropping both ship on, so a default install puts two buttons on
+  // each card and neither does anything until it is pressed.
   const { w } = await boot(
     'fictions-rising-stars.new.html',
     'https://www.royalroad.com/fictions/rising-stars'
   );
   assert.equal(w.document.querySelectorAll('[data-rrx-fid]').length, 50);
-  assert.equal(w.document.querySelectorAll('.rrx-card-btn').length, 50);
+  assert.equal(w.document.querySelectorAll('[data-rrx-btn="hide"]').length, 50);
+  assert.equal(w.document.querySelectorAll('[data-rrx-btn="drop"]').length, 50);
+  assert.equal(w.document.querySelectorAll('.rrx-card-btn').length, 100);
 });
 
 test('a stored filter narrows the page, and the toolbar says by how much', async () => {
@@ -362,6 +378,67 @@ test('hiding a fiction through the button removes it and records it', async () =
   assert.ok(w.document.getElementById('rrx-toast'), 'an undo toast is offered');
 });
 
+test('dropping a fiction dims its card and leaves it in the list', async () => {
+  const { w } = await boot(
+    'fictions-rising-stars.new.html',
+    'https://www.royalroad.com/fictions/rising-stars',
+    { 'drop.enabled': true }
+  );
+  const card = w.document.querySelector('[data-rrx-fid]');
+  const id = Number(card.dataset.rrxFid);
+  const before = w.document.querySelectorAll('.fiction-card-expanded').length;
+
+  card
+    .querySelector('[data-rrx-btn="drop"]')
+    .dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.ok(w.RRX.main.ctx.droppedSet.has(id), 'recorded as dropped');
+  const css = w.document.getElementById('rrx-hide-style').textContent;
+  assert.ok(css.includes(`/fiction/${id}/`), 'the generated rule targets it');
+  assert.equal(css.includes('display:none'), false, 'and does not remove it');
+  assert.equal(
+    w.document.querySelectorAll('.fiction-card-expanded').length,
+    before,
+    'the card is still on the page'
+  );
+  assert.ok(card.querySelector('.rrx-dropped-badge'), 'and says why it is dimmed');
+  assert.ok(w.document.getElementById('rrx-toast'), 'an undo toast is offered');
+});
+
+test('switching the feature off stops the marking, but not a filter asked for', async () => {
+  // `drop.enabled` decides whether the button and the dimming appear. It used to
+  // gate the filter too, so that one switch turned everything off - but the
+  // panel offers the Dropped chip whatever the switch says and the toolbar
+  // counts it as narrowing the list, so an explicitly chosen filter silently did
+  // nothing.
+  const stored = { title: 'X', url: '/fiction/1', cover: '', droppedAt: 1 };
+  const url = 'https://www.royalroad.com/fictions/rising-stars';
+  const settings = { 'drop.enabled': true, 'filters.hideMine': ['dropped'] };
+
+  const on = await boot('fictions-rising-stars.new.html', url, settings, {}, {});
+  const id = Number(on.w.document.querySelector('[data-rrx-fid]').dataset.rrxFid);
+  const total = on.w.document.querySelectorAll('.fiction-card-expanded').length;
+
+  const filtered = await boot('fictions-rising-stars.new.html', url, settings, {}, { [id]: stored });
+  assert.equal(visibleCards(filtered.w).length, total - 1, 'the dropped card is filtered out');
+
+  const off = await boot(
+    'fictions-rising-stars.new.html',
+    url,
+    { ...settings, 'drop.enabled': false },
+    {},
+    { [id]: stored }
+  );
+  assert.equal(
+    visibleCards(off.w).length,
+    total - 1,
+    'still filtered: that is what the reader asked the panel for'
+  );
+  assert.equal(off.w.document.getElementById('rrx-hide-style').textContent, '', 'but not dimmed');
+  assert.equal(off.w.document.querySelector('[data-rrx-btn="drop"]'), null, 'and no control');
+});
+
 test('the load-more bar appears only when filters could be hiding further pages', async () => {
   // rising-stars is a single page of 50, so there is nothing further to scan.
   const single = await boot(
@@ -501,6 +578,270 @@ test('an accordion already in the wanted state is marked done, not clicked forev
     'open'
   );
   assert.equal(clicks, 0, 'and still never clicked');
+});
+
+test('a first visit records the numbers and says nothing', async () => {
+  const { w, errors } = await boot(
+    'fiction-detail.new.html',
+    'https://www.royalroad.com/fiction/21220/mother-of-learning',
+    { 'fiction.statDeltas': true }
+  );
+  await new Promise((resolve) => setTimeout(resolve, 20));
+
+  assert.deepEqual(errors, []);
+  assert.equal(w.document.getElementById('rrx-stat-delta'), null, 'nothing to compare against yet');
+
+  const stored = w.__store.stats[21220];
+  assert.ok(stored && stored.now, 'but the visit was recorded');
+  assert.equal(stored.now.f, 32866, 'with the followers off the page');
+  assert.equal(stored.now.s, 4.83, 'and the two-decimal score');
+  assert.equal(stored.prev, undefined, 'and no baseline, since this was the first look');
+});
+
+test('opening the same fiction twice in one sitting is enough to get an answer', async () => {
+  // The journey that was broken: switch the feature on, open a fiction, open it
+  // again. Every visit overwrote the last reading and none of them established a
+  // baseline, so the readout could not appear until the next day.
+  const url = 'https://www.royalroad.com/fiction/21220/mother-of-learning';
+  const settings = { 'fiction.statDeltas': true };
+
+  const first = await boot('fiction-detail.new.html', url, settings);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const carried = JSON.parse(JSON.stringify(first.w.__store.stats));
+  assert.ok(carried[21220].now, 'the first visit was recorded');
+
+  // Second visit, minutes later. The capture cannot change between the two, so
+  // the first reading is doctored instead: the same page now reads as a fiction
+  // that has gained a chapter and a follower since.
+  carried[21220].now.c -= 1;
+  carried[21220].now.f -= 1;
+
+  const second = await boot('fiction-detail.new.html', url, settings, {}, {}, carried);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+
+  assert.ok(second.w.__store.stats[21220].prev, 'the earlier reading became the baseline');
+  const line = second.w.document.getElementById('rrx-stat-delta');
+  assert.ok(line, 'and the readout appears on the second visit');
+  assert.match(line.textContent, /\+1 chapter\b/);
+  assert.match(line.textContent, /\+1 follower\b/);
+  // Minutes old, so it says a time rather than today's date, which would read
+  // as a bug on the day it was written.
+  assert.match(line.textContent, /^Since \d/);
+});
+
+test('coming back says what moved, and nothing while the feature is off', async () => {
+  const url = 'https://www.royalroad.com/fiction/21220/mother-of-learning';
+  // A look from two days ago, when it had 500 fewer followers and a lower score.
+  const then = Math.floor(Date.now() / 1000) - 2 * 24 * 3600;
+  const seed = () => ({
+    21220: { now: { a: then, f: 32366, m: 31777, s: 4.81, c: 106, p: 2932, r: 17316, v: 27778323 } },
+  });
+
+  const { w } = await boot('fiction-detail.new.html', url, { 'fiction.statDeltas': true }, {}, {}, seed());
+  await new Promise((resolve) => setTimeout(resolve, 20));
+
+  const line = w.document.getElementById('rrx-stat-delta');
+  assert.ok(line, 'the readout is on the page');
+  assert.match(line.textContent, /\+500 followers/);
+  assert.match(line.textContent, /\+3 chapters/);
+  assert.match(line.textContent, /\+0\.02 score/, 'the rounded 4.8 could never show this');
+  assert.equal(/favourites/.test(line.textContent), false, 'and stays quiet about what did not move');
+
+  // It sits where it can be read: outside the trigger, above the panel Royal
+  // Road ships closed.
+  const content = w.document.querySelector('#stats-accordion [data-rr-accordion-content]');
+  assert.equal(line.nextElementSibling, content);
+  assert.equal(line.closest('[data-rr-accordion-trigger]'), null);
+
+  // The baseline rolled forward, so the record now compares against today.
+  assert.equal(w.__store.stats[21220].prev.f, 32366);
+  assert.equal(w.__store.stats[21220].now.f, 32866);
+
+  const off = await boot('fiction-detail.new.html', url, { 'fiction.statDeltas': false }, {}, {}, seed());
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(off.w.document.getElementById('rrx-stat-delta'), null, 'nothing shown');
+  assert.deepEqual(
+    off.w.__store.stats[21220].now.a,
+    then,
+    'and nothing recorded: the stored look is untouched'
+  );
+});
+
+test('the tag cache ages from when it was fetched, not from when it was last used', async () => {
+  // `save` rewrites the key on every read of the cache and on any page carrying
+  // tag chips. Stamping those with "now" made the week count from the last time
+  // the filter panel was opened, so a reader who opened it weekly never
+  // refreshed - the cache aged only while it went unused.
+  const eightDays = Date.now() - 8 * 24 * 3600 * 1000;
+  const { w } = await boot(
+    'fictions-rising-stars.new.html',
+    'https://www.royalroad.com/fictions/rising-stars'
+  );
+  // Marked complete, or `load` would rightly go and fetch the rest and the
+  // stamp would move because it really was fetched.
+  w.__store.tagCatalogue = { at: eightDays, full: true, tags: [{ slug: 'litrpg', label: 'LitRPG' }] };
+
+  await w.RRX.tags.load();
+  assert.equal(
+    w.__store.tagCatalogue.at,
+    eightDays,
+    'using the cache does not make it look freshly fetched'
+  );
+});
+
+test('the stored maps age out even with every feature that fills them off', async () => {
+  // The prunes live inside the write paths, and every write path is behind a
+  // setting. With those off nothing wrote and so nothing expired either: what
+  // was there stayed for good. Housekeeping is what makes the expiry real.
+  const year = 400 * 24 * 3600;
+  const old = Math.floor(Date.now() / 1000) - year;
+  const { w } = await boot(
+    'fictions-rising-stars.new.html',
+    'https://www.royalroad.com/fictions/rising-stars',
+    {}, // every reading feature at its default, which is off
+    {},
+    {},
+    { 21220: { now: { a: old, f: 100 } } }
+  );
+  // Booting a page is enough to have run it once, which is the point.
+  assert.ok(w.__store.tidiedAt, 'every page load offers to tidy');
+
+  w.__store.chapters = { 3766643: { f: 9, a: old, p: 42, o: 0.5 } };
+  delete w.__store.tidiedAt; // as if a day had passed
+  assert.equal(await w.RRX.store.tidy(), true, 'it ran');
+  assert.equal(Object.keys(w.__store.chapters).length, 0, 'the stale chapter went');
+  assert.equal(Object.keys(w.__store.stats).length, 0, 'and the stale fiction');
+
+  // Once a day, not once a page: this reads two maps that reach megabytes.
+  assert.equal(await w.RRX.store.tidy(), false, 'not again today');
+});
+
+test('housekeeping does not clobber a record written while it was deciding', async () => {
+  // It runs at document_end alongside the features that write these maps, and
+  // the write is the whole map: a reading recorded between the read and the
+  // write was read back stale and dropped by the prune that had already run.
+  const { w } = await boot(
+    'fictions-rising-stars.new.html',
+    'https://www.royalroad.com/fictions/rising-stars'
+  );
+  const stale = Math.floor(Date.now() / 1000) - 400 * 24 * 3600;
+  w.__store.stats = { 1: { now: { a: stale, f: 1 } } };
+  delete w.__store.tidiedAt;
+
+  // A page records while housekeeping is mid-flight.
+  const housekeeping = w.RRX.store.tidy();
+  await w.RRX.store.markFictionStats(21220, { f: 32866 });
+  await housekeeping;
+
+  assert.ok(w.__store.stats[21220], 'the fresh reading survived');
+  assert.equal(w.__store.stats[1], undefined, 'and the stale one still went');
+});
+
+test('housekeeping prunes against the reader’s own expiry, not the built-in one', async () => {
+  // The 1.4.1 bug from the other direction: a writer that omits the setting
+  // prunes the whole map against the default, silently overriding the choice.
+  const days = (n) => Math.floor(Date.now() / 1000) - n * 24 * 3600;
+  const { w } = await boot(
+    'fictions-rising-stars.new.html',
+    'https://www.royalroad.com/fictions/rising-stars',
+    { 'comments.seenDays': 300 }
+  );
+  // 200 days old: past the built-in 60, well inside the 300 the reader chose.
+  w.__store.chapters = { 3766643: { f: 9, a: days(200), s: days(200) } };
+  delete w.__store.tidiedAt;
+
+  await w.RRX.store.tidy();
+  assert.ok(w.__store.chapters[3766643], 'kept, because the reader asked for 300 days');
+  assert.equal(w.__store.chapters[3766643].s, days(200), 'watermark and all');
+});
+
+test('forgetting the reading history reaches the scratchpad with no tab open', async () => {
+  // The options page cannot touch it: the scratchpad is royalroad.com's
+  // localStorage. A listener in an open tab handled the easy case, and the daily
+  // housekeeping was supposed to catch the rest - but it keeps anything written
+  // in the last day, and only runs once a day, so a position could outlive the
+  // press by two days and then be handed straight back, since a scratchpad entry
+  // outranks a missing record. The press is stamped now, and read on load.
+  const { w } = await boot(
+    'fictions-rising-stars.new.html',
+    'https://www.royalroad.com/fictions/rising-stars'
+  );
+  const nowS = Math.floor(Date.now() / 1000);
+  w.RRX.store.writePosition(3766643, { a: nowS, p: 42 });
+  assert.ok(w.RRX.store.readPositions()[3766643], 'a position is in the scratchpad');
+
+  await w.RRX.store.forgetChapters();
+  assert.ok(w.__store.forgotAt, 'the press is recorded where any tab can find it');
+
+  // The next Royal Road page load, in a browser where none was open at the time.
+  assert.equal(await w.RRX.store.honourForget(), true, 'it acts on the press');
+  assert.equal(
+    Object.keys(w.RRX.store.readPositions()).length,
+    0,
+    'and the position does not come back'
+  );
+
+  assert.equal(await w.RRX.store.honourForget(), false, 'once, not on every load after');
+});
+
+test('a position written after the forget is left alone', async () => {
+  // The stamp, not an empty map: a reader who finishes what they open has no
+  // records either, and their unflushed position is what the scratchpad is for.
+  const { w } = await boot(
+    'fictions-rising-stars.new.html',
+    'https://www.royalroad.com/fictions/rising-stars'
+  );
+  await w.RRX.store.forgetChapters();
+  await w.RRX.store.honourForget();
+
+  w.RRX.store.writePosition(3766643, { a: Math.floor(Date.now() / 1000), p: 7 });
+  assert.equal(await w.RRX.store.honourForget(), false, 'nothing new to act on');
+  assert.ok(w.RRX.store.readPositions()[3766643], 'so the fresh position stands');
+});
+
+test('resetting and importing delete the readings too, not just the toggle', async () => {
+  // saveSettings noticed the on->off transition; resetSettings writes the
+  // settings key directly and import replaces it wholesale, so both reached
+  // "off" without ever cleaning up after it.
+  const url = 'https://www.royalroad.com/fiction/21220/mother-of-learning';
+  const seeded = { 21220: { now: { a: Math.floor(Date.now() / 1000), f: 32366 } } };
+
+  const reset = await boot('fiction-detail.new.html', url, { 'fiction.statDeltas': true }, {}, {}, seeded);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  await reset.w.RRX.store.resetSettings();
+  assert.equal(Object.keys(reset.w.__store.stats).length, 0, 'reset turns it off, so it clears');
+
+  // ...and a backup carrying readings alongside a setting that says they are
+  // not kept: the setting wins, or import would be a way back in.
+  const imported = await boot('fiction-detail.new.html', url, { 'fiction.statDeltas': true }, {}, {}, seeded);
+  const state = await imported.w.RRX.store.replaceAll({
+    settings: { 'fiction.statDeltas': false },
+    stats: seeded,
+  });
+  assert.equal(Object.keys(imported.w.__store.stats).length, 0, 'not restored behind the setting');
+  assert.equal(Object.keys(state.stats).length, 0, 'and the caller is told so');
+});
+
+test('switching the readings off deletes them', async () => {
+  // The map is pruned only when a reading is written, so with the feature off
+  // nothing would ever touch it again: what was there would sit in storage for
+  // good, whatever "forgotten after a year" claimed.
+  const url = 'https://www.royalroad.com/fiction/21220/mother-of-learning';
+  const seeded = { 21220: { now: { a: 1_700_000_000, f: 32366 } } };
+  const { w } = await boot('fiction-detail.new.html', url, { 'fiction.statDeltas': true }, {}, {}, seeded);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.ok(w.__store.stats[21220], 'seeded');
+
+  await w.RRX.store.saveSettings({ 'fiction.statDeltas': false });
+  // Counted rather than deepEqual'd: a jsdom `{}` is not strictly equal to one
+  // built out here.
+  assert.equal(Object.keys(w.__store.stats).length, 0, 'off means gone, not merely paused');
+
+  // Turning something else off leaves it alone.
+  await w.RRX.store.saveSettings({ 'fiction.statDeltas': true });
+  await w.RRX.store.markFictionStats(21220, { f: 1 });
+  await w.RRX.store.saveSettings({ 'list.expandAll': false });
+  assert.ok(w.__store.stats[21220], 'an unrelated setting change keeps them');
 });
 
 test('a section forced open survives Royal Road re-closing it after init', async () => {
@@ -651,6 +992,11 @@ async function atListBottom(settings) {
 
 const settled = () => new Promise((resolve) => setTimeout(resolve, 900));
 
+/** Requests for the tag vocabulary itself, which is `/fictions/search` with no
+ *  query - the list pager asks the same path for `?page=N`. */
+const catalogueFetches = (w) =>
+  w.__fetched.filter((u) => /\/fictions\/search$/.test(String(u).split('?')[0]) && !String(u).includes('page='));
+
 test('reaching the bottom loads the next page, with no filter set', async () => {
   // This was once gated on having a filter active, which made a setting called
   // "keep loading as you scroll" do nothing on an ordinary list, with no
@@ -732,6 +1078,120 @@ test('Royal Road’s page numbers go once we have appended beneath them', async 
   assert.equal(paginate.classList.contains('rrx-endless'), false, 'restored on reset');
 });
 
+test('an empty list says so, and names the reader’s own global filters when it can', async () => {
+  // An empty list is indistinguishable from a page that genuinely has nothing -
+  // and, signed in, from the reader's own Global Filters cutting the results
+  // before we ever see them. Theirs, not Royal Road's: the dialog says
+  // "Customize your experience by including or excluding tags across the entire
+  // site", and signed out only "You must be logged in to use global tag filters".
+  const w = await atListBottom({
+    'list.infiniteScroll': false,
+    'filters.enabled': true,
+    'filters.minRating': 5,
+    'filters.maxRating': 5,
+  });
+  const note = () => w.document.getElementById('rrx-no-matches');
+
+  w.RRX.main.syncCards(w.document);
+  const counts = w.RRX.main.ctx.filterCounts;
+  assert.ok(counts.total > 0, 'the page has cards');
+  assert.equal(counts.shown, 0, 'and the filter hides every one');
+  assert.ok(note(), 'so the list says so');
+  assert.doesNotMatch(note().textContent, /Global Filters/, 'no badge, nothing to add');
+
+  // Signed in, Royal Road badges its own button with the reader's count.
+  const badge = w.document.createElement('span');
+  badge.textContent = '10';
+  w.document.querySelector(w.RRX.SEL.globalFiltersTrigger).appendChild(badge);
+  w.RRX.main.syncCards(w.document);
+  assert.match(note().textContent, /Your own Global Filters hide 10 tags site-wide/);
+  assert.doesNotMatch(
+    note().textContent,
+    /Royal Road is (also )?hiding|tags? of its own/,
+    'the note calls the reader’s own filters Royal Road’s'
+  );
+
+});
+
+test('a tag in both lists is called out before it empties the page', async () => {
+  // "Must have: Magic" and "Must not: Magic" can never match anything, and the
+  // empty list it produces looks exactly like a filter that is merely strict.
+  const w = await atListBottom({ 'list.infiniteScroll': true, 'filters.enabled': true });
+  toolbar(w)
+    .querySelector('[data-rrx-toggle="filters"]')
+    .dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+
+  const warn = () => w.document.querySelector('.rrx-panel__warn');
+  assert.ok(warn(), 'the line exists');
+  assert.equal(warn().hidden, true, 'and says nothing while the lists agree');
+
+  const inputs = [...w.document.querySelectorAll('#rrx-filter-panel input[role="combobox"]')];
+  assert.equal(inputs.length, 2, 'must have, and must not');
+
+  for (const input of inputs) {
+    input.value = 'Magic';
+    input.dispatchEvent(new w.Event('input', { bubbles: true }));
+    const hit = [...input.parentElement.querySelectorAll('.rrx-combo__item')].find(
+      (b2) => b2.textContent === 'Magic'
+    );
+    assert.ok(hit, 'Magic is offered');
+    hit.dispatchEvent(new w.MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+  }
+
+  assert.equal(warn().hidden, false, 'both lists hold it, so the line shows');
+  assert.match(warn().textContent, /Magic/);
+  assert.match(warn().textContent, /nothing can match/);
+});
+
+test('a run of pages matching nothing offers a reason, without stopping', async () => {
+  // Deliberately not a stop: the one match can be on page five, so giving up at
+  // four would guarantee never finding it. What the reader gets instead is the
+  // one thing they cannot see from here - Royal Road cuts these lists to the
+  // signed-in reader's own Global Filters before we ever fetch them.
+  const w = await atListBottom({ 'list.infiniteScroll': true });
+  const loadMore = w.RRX.loadMore;
+  const line = () => {
+    const bar = w.document.getElementById('rrx-loadmore');
+    return bar ? bar.textContent : '';
+  };
+
+  Object.assign(loadMore.state, { pages: 4, added: 0, dry: 4, busy: false });
+  loadMore.render(w.RRX.main.ctx);
+  assert.match(line(), /scanned 4 extra page/, 'it says how far it has read');
+  assert.doesNotMatch(line(), /Global Filters/, 'no badge, so nothing to point at');
+  assert.equal(loadMore.state.done, '', 'and the run is not finished');
+
+  // Signed in, Royal Road badges its own button with the count. The button is
+  // already in the capture - it is there signed out too, which is why the code
+  // reads the badge rather than the button.
+  const badge = w.document.createElement('span');
+  badge.textContent = '10';
+  w.document.querySelector(w.RRX.SEL.globalFiltersTrigger).appendChild(badge);
+  loadMore.render(w.RRX.main.ctx);
+  assert.match(line(), /Global Filters hide 10 tags site-wide/);
+
+  // One page that matches resets it: the run is finding things again.
+  Object.assign(loadMore.state, { dry: 0, added: 3 });
+  loadMore.render(w.RRX.main.ctx);
+  assert.doesNotMatch(line(), /Global Filters/, 'nothing dry to explain');
+});
+
+test('the page numbers survive a page that was fetched and filtered away', async () => {
+  // `syncPaginator` keyed on pages fetched rather than rows appended, which its
+  // own paragraph already said was wrong. A filter matching nothing hid the
+  // numbers and left an empty list with no way to navigate at all.
+  const w = await atListBottom({ 'list.infiniteScroll': true });
+  const paginate = w.document.querySelector(w.RRX.SEL.paginateRoot);
+
+  Object.assign(w.RRX.loadMore.state, { pages: 3, added: 0 });
+  w.RRX.loadMore.syncPaginator();
+  assert.equal(paginate.classList.contains('rrx-endless'), false, 'fetched is not appended');
+
+  w.RRX.loadMore.state.added = 1;
+  w.RRX.loadMore.syncPaginator();
+  assert.ok(paginate.classList.contains('rrx-endless'), 'and they go once something lands');
+});
+
 test('the page numbers stay gone if Royal Road re-renders its paginator', async () => {
   // `hideFooter` used to be called from exactly one place: the end of a load.
   // Anything that re-rendered the pagination took the class with it, the page
@@ -768,6 +1228,16 @@ test('the page numbers stay gone if Royal Road re-renders its paginator', async 
 /** A stand-in for an element's on-screen box. */
 const boxOf = (over) => ({ top: 0, left: 0, right: 0, width: 0, height: 0, bottom: 0, ...over });
 
+/** A list that moves out of trigger range as it grows, the way a real one does.
+ *  A box pinned near the bottom forever makes the pager's own poll walk every
+ *  page a fixture declares - 135 of them on the reviews root - which is a
+ *  harness artefact rather than a bug, but it exhausts the heap all the same. */
+const growingBox = (host, extra = 0) => {
+  const start = host.children.length;
+  return () =>
+    boxOf({ width: 900, height: 900, bottom: host.children.length > start + extra ? 5000 : 10 });
+};
+
 async function fictionPage(settings) {
   const { w } = await boot(
     'fiction-detail.new.html',
@@ -794,7 +1264,7 @@ test('a collapsed reviews panel is never paged into', async () => {
   assert.equal(w.__fetched.length, before, 'a closed panel asks Royal Road for nothing');
 
   // Opened, and scrolled to its end, it pages as normal.
-  host.getBoundingClientRect = () => boxOf({ width: 900, height: 900, bottom: 10 });
+  host.getBoundingClientRect = growingBox(host);
   w.RRX.fictionPage.reviewPager.check();
   await new Promise((r) => setTimeout(r, 120));
   assert.ok(w.__fetched.length > before, 'an open panel at its end does page');
@@ -825,24 +1295,45 @@ test('Royal Road’s review numbers survive until we have appended something', a
   assert.ok(root.classList.contains('rrx-endless'), 'once something is appended, they go');
 });
 
-test('paging follows the sort the reader chose, not the one the page loaded with', async () => {
-  // Royal Road leaves data-rr-paginate-fetch-url on the ordering the page was
-  // rendered with. Ask it for page 2 after a re-sort and it answers with rows
-  // from the OLD order: on a fiction with few reviews those are all already on
-  // screen, every one deduplicates away, and the pager concludes there is
-  // nothing left and stops for good having added nothing.
+test('the order is the one on screen, not the one the fetch URL was rendered with', async () => {
+  // Read from Royal Road's own source: its paginator takes
+  // `data-rr-paginate-fetch-url` once, in its constructor, into a `fetchUrl`
+  // property, and a re-sort assigns that property - `fetchUpdateUrlAndHook` -
+  // without ever writing the attribute back. From the first re-sort onwards the
+  // attribute describes an order nobody is looking at, and page two of it comes
+  // back as rows already on screen: they all deduplicate away, nothing is
+  // added, and the run stops with the page numbers up.
+  //
+  // `fiction.reviewSort` reaches Royal Road by clicking its own dropdown item,
+  // so the list really is in that order. This asserted the opposite for a
+  // while, on the strength of a capture whose scripts never run and so never
+  // rewrite anything.
   const w = await fictionPage({ 'fiction.reviewsAutoLoad': true, 'fiction.reviewSort': 'oldest' });
   const root = w.document.querySelector(w.RRX.SEL.reviewsPaginate);
+  const url = w.RRX.fictionPage.reviewPager.urlFor(2);
+
   assert.match(
     root.getAttribute('data-rr-paginate-fetch-url'),
     /sorting=top/,
-    'Royal Road’s own URL still says top, which is the whole problem'
+    'the attribute keeps saying what the page was built with'
   );
+  assert.match(url, /sorting=oldest/, 'and we ask in the order actually on screen');
+  assert.doesNotMatch(url, /sorting=top/);
+  assert.match(url, /page=2/);
+});
 
-  const url = w.RRX.fictionPage.reviewPager.urlFor(2);
-  assert.match(url, /sorting=oldest/, 'we ask for the order actually on screen');
-  assert.match(url, /page=2/, 'and the next page of it');
-  assert.equal((url.match(/sorting=/g) || []).length, 1, 'the old sort is replaced, not appended');
+test('a reader picking an order beats the one we asked for', async () => {
+  const w = await fictionPage({ 'fiction.reviewsAutoLoad': true, 'fiction.reviewSort': 'oldest' });
+  const pager = w.RRX.fictionPage.reviewPager;
+  assert.equal(pager.sorting(), 'oldest');
+
+  const item = [...w.document.querySelectorAll(w.RRX.SEL.reviewSortDropdown + ' [data-rr-dropdown-item]')].find(
+    (el) => el.getAttribute('data-rr-dropdown-option-value') === 'upvotes'
+  );
+  item.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+
+  assert.equal(pager.sorting(), 'upvotes');
+  assert.match(pager.urlFor(2), /sorting=upvotes/);
 });
 
 test('with no sort of our own, Royal Road’s own fetch URL is left untouched', async () => {
@@ -956,4 +1447,420 @@ test('"About Fiction: always open" survives Royal Road re-applying its own state
   box().checked = false;
   await new Promise((r) => setTimeout(r, 700));
   assert.equal(box().checked, true, 'and is put back');
+});
+
+test('re-sorting after loading pages does not strand the rest of the comments', async () => {
+  // Reported: load several pages of comments, change the sort, and only the
+  // first page comes back - the rest vanish and infinite scroll never resumes.
+  // Royal Road refetches page one and swaps the container's contents, taking
+  // every page we appended with it, while our counters still believe the run is
+  // deep in progress or finished.
+  const w = await fictionPage({ 'fiction.reviewsAutoLoad': true });
+  const pager = w.RRX.fictionPage.reviewPager;
+  const host = w.document.querySelector(w.RRX.SEL.reviewsContainer);
+  assert.ok(host, 'the fiction page has a reviews container');
+
+  // Stand in for a run that reached the end: pages appended, nothing left.
+  const appended = w.document.createElement('div');
+  appended.setAttribute('data-rr-paginate-item', '');
+  appended.setAttribute('data-rrx-appended', '1');
+  host.appendChild(appended);
+  pager.state.added = 3;
+  pager.state.next = 4;
+  pager.state.done = true;
+
+  assert.equal(pager.noticeReplacement(), false, 'our pages are still there, so nothing to do');
+
+  // Royal Road re-sorts: it replaces the container with page one of the new
+  // order, and everything we appended goes with it.
+  host.innerHTML = '<div data-rr-paginate-item></div>';
+
+  assert.equal(pager.noticeReplacement(), true, 'the replacement is noticed');
+  assert.equal(pager.state.done, false, 'so the run can resume');
+  assert.equal(pager.state.next, 2, 'from page two of the NEW order');
+  assert.equal(pager.state.added, 0);
+});
+
+test('a re-sort while a page is in flight drops that page rather than mixing it in', async () => {
+  // `noticeReplacement` restarts the run through `reset`, which clears `busy`.
+  // A fetch already in the air then landed anyway: it appended into the
+  // container that had just been swapped out, and bumped the counters, so the
+  // restarted run believed it was holding a page nobody could see.
+  const w = await fictionPage({ 'fiction.reviewsAutoLoad': true });
+  const pager = w.RRX.fictionPage.reviewPager;
+  const host = w.document.querySelector(w.RRX.SEL.reviewsContainer);
+
+  const appended = w.document.createElement('div');
+  appended.setAttribute('data-rr-paginate-item', '');
+  appended.setAttribute('data-rrx-appended', '1');
+  host.appendChild(appended);
+  Object.assign(pager.state, { added: 3, next: 4, done: false });
+
+  // A fetch that will not resolve until we say so.
+  let release;
+  const inFlight = new Promise((resolve) => {
+    release = resolve;
+  });
+  w.eval(`globalThis.__held = null; globalThis.fetch = (url) => {
+    globalThis.__fetched.push(String(url));
+    return new Promise((resolve) => { globalThis.__held = resolve; });
+  };`);
+
+  pager.loadNext();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(pager.state.busy, true, 'a page is in the air');
+
+  // Royal Road re-sorts underneath it.
+  host.innerHTML = '<div data-rr-paginate-item></div>';
+  assert.equal(pager.noticeReplacement(), true);
+  const restarted = { next: pager.state.next, added: pager.state.added };
+
+  // ...and only now does the old response arrive.
+  w.eval(`globalThis.__held({ ok: true, status: 200, text: async () =>
+    '<div data-rr-paginate-item><div id="stale-1"></div></div>' });`);
+  release();
+  await inFlight;
+  await new Promise((r) => setTimeout(r, 20));
+
+  assert.equal(w.document.getElementById('stale-1'), null, 'the stale page was not appended');
+  assert.equal(pager.state.next, restarted.next, 'and the restarted run is untouched');
+  assert.equal(pager.state.added, restarted.added);
+});
+
+test('a re-sorted list keeps loading instead of dropping back to pagination', async () => {
+  // Reported twice. A re-sort leaves one page on screen, so the end of the list
+  // is nowhere near the viewport and `check` refuses to load - while
+  // `noticeReplacement` has already put Royal Road's page numbers back, because
+  // they are true again. Nothing then loaded until the reader scrolled all the
+  // way down, which reads as infinite scroll having simply stopped.
+  const w = await fictionPage({ 'fiction.reviewsAutoLoad': true });
+  const pager = w.RRX.fictionPage.reviewPager;
+  const host = w.document.querySelector(w.RRX.SEL.reviewsContainer);
+  const root = w.document.querySelector(w.RRX.SEL.reviewsPaginate);
+  root.setAttribute('data-rr-paginate-max-page', '5');
+
+  const appended = w.document.createElement('div');
+  appended.setAttribute('data-rr-paginate-item', '');
+  appended.setAttribute('data-rrx-appended', '1');
+  host.appendChild(appended);
+  Object.assign(pager.state, { added: 6, next: 3, done: true });
+  pager.hideFooter(true);
+
+  // Royal Road re-sorts: one page, and its bottom is far below the fold.
+  host.innerHTML = '<div data-rr-paginate-item><div id="sorted-1"></div></div>';
+  // Far below the fold, which is what a one-page list looks like: the trigger
+  // geometry alone would never fire, which is the whole point of the test.
+  host.getBoundingClientRect = growingBox(host);
+
+  w.RRX.main.syncCards(w.document);
+  for (let i = 0; i < 50 && host.children.length < 2; i += 1) {
+    await new Promise((r) => setTimeout(r, 20));
+  }
+
+  assert.ok(host.children.length > 1, 'the next page loaded without waiting for a scroll');
+  assert.ok(
+    root.classList.contains('rrx-endless'),
+    'so Royal Road’s page numbers stay put away'
+  );
+});
+
+test('picking a different order throws our pages away and waits for the new first one', async () => {
+  // Driven by the click rather than inferred from what is missing afterwards.
+  // Two things that inference could not do: our appended rows go at once, so
+  // they cannot be stranded under Royal Road's new page one if Royal Road only
+  // clears the rows it rendered itself; and nothing is fetched until the list
+  // has visibly changed, because until then the fetch URL still describes the
+  // order the reader has just left.
+  const w = await fictionPage({ 'fiction.reviewsAutoLoad': true });
+  const pager = w.RRX.fictionPage.reviewPager;
+  const host = w.document.querySelector(w.RRX.SEL.reviewsContainer);
+  const root = w.document.querySelector(w.RRX.SEL.reviewsPaginate);
+
+  const ours = w.document.createElement('div');
+  ours.setAttribute('data-rr-paginate-item', '');
+  ours.setAttribute('data-rrx-appended', '1');
+  ours.innerHTML = '<div id="review-ours"></div>';
+  host.appendChild(ours);
+  Object.assign(pager.state, { added: 3, next: 4, done: true });
+  pager.hideFooter(true);
+
+  // The reader picks a different order from Royal Road's own dropdown.
+  const option = [...w.document.querySelectorAll(w.RRX.SEL.dropdownItem)].find(
+    (el) => el.getAttribute('data-rr-dropdown-option-value') === 'newest'
+  );
+  option.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+
+  assert.equal(w.document.getElementById('review-ours'), null, 'our pages went at once');
+  assert.equal(pager.state.next, 2, 'and the run is back to the beginning');
+  assert.equal(root.classList.contains('rrx-endless'), false, 'its page numbers are true again');
+
+  // The debt, not a fetch: driving a real one appends a 1.8 MB fixture, and this
+  // suite already holds a jsdom document per test. That the restart then loads
+  // is covered by "a re-sorted list keeps loading instead of dropping back to
+  // pagination"; what is unique here is that it waits first.
+  assert.equal(pager.owed(), false, 'nothing is owed while the old list is still up');
+
+  // Royal Road finishes and puts page one of the new order in.
+  host.innerHTML = '<div data-rr-paginate-item><div id="review-new-1"></div></div>';
+  assert.equal(pager.owed(), true, 'now the restart is owed its first page');
+  assert.match(pager.urlFor(pager.state.next), /page=2/, 'from page two');
+});
+
+test('a reader on page two carries on from page three, not back to page two', async () => {
+  // Reported as "I was on the second page, reordered, and got three reviews".
+  // The run started at page two whatever was on screen, so a reader who had
+  // used Royal Road's own pagination refetched the page they were already
+  // looking at: every row deduplicated away, `added` came out zero, and the run
+  // ended before it began - leaving Royal Road's page numbers up, which is the
+  // "it still paginates" half.
+  const w = await fictionPage({ 'fiction.reviewsAutoLoad': true });
+  const pager = w.RRX.fictionPage.reviewPager;
+  const root = w.document.querySelector(w.RRX.SEL.reviewsPaginate);
+  const host = w.document.querySelector(w.RRX.SEL.reviewsContainer);
+
+  root.setAttribute('data-rr-paginate-current-page', '2');
+  root.setAttribute('data-rr-paginate-max-page', '12');
+  host.getBoundingClientRect = growingBox(host);
+
+  const before = w.__fetched.length;
+  pager.loadNext();
+  for (let i = 0; i < 50 && w.__fetched.length === before; i += 1) {
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  assert.match(w.__fetched[w.__fetched.length - 1], /page=3/, 'the page after the one on screen');
+
+  // Waited for the response, not just the request: the assertion below is about
+  // what the run does once rows have actually landed.
+  for (let i = 0; i < 50 && !pager.state.added; i += 1) {
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  assert.ok(pager.state.added > 0, 'the page landed');
+
+  // ...and once we are appending, Royal Road's number is stale: it describes
+  // what it rendered, not what we have added since.
+  root.setAttribute('data-rr-paginate-current-page', '2');
+  assert.ok(pager.state.next > 3, 'so it is not consulted again mid-run');
+});
+
+test('an id used elsewhere in the list does not swallow an arriving row', async () => {
+  // Reported as "12 reviews before the reorder, 11 after". The duplicate check
+  // compared an arriving item's first id against *every* id in the container,
+  // so anything else carrying that id - a tooltip, a widget, a reply - dropped
+  // the row silently. It has to compare item markers with item markers.
+  const w = await fictionPage({ 'fiction.reviewsAutoLoad': true });
+  const pager = w.RRX.fictionPage.reviewPager;
+  const host = w.document.querySelector(w.RRX.SEL.reviewsContainer);
+  const root = w.document.querySelector(w.RRX.SEL.reviewsPaginate);
+  root.setAttribute('data-rr-paginate-max-page', '9');
+
+  // Something in the container that is not an item, wearing the id the next row
+  // will arrive with.
+  host.innerHTML =
+    '<div data-rr-paginate-item><div id="review-onscreen"></div></div>' +
+    '<div class="tooltip"><span id="review-arriving"></span></div>';
+  host.getBoundingClientRect = growingBox(host);
+  w.eval(`globalThis.fetch = async (url) => {
+    globalThis.__fetched.push(String(url));
+    return { ok: true, status: 200, text: async () =>
+      '<div data-rr-paginate-item><div id="review-arriving"></div></div>' };
+  };`);
+
+  const before = host.querySelectorAll('[data-rr-paginate-item]').length;
+  pager.loadNext();
+  for (let i = 0; i < 50 && !pager.state.added; i += 1) {
+    await new Promise((r) => setTimeout(r, 20));
+  }
+
+  assert.equal(pager.state.added, 1, 'the row was appended, not swallowed');
+  assert.equal(host.querySelectorAll('[data-rr-paginate-item]').length, before + 1);
+
+  // ...and a genuine repeat is still dropped.
+  pager.state.busy = false;
+  pager.loadNext();
+  await new Promise((r) => setTimeout(r, 60));
+  assert.equal(pager.state.added, 1, 'the same row a second time is still refused');
+});
+
+test('a list we never appended to is left alone', async () => {
+  // Royal Road replaces its own list for its own reasons. Before we have added
+  // anything there is nothing to restart, and resetting would be noise.
+  const w = await fictionPage({ 'fiction.reviewsAutoLoad': true });
+  const pager = w.RRX.fictionPage.reviewPager;
+  const host = w.document.querySelector(w.RRX.SEL.reviewsContainer);
+
+  pager.state.added = 0;
+  host.innerHTML = '<div data-rr-paginate-item></div>';
+  assert.equal(pager.noticeReplacement(), false);
+});
+
+test('after a re-sort the run really does start again, not just reset its counters', async () => {
+  // Resetting the state is only half of it. What was reported is "infinite
+  // scroll stops working", so the test that matters is whether a further page
+  // is actually fetched afterwards - in the new order, from page two, because
+  // Royal Road has already put page one on screen itself.
+  const w = await fictionPage({ 'fiction.reviewsAutoLoad': true });
+  const pager = w.RRX.fictionPage.reviewPager;
+  const host = w.document.querySelector(w.RRX.SEL.reviewsContainer);
+
+  const appended = w.document.createElement('div');
+  appended.setAttribute('data-rr-paginate-item', '');
+  appended.setAttribute('data-rrx-appended', '1');
+  host.appendChild(appended);
+  Object.assign(pager.state, { added: 3, next: 4, done: true });
+
+  // Royal Road re-sorts and replaces the list.
+  host.innerHTML = '<div data-rr-paginate-item></div>';
+  pager.noticeReplacement();
+
+  // At the end of the list, so a check should want the next page.
+  host.getBoundingClientRect = growingBox(host);
+  const before = w.__fetched.length;
+  pager.check();
+  // Waited for rather than slept through: a fixed delay is a race, and this one
+  // failed once under load before passing three runs in a row.
+  for (let i = 0; i < 50 && w.__fetched.length === before; i += 1) {
+    await new Promise((r) => setTimeout(r, 20));
+  }
+
+  assert.ok(w.__fetched.length > before, 'nothing was fetched: the run is still stuck');
+  assert.match(w.__fetched[w.__fetched.length - 1], /page=2/, 'and it resumed from page two');
+});
+
+test('a list page teaches the vocabulary without the filter panel being opened', async () => {
+  // The catalogue used to be filled only by `tags.load()`, whose one caller is
+  // the filter panel opening. A reader who never opens it never learnt a single
+  // tag name - and without a name a tag colour cannot reach the home page, where
+  // the chips carry no slug to match on.
+  const { w } = await boot(
+    'fictions-rising-stars.new.html',
+    'https://www.royalroad.com/fictions/rising-stars'
+  );
+  await settled();
+
+  const cached = w.__store.tagCatalogue;
+  assert.ok(cached && Array.isArray(cached.tags), 'nothing was cached by opening a list page');
+  assert.ok(cached.tags.length > 20, `only ${cached.tags && cached.tags.length} tags learnt`);
+  assert.ok(
+    cached.tags.some((t) => t.slug && t.label && t.slug !== t.label),
+    'slugs were stored as their own labels, which is the mismatch the cache exists for'
+  );
+});
+
+test('a page that knows a few tags cannot shrink a cache that knows more', async () => {
+  // Every page harvests now, so a fiction page with six chips runs the same path
+  // as the search page with seventy-two. Merging the page into the cache is
+  // safe; merging the cache into the page would let the smaller one win.
+  const { w } = await boot(
+    'fiction-detail.new.html',
+    'https://www.royalroad.com/fiction/181303/gifted'
+  );
+  const rich = Array.from({ length: 60 }, (_, i) => ({ slug: `s${i}`, label: `Label ${i}` }));
+  w.__store.tagCatalogue = { at: 1, tags: rich };
+
+  await w.RRX.tags.harvest();
+  await settled();
+
+  assert.ok(
+    w.__store.tagCatalogue.tags.length >= rich.length,
+    `the cache shrank from ${rich.length} to ${w.__store.tagCatalogue.tags.length}`
+  );
+  for (const tag of rich.slice(0, 5)) {
+    assert.ok(
+      w.__store.tagCatalogue.tags.some((t) => t.slug === tag.slug),
+      `${tag.slug} was dropped from the cache`
+    );
+  }
+});
+
+test('a harvest that learns nothing new does not rewrite the cache', async () => {
+  // Harvesting runs on every page load, and most pages teach it nothing.
+  const { w } = await boot(
+    'fictions-rising-stars.new.html',
+    'https://www.royalroad.com/fictions/rising-stars'
+  );
+  await settled();
+
+  const before = w.__store.tagCatalogue;
+  const stamp = {};
+  w.__store.tagCatalogue = { ...before, marker: stamp };
+
+  await w.RRX.tags.harvest();
+  await settled();
+
+  assert.equal(
+    w.__store.tagCatalogue.marker,
+    stamp,
+    'the key was rewritten even though the page held nothing new'
+  );
+});
+
+test('the whole published vocabulary is read, genres included', async () => {
+  // `#tagsAdd` is 72 tags and carries no genres at all; the genre buttons are 22
+  // more, not one of which is in the select. Chips are a sample of both.
+  const { w } = await boot(
+    'fictions-search.new.html',
+    'https://www.royalroad.com/fictions/search'
+  );
+  const vocabulary = w.RRX.tags.parseVocabulary(w.document);
+  const genres = w.RRX.tags.parseGenres(w.document);
+  const select = w.RRX.tags.parseSelect(w.document.querySelector(w.RRX.SEL.tagSelect));
+
+  assert.equal(select.length, 72);
+  assert.equal(genres.length, 22);
+  assert.equal(new Set(vocabulary.map((t) => t.slug)).size, 94, 'the two overlap, so one is wrong');
+  assert.ok(
+    genres.every((g) => !select.some((s) => s.slug === g.slug)),
+    'a genre appeared in the select, so they are not disjoint after all'
+  );
+  // The label is the button's own text, not its tooltip paragraph. Compared
+  // field by field: an object built inside jsdom is never deepEqual to one here.
+  const action = genres.find((g) => g.slug === 'action');
+  assert.equal(action.label, 'Action');
+});
+
+test('a busy list page does not pass for the whole vocabulary', async () => {
+  // `load` skipped the fetch on `catalogue.length >= 72`, and rising-stars alone
+  // carries 73 distinct slugs - so the picker offered whatever had been seen and
+  // never learnt the rest. Harvesting on every page made that permanent.
+  const { w } = await boot(
+    'fictions-rising-stars.new.html',
+    'https://www.royalroad.com/fictions/rising-stars'
+  );
+  await settled();
+
+  assert.ok(w.RRX.tags.all().length >= 72, 'this capture no longer clears the old threshold');
+  assert.equal(w.RRX.tags.isFull(), false, 'chips off one list page were taken for the vocabulary');
+  assert.equal(w.__store.tagCatalogue.full, false, 'and the cache was marked complete');
+
+  // Opening the panel therefore still fetches, and that is what completes it.
+  await w.RRX.tags.load();
+  assert.equal(w.RRX.tags.isFull(), true, 'the fetch did not complete the vocabulary');
+  assert.ok(w.RRX.tags.all().length >= 94, `only ${w.RRX.tags.all().length} tags after the fetch`);
+  assert.ok(w.RRX.tags.slugFor('Action'), 'a genre is still missing from the picker');
+});
+
+test('the search page completes the vocabulary without any fetch', async () => {
+  const { w } = await boot(
+    'fictions-search.new.html',
+    'https://www.royalroad.com/fictions/search'
+  );
+  await settled();
+
+  assert.equal(w.RRX.tags.isFull(), true, 'the page that states the vocabulary did not mark it read');
+  // Not just "includes /fictions/search": infinite scroll on this page asks for
+  // `?page=2`, which is a different request entirely.
+  assert.equal(catalogueFetches(w).length, 0, 'it fetched the page it was already on');
+  assert.ok(w.__store.tagCatalogue.full, 'the cache does not record that it is complete');
+});
+
+test('a complete cache is not thrown away by a page that knows less', async () => {
+  const { w } = await boot(
+    'fiction-detail.new.html',
+    'https://www.royalroad.com/fiction/181303/gifted'
+  );
+  w.__store.tagCatalogue = { at: Date.now(), full: true, tags: [{ slug: 'litrpg', label: 'LitRPG' }] };
+
+  await w.RRX.tags.load();
+  assert.equal(w.RRX.tags.isFull(), true, 'a fiction page downgraded a complete cache');
+  assert.equal(catalogueFetches(w).length, 0, 'it refetched a cache that was complete and fresh');
 });

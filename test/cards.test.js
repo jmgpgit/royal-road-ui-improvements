@@ -133,7 +133,8 @@ test('an unmarked card reports nothing on my shelves', () => {
   assert.ok(cards.length >= 1);
   for (const el of cards) {
     const d = w.RRX.readCardData(el);
-    assert.deepEqual(own(d.mine), { follow: false, favorite: false, ril: false });
+    // `dropped` is ours rather than Royal Road's; nothing on a card can set it.
+    assert.deepEqual(own(d.mine), { follow: false, favorite: false, ril: false, dropped: false });
   }
 });
 

@@ -396,6 +396,7 @@ html.rrx-view-compact .fiction-card-expanded [class*='grid-cols-5'] > div {
    ========================================================================== */
 
 html[class*='rrx-view-'] .rrx-card-btn,
-html[class*='rrx-view-'] .rrx-hidden-badge {
+html[class*='rrx-view-'] .rrx-hidden-badge,
+html[class*='rrx-view-'] .rrx-dropped-badge {
   display: inline-flex !important;
 }

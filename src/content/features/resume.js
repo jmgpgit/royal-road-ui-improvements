@@ -176,9 +176,14 @@
     }
   })();
 
+  /** The handlers are latched on and never taken off - the reader can switch
+   *  this off in a tab that is already listening, so "off" has to be honoured
+   *  where the write happens, not only where the listeners are attached. */
+  const recording = () => !lastCtx || lastCtx.settings['chapter.resume'] !== 'off';
+
   function remember(now) {
     const id = chapterId();
-    if (!id || !now) return;
+    if (!id || !now || !recording()) return;
     dirty = { ...now, f: fictionId() || 0, a: Math.floor(Date.now() / 1000) };
     RRX.store.writePosition(id, dirty);
   }
@@ -186,7 +191,7 @@
   /** One write per visit, on the way out. */
   function flush() {
     const id = chapterId();
-    if (!id || !dirty) return;
+    if (!id || !dirty || !recording()) return;
     const patch = dirty;
     dirty = null;
     // Fire and forget: a pagehide handler cannot await, which is why the
@@ -206,6 +211,11 @@
    *  carries the comment watermark, and someone who read a chapter and its
    *  comments must not come back to find the conversation unread again. */
   function forget(id) {
+    // Guarded like the writes, and for a sharper reason: with this off, the
+    // latched scroll handler still reached here through `measureNow`, so
+    // scrolling deleted the stored position while `remember` - the thing that
+    // used to put it straight back - was already refusing to run.
+    if (!recording()) return;
     dirty = null;
     RRX.store.clearPosition(id);
     Promise.resolve(RRX.store.forgetPosition(id)).catch(() => {});
@@ -433,5 +443,6 @@
     apply,
     ready,
     flush,
+    forget,
   };
 })(globalThis);

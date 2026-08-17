@@ -14,17 +14,24 @@
   const ext = RRX.ext;
   const KEY_SETTINGS = 'settings';
   const KEY_HIDDEN = 'hidden';
+  const KEY_DROPPED = 'dropped';
   const KEY_CHAPTERS = 'chapters';
+  const KEY_STATS = 'stats';
+  /** When housekeeping last ran. One number, and the reason it exists is below. */
+  const KEY_TIDIED = 'tidiedAt';
+  const KEY_FORGOT = 'forgotAt';
+  const TIDY_EVERY_MS = 24 * 60 * 60 * 1000;
 
   /** Scroll scratchpad, in royalroad.com's own localStorage. See `writePosition`. */
   const POS_KEY = 'rrx:v1:pos';
   const POS_MAX = 300;
 
   async function load() {
-    const raw = await ext.storage.local.get([KEY_SETTINGS, KEY_HIDDEN]);
+    const raw = await ext.storage.local.get([KEY_SETTINGS, KEY_HIDDEN, KEY_DROPPED]);
     return {
       settings: RRX.normalizeSettings(raw[KEY_SETTINGS]),
       hidden: RRX.normalizeHidden(raw[KEY_HIDDEN]),
+      dropped: RRX.normalizeDropped(raw[KEY_DROPPED]),
     };
   }
 
@@ -34,6 +41,119 @@
   async function loadChapters() {
     const raw = await ext.storage.local.get(KEY_CHAPTERS);
     return RRX.normalizeChapters(raw[KEY_CHAPTERS]);
+  }
+
+  /** Fiction statistics, kept out of `load()` for the same reason as chapters:
+   *  only fiction pages need it, and every other page would pay to deserialise
+   *  it. It is also out of `onChange`, so recording a snapshot in one tab does
+   *  not rebuild the toolbar in every other. */
+  async function loadStats() {
+    const raw = await ext.storage.local.get(KEY_STATS);
+    return RRX.normalizeStats(raw[KEY_STATS]);
+  }
+
+  /**
+   * Fold this visit's numbers into a fiction's record, and return the record so
+   * the caller can say what changed. Re-read inside the call, like `markChapter`.
+   *
+   * @param {number} fictionId
+   * @param {object} reading the numbers read off the page, without a timestamp
+   */
+  async function markFictionStats(fictionId, reading) {
+    const id = Number(fictionId);
+    if (!Number.isInteger(id) || id <= 0) return null;
+
+    const stats = await loadStats();
+    const now = Math.floor(Date.now() / 1000);
+    const record = RRX.rollStats(stats[id], reading, { now });
+    if (!record) return null;
+
+    // Re-read before writing: the write is the whole map, and opening several
+    // fiction pages at once means several tabs doing this at the same moment, so
+    // whichever read first would otherwise write back a map missing everything
+    // recorded since. storage.local has no compare-and-set, so this narrows the
+    // window rather than closing it.
+    const fresh = await loadStats();
+    const next = RRX.pruneStats({ ...fresh, [id]: record }, { now });
+    await ext.storage.local.set({ [KEY_STATS]: next });
+    // What was stored, which is not always what was passed: a record can be
+    // pruned away in the same write that made it.
+    return next[id] || null;
+  }
+
+  async function forgetStats() {
+    await ext.storage.local.set({ [KEY_STATS]: {} });
+    return {};
+  }
+
+  /**
+   * Age out the two growing maps, whatever is or is not still writing to them.
+   *
+   * Both prunes live inside their own write path, and every write path is behind
+   * a setting - so turning the reading features off stopped the writes *and* the
+   * expiries, and what was there stayed for good. An expiry that only runs while
+   * the feature is on is not an expiry, it is a side effect of continued use.
+   *
+   * Once a day, from any Royal Road page. The cost on all the other loads is one
+   * read of a single number.
+   *
+   * @returns {boolean} whether housekeeping actually ran
+   */
+  async function tidy() {
+    const raw = await ext.storage.local.get(KEY_TIDIED);
+    // A negative elapsed means the stamp is in the future - a clock that jumped
+    // forward and came back. Treated as due, or housekeeping would stop until
+    // real time caught up with the jump.
+    const elapsed = Date.now() - (Number(raw[KEY_TIDIED]) || 0);
+    if (elapsed >= 0 && elapsed < TIDY_EVERY_MS) return false;
+    // Stamped before the work, so a failure half way through cannot put every
+    // page load into a retry loop over a map this size.
+    await ext.storage.local.set({ [KEY_TIDIED]: Date.now() });
+
+    const now = Math.floor(Date.now() / 1000);
+    const { settings } = await load();
+    // Threaded, never defaulted: pruning against the built-in 60 days would
+    // silently override whatever the reader set `comments.seenDays` to - the
+    // 1.4.1 bug, from the other direction.
+    const seenMaxAgeS = (settings['comments.seenDays'] || 60) * 86400;
+
+    for (const [key, load1, prune] of [
+      [KEY_CHAPTERS, loadChapters, (map) => RRX.pruneChapters(map, { now, seenMaxAgeS })],
+      [KEY_STATS, loadStats, (map) => RRX.pruneStats(map, { now })],
+    ]) {
+      const before = await load1();
+      // Compared rather than written blind: at the chapter map's ceiling this is
+      // megabytes, and most days there is nothing to drop.
+      if (JSON.stringify(prune(before)) === JSON.stringify(before)) {
+        if (key === KEY_CHAPTERS) prunePositions(before);
+        continue;
+      }
+      // Re-read and re-prune before writing. Housekeeping runs at document_end
+      // alongside the features that write these maps, and the write is the whole
+      // map: without this, a record written while the prune was deciding was
+      // read back stale and clobbered by it.
+      const fresh = await load1();
+      const next = prune(fresh);
+      await ext.storage.local.set({ [key]: next });
+      if (key === KEY_CHAPTERS) prunePositions(next);
+    }
+    return true;
+  }
+
+  /** Drop scratchpad entries for chapters the store no longer knows about -
+   *  what "forget reading history" leaves behind when no Royal Road tab was open
+   *  to hear it. Recent ones are kept: the scratchpad exists precisely because
+   *  the flush on the way out may not have landed yet. */
+  function prunePositions(chapters) {
+    const { f, pos } = readScratch();
+    const cutoff = Math.floor((Date.now() - TIDY_EVERY_MS) / 1000);
+    let dropped = false;
+    for (const id of Object.keys(pos)) {
+      if (chapters[id] || (pos[id] && (pos[id].a || 0) > cutoff)) continue;
+      delete pos[id];
+      dropped = true;
+    }
+    if (dropped) writeScratch(f, pos);
   }
 
   /**
@@ -84,14 +204,34 @@
   }
 
   async function forgetChapters() {
-    await ext.storage.local.set({ [KEY_CHAPTERS]: {} });
+    // Stamped in the same write as the emptying, so a tab that hears one hears
+    // both. `honourForget` is what turns this into a cleared scratchpad.
+    await ext.storage.local.set({ [KEY_CHAPTERS]: {}, [KEY_FORGOT]: Date.now() });
     return {};
+  }
+
+  /**
+   * What a settings write has to clean up after itself.
+   *
+   * Switching the fiction readings off throws away what was read: "nothing is
+   * saved while this is off" has to mean nothing is kept either. Unlike the
+   * hidden and dropped lists, this is not something the reader wrote and cannot
+   * be browsed or restored, so there is nothing to keep it for.
+   *
+   * Shared because there are three ways to arrive at the setting being off -
+   * changing it, resetting every setting, and importing a backup - and only the
+   * first of them used to notice.
+   */
+  async function settleSettings(next) {
+    if (!next['fiction.statDeltas']) await forgetStats();
+    return next;
   }
 
   async function saveSettings(patch) {
     const { settings } = await load();
     const next = RRX.normalizeSettings({ ...settings, ...patch });
     await ext.storage.local.set({ [KEY_SETTINGS]: next });
+    if (settings['fiction.statDeltas']) await settleSettings(next);
     return next;
   }
 
@@ -121,18 +261,49 @@
     return {};
   }
 
+  /** @param {{title?:string,url?:string,cover?:string}} meta as for `hide` */
+  async function drop(id, meta) {
+    const { dropped } = await load();
+    const next = RRX.normalizeDropped({ ...dropped, [id]: { ...(meta || {}), droppedAt: Date.now() } });
+    await ext.storage.local.set({ [KEY_DROPPED]: next });
+    return next;
+  }
+
+  async function undrop(id) {
+    const { dropped } = await load();
+    const next = { ...dropped };
+    delete next[Number(id)];
+    await ext.storage.local.set({ [KEY_DROPPED]: next });
+    return next;
+  }
+
+  async function undropAll() {
+    await ext.storage.local.set({ [KEY_DROPPED]: {} });
+    return {};
+  }
+
   /** Used by import. Replaces every key wholesale. */
-  async function replaceAll({ settings, hidden, chapters }) {
+  async function replaceAll({ settings, hidden, dropped, chapters, stats }) {
     const next = {
       [KEY_SETTINGS]: RRX.normalizeSettings(settings),
       [KEY_HIDDEN]: RRX.normalizeHidden(hidden),
+      [KEY_DROPPED]: RRX.normalizeDropped(dropped),
       [KEY_CHAPTERS]: RRX.normalizeChapters(chapters),
+      [KEY_STATS]: RRX.normalizeStats(stats),
     };
     await ext.storage.local.set(next);
+    // An imported file can carry readings alongside a setting that says they are
+    // not kept. The setting wins, or importing would be a way to put back what
+    // switching it off is meant to remove.
+    await settleSettings(next[KEY_SETTINGS]);
+
+    const kept = next[KEY_SETTINGS]['fiction.statDeltas'] ? next[KEY_STATS] : {};
     return {
       settings: next[KEY_SETTINGS],
       hidden: next[KEY_HIDDEN],
+      dropped: next[KEY_DROPPED],
       chapters: next[KEY_CHAPTERS],
+      stats: kept,
     };
   }
 
@@ -141,7 +312,8 @@
   async function resetSettings() {
     const next = RRX.normalizeSettings({});
     await ext.storage.local.set({ [KEY_SETTINGS]: next });
-    return next;
+    // Reset returns every setting to its default, and this one's default is off.
+    return settleSettings(next);
   }
 
   /** Changes from any context - other tabs, options page, popup.
@@ -149,11 +321,11 @@
   function onChange(callback) {
     const listener = (changes, area) => {
       if (area !== 'local') return;
-      // `chapters` is deliberately absent: its subscriber would be main.js, which
+      // `chapters` and `stats` are deliberately absent: their subscriber would be main.js, which
       // rebuilds the toolbar, re-syncs every card and re-enters every feature's
       // onPage in every open Royal Road tab - absurd for somebody scrolling a
       // chapter, which is what writes this key. The next page load reads the truth.
-      if (!(KEY_SETTINGS in changes) && !(KEY_HIDDEN in changes)) return;
+      if (!(KEY_SETTINGS in changes) && !(KEY_HIDDEN in changes) && !(KEY_DROPPED in changes)) return;
       load().then(callback);
     };
     ext.storage.onChanged.addListener(listener);
@@ -162,9 +334,9 @@
 
   /** The boot mirror. Only meaningful from a content script, where localStorage
    *  belongs to royalroad.com; failure costs the no-flicker path, not correctness. */
-  function writeMirror(settings, hidden) {
+  function writeMirror(settings, hidden, dropped) {
     try {
-      const payload = JSON.stringify(RRX.buildMirror(settings, hidden));
+      const payload = JSON.stringify(RRX.buildMirror(settings, hidden, dropped));
       if (root.localStorage.getItem(RRX.MIRROR_KEY) !== payload) {
         root.localStorage.setItem(RRX.MIRROR_KEY, payload);
       }
@@ -179,19 +351,37 @@
   // storage.local gets one write per visit on the way out; whatever did not make
   // it is reconciled from here on the next load.
 
-  function readPositions() {
+  /** The scratchpad is `{ v, f, pos }`: the positions, and `f`, the "forget
+   *  reading history" stamp already acted on. See `honourForget`. Read and
+   *  written in one place each, because every writer has to carry `f` through -
+   *  dropping it would make the next page load forget all over again. */
+  function readScratch() {
     try {
       const raw = root.localStorage.getItem(POS_KEY);
       const data = raw ? JSON.parse(raw) : null;
-      return data && data.v === 1 && data.pos && typeof data.pos === 'object' ? data.pos : {};
+      if (!data || data.v !== 1) return { f: 0, pos: {} };
+      const pos = data.pos && typeof data.pos === 'object' ? data.pos : {};
+      return { f: Number(data.f) || 0, pos };
     } catch {
-      return {};
+      return { f: 0, pos: {} };
     }
+  }
+
+  function writeScratch(f, pos) {
+    try {
+      root.localStorage.setItem(POS_KEY, JSON.stringify({ v: 1, f, pos }));
+    } catch {
+      /* blocked or full storage costs the fast path, not correctness */
+    }
+  }
+
+  function readPositions() {
+    return readScratch().pos;
   }
 
   function writePosition(chapterId, position) {
     try {
-      const pos = readPositions();
+      const { f, pos } = readScratch();
       pos[Number(chapterId)] = position;
 
       // Oldest out first, bounded because this shares royalroad.com's origin
@@ -207,25 +397,63 @@
           .slice(0, keys.length - POS_MAX)
           .forEach((key) => delete pos[key]);
       }
-      root.localStorage.setItem(POS_KEY, JSON.stringify({ v: 1, pos }));
+      writeScratch(f, pos);
     } catch {
       /* blocked or full storage costs the fast path, not correctness */
     }
   }
 
-  function clearPosition(chapterId) {
+  /** The whole scratchpad. Only a content script can do this - it is
+   *  royalroad.com's localStorage, not the extension's - so the options page
+   *  cannot, and `tidy` and the storage listener in main.js do it instead. */
+  function clearPositions() {
+    // Emptied rather than removed: `f` has to survive, or `honourForget` sees an
+    // unstamped scratchpad and clears it again on every page load.
+    writeScratch(readScratch().f, {});
+  }
+
+  /**
+   * Act on a "forget reading history" that this origin has not seen yet.
+   *
+   * The options page cannot reach the scratchpad - it is royalroad.com's
+   * `localStorage` and only a content script can touch it - so the press is
+   * recorded as a timestamp in `storage.local` and honoured here. The listener
+   * in `main.js` catches it when a Royal Road tab is already open; this catches
+   * the case where none was, which used to leave a position behind for up to two
+   * days and then hand it back, because a scratchpad entry outranks a missing
+   * record.
+   *
+   * A stamp, not an empty map: a reader who finishes everything they open has no
+   * records either, and their unflushed position is the one thing the scratchpad
+   * is for.
+   */
+  async function honourForget() {
     try {
-      const pos = readPositions();
-      delete pos[Number(chapterId)];
-      root.localStorage.setItem(POS_KEY, JSON.stringify({ v: 1, pos }));
+      const raw = await ext.storage.local.get(KEY_FORGOT);
+      const at = Number(raw[KEY_FORGOT]) || 0;
+      if (!at) return false;
+      const { f } = readScratch();
+      if (f >= at) return false;
+      writeScratch(at, {});
+      return true;
     } catch {
-      /* no-op */
+      return false;
     }
+  }
+
+  function clearPosition(chapterId) {
+    const { f, pos } = readScratch();
+    delete pos[Number(chapterId)];
+    writeScratch(f, pos);
   }
 
   RRX.store = {
     load,
     loadChapters,
+    loadStats,
+    markFictionStats,
+    forgetStats,
+    tidy,
     markChapter,
     forgetPosition,
     forgetChapter,
@@ -235,12 +463,18 @@
     hide,
     unhide,
     unhideAll,
+    drop,
+    undrop,
+    undropAll,
     replaceAll,
     onChange,
     writeMirror,
     readPositions,
     writePosition,
     clearPosition,
+    clearPositions,
+    honourForget,
     POS_KEY,
+    KEY_FORGOT,
   };
 })(globalThis);

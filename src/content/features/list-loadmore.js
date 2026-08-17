@@ -21,11 +21,16 @@
   const BAR_ID = 'rrx-loadmore';
 
   const MAX_PAGES = 25;
+  /** Consecutive pages matching nothing before the status line offers a reason.
+   *  It does not stop the run: the whole point of scanning ahead is that the one
+   *  match can be on page five, and giving up at four would guarantee never
+   *  finding it. */
+  const DRY_PAGES = 4;
   const REQUEST_GAP_MS = 500;
   /** Fetch when the list's end is within this many viewport heights. */
   const TRIGGER_MARGIN = 1.5;
 
-  const state = { pages: 0, added: 0, busy: false, done: '', error: '', watching: false };
+  const state = { pages: 0, added: 0, dry: 0, busy: false, done: '', error: '', watching: false };
 
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -85,7 +90,9 @@
       }
 
       // The next page's chips may name tags the vocabulary has not seen yet.
-      if (RRX.tags) RRX.tags.harvestChips(doc);
+      // `harvestChips` only returns them - `harvest` is the one that records
+      // them, and calling the wrong one meant this line did nothing at all.
+      if (RRX.tags) RRX.tags.harvest(doc);
 
       const container =
         document.querySelector(`${SEL.listRoot} [data-rr-paginate-item]`) ||
@@ -96,12 +103,17 @@
       for (const card of cards) {
         const adopted = document.adoptNode(card);
         const data = RRX.readCardData(adopted);
+        // Ours rather than Royal Road's, so nothing on the card can carry it:
+        // without this, "Hide mine -> Dropped" let every dropped fiction in and
+        // counted it, and list-filters hid it again a moment later.
+        data.mine.dropped = ctx.droppedSet ? ctx.droppedSet.has(data.id) : false;
         if (!RRX.matchesFilters(data, ctx.settings)) continue;
         if (ctx.hiddenSet.has(data.id)) continue;
         container.appendChild(adopted);
         addedNow += 1;
       }
       state.added += addedNow;
+      state.dry = addedNow ? 0 : state.dry + 1;
 
       // Let the normal pipeline decorate what was just appended.
       RRX.main.syncCards(document);
@@ -145,7 +157,39 @@
    */
   function syncPaginator() {
     const paginate = document.querySelector(SEL.paginateRoot);
-    if (paginate) paginate.classList.toggle('rrx-endless', state.pages > 0);
+    // `added`, not `pages`, which is what the paragraph above describes and what
+    // the code said for a while. A page fetched and filtered away entirely adds
+    // nothing to the list but still counted, so a filter matching nothing took
+    // Royal Road's page numbers away and left an empty list with no way on.
+    if (paginate) paginate.classList.toggle('rrx-endless', state.added > 0);
+  }
+
+  /** How many tags the reader has filtered site-wide, off the badge on Royal
+   *  Road's own button. Theirs rather than Royal Road's: the dialog reads
+   *  "Customize your experience by including or excluding tags across the
+   *  entire site", and signed out only "You must be logged in to use global
+   *  tag filters".
+   *
+   *  The button itself is on the list pages either way - it is in the signed-out
+   *  captures - so its presence says nothing. Only the badge does, and it is
+   *  there only when the count is above zero. The dialog is in the DOM, but
+   *  signed out it holds that login prompt and nothing else, so the badge is all
+   *  there is to read and all that is needed. */
+  function globalFilterCount() {
+    const trigger = document.querySelector(SEL.globalFiltersTrigger);
+    if (!trigger) return 0;
+    const digits = (trigger.textContent || '').match(/\d+/);
+    return digits ? Number(digits[0]) : 0;
+  }
+
+  /** Offered after a run of pages matches nothing, and only when there is
+   *  something to point at. Royal Road cuts these lists before we see them, so
+   *  a filter that looks broken may be working on what is left of the site. */
+  function dryHint() {
+    if (state.dry < DRY_PAGES) return '';
+    const global = globalFilterCount();
+    if (!global) return '';
+    return ` · Your own Global Filters hide ${global} tag${global > 1 ? 's' : ''} site-wide, which may be why there are no results. Or you have very niche tastes.`;
   }
 
   /** A quiet status line at the end of the list. */
@@ -166,7 +210,8 @@
     if (state.error) text = `${state.error}: stopped after ${state.pages} extra page(s)`;
     else if (state.busy) text = `loading more… · ${state.added} added`;
     else if (state.done) text = `${state.done} · scanned ${state.pages} extra page(s) · ${state.added} added`;
-    else if (state.pages) text = `scanned ${state.pages} extra page(s) · ${state.added} added`;
+    else if (state.pages)
+      text = `scanned ${state.pages} extra page(s) · ${state.added} added${dryHint()}`;
     else return existing ? existing.remove() : undefined;
 
     const statusClass = `rrx-loadmore__status${state.error ? ' rrx-loadmore__status--error' : ''}`;
@@ -208,7 +253,7 @@
   }
 
   function reset() {
-    Object.assign(state, { pages: 0, added: 0, busy: false, done: '', error: '' });
+    Object.assign(state, { pages: 0, added: 0, dry: 0, busy: false, done: '', error: '' });
   }
 
   features.list.push({

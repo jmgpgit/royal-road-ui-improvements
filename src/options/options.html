@@ -15,6 +15,9 @@
         </p>
       </header>
 
+      <!-- Built from SECTIONS, so it cannot fall out of step with the boxes. -->
+      <nav id="jump" class="jump" aria-label="Jump to a section"></nav>
+
       <!-- Settings sections are generated from the schema; see settings-ui.js. -->
       <div id="sections"></div>
 
@@ -35,7 +38,63 @@
         <p id="hidden-empty" class="muted">
           Nothing hidden yet. Use the &minus; button on any fiction card on Royal Road.
         </p>
-        <ul id="hidden-list" class="hidden-list"></ul>
+        <ul id="hidden-list" class="fic-list"></ul>
+      </section>
+
+      <section class="card" id="dropped-section" aria-labelledby="dropped-heading">
+        <div class="card__head">
+          <h3 class="group__title" id="dropped-heading">
+            Tried and dropped (<span id="dropped-count">0</span>)
+          </h3>
+          <div class="card__actions">
+            <input
+              type="search"
+              id="dropped-search"
+              class="input"
+              placeholder="Filter by title…"
+              aria-label="Filter dropped fictions by title"
+            />
+            <button type="button" id="undrop-all" class="btn btn--danger">Clear the list</button>
+          </div>
+        </div>
+        <p id="dropped-empty" class="muted">
+          Nothing dropped yet. Turn on “Mark fictions you tried and dropped” above, then use the
+          bookmark button on any fiction card on Royal Road.
+        </p>
+        <ul id="dropped-list" class="fic-list"></ul>
+      </section>
+
+      <section class="card" id="tag-colors-section" aria-labelledby="tag-colors-heading">
+        <h2 id="tag-colors-heading">Tag colours</h2>
+        <p class="muted card__blurb">
+          Give a tag a colour and it carries it everywhere it appears, on the fiction lists and on
+          a fiction’s own page. Tags you do not pick are left as Royal Road styles them.
+        </p>
+
+        <div class="tagc__add">
+          <label class="tagc__field" for="tagc-name">
+            <span>Tag</span>
+            <input id="tagc-name" class="input" list="tagc-options" placeholder="LitRPG" />
+          </label>
+          <datalist id="tagc-options"></datalist>
+          <label class="tagc__field tagc__field--color" for="tagc-color">
+            <span>Colour</span>
+            <input id="tagc-color" type="color" value="#c084fc" />
+          </label>
+          <button type="button" id="tagc-add" class="btn">Add</button>
+        </div>
+        <p id="tagc-error" class="status" hidden></p>
+
+        <!-- Filled by the same row builder the generated settings use, so this
+             one checkbox cannot drift from the shape of every other. Hand-written
+             markup here had the control first and the label right-aligned after
+             it - the exact geometry the one-shape-per-row rework removed - and
+             its own copy of the label and note, so editing COPY changed nothing
+             on screen. -->
+        <div id="tagc-home-row" class="tagc__toggle"></div>
+
+        <p id="tagc-empty" class="muted">No tag has a colour yet.</p>
+        <ul id="tagc-list" class="tagc__list"></ul>
       </section>
 
       <section class="card" aria-labelledby="backup-heading">
@@ -48,8 +107,12 @@
           <button type="button" id="export" class="btn">Export JSON</button>
           <button type="button" id="import" class="btn">Import JSON…</button>
           <button type="button" id="reset" class="btn btn--danger">Reset settings</button>
+          <button type="button" id="forget-history" class="btn btn--danger">
+            Forget reading history
+          </button>
           <input type="file" id="import-file" accept="application/json,.json" hidden />
         </div>
+        <p id="history-size" class="muted"></p>
         <p id="backup-status" class="status" role="status"></p>
       </section>
     </main>
@@ -59,6 +122,7 @@
     <script src="../common/schema.js"></script>
     <script src="../common/model.js"></script>
     <script src="../common/filters.js"></script>
+    <script src="../common/css.js"></script>
     <script src="../common/store.js"></script>
     <script src="settings-ui.js"></script>
     <script src="options.js"></script>

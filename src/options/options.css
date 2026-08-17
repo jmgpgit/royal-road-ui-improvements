@@ -54,8 +54,8 @@ body {
  * gets a gap.
  *
  * `gap` on the flex parent reaches direct children only, which is exactly what
- * is wanted here: the hidden-fiction manager lives one level deeper, inside the
- * Fiction lists box, so it cannot pick this up and keeps its group spacing.
+ * is wanted here: the two fiction managers live one level deeper, inside the
+ * Fiction lists box, so they cannot pick this up and keep their group spacing.
  *
  * The between-box gap has to stay clearly larger than the between-group gap
  * inside a box (1.25rem), or the hierarchy reads flat.
@@ -110,33 +110,133 @@ body {
   align-items: center;
 }
 
-/* --- settings rows ------------------------------------------------------- */
+/* --- tag colours ---------------------------------------------------------- */
 
-.row {
+.tagc__add {
   display: flex;
-  gap: 0.7rem;
-  align-items: flex-start;
-  padding: 0.6rem 0;
-  border-top: 1px solid var(--border);
-  cursor: pointer;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
 }
 
-.row--stack {
+.tagc__field {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  align-items: stretch;
-  cursor: default;
+  gap: 0.25rem;
+  font-size: 0.8125rem;
+  color: var(--muted);
 }
 
-.row--disabled {
-  opacity: 0.5;
+.tagc__field--color input {
+  width: 3rem;
+  height: 2rem;
+  padding: 0;
 }
 
-.row__inline {
+/* The switch is a settings row like any other, so it brings its own rule above
+   it. What it needs is room below: its note sat directly on top of the coloured
+   tags, and "No tag has a colour yet." read as the end of that note rather than
+   as the state of the list. */
+.tagc__toggle {
+  margin-bottom: 1rem;
+}
+
+.tagc__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.tagc__row {
   display: flex;
   align-items: center;
+  gap: 0.6rem;
+}
+
+/* The chip is the point of the card: it is what the tag will look like. */
+.tagc__chip {
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #111;
+}
+
+.tagc__slug {
+  font-size: 0.75rem;
+  margin-right: auto;
+}
+
+/* --- the jump strip ------------------------------------------------------- */
+
+.jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 1.25rem;
+}
+
+.jump__link {
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.8125rem;
+  text-decoration: none;
+}
+
+.jump__link:hover,
+.jump__link:focus-visible {
+  color: var(--text);
+  border-color: var(--muted);
+}
+
+/* A jumped-to heading should not land against the top edge. */
+.card {
+  scroll-margin-top: 1rem;
+}
+
+/* --- settings rows ------------------------------------------------------- */
+
+/* One shape for every row: label left, control right, note beneath the label.
+   Three geometries used to share the name - a checkbox row put its control
+   first, a stacked row put the label above it - so no two kinds of setting
+   lined up down the page. */
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 1rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.row__control {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   gap: 0.45rem;
+}
+
+/* A textarea gets the full width; a label beside it would leave it 12rem. */
+.row--wide {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.row--wide .row__control > .input {
+  width: 100%;
+}
+
+/* Only the control and its label dim. The note is what names the switch that
+   turns the row back on, so it is the one part that has to stay readable. */
+.row--disabled .row__title,
+.row--disabled .row__control {
+  opacity: 0.5;
 }
 
 .row__unit {
@@ -160,23 +260,46 @@ select.input {
   flex: none;
   width: 1.05rem;
   height: 1.05rem;
-  margin: 0.18rem 0 0;
+  margin: 0;
   accent-color: var(--primary);
-}
-
-.row__body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
 }
 
 .row__title {
   font-weight: 550;
+  cursor: pointer;
+}
+
+.row__note,
+.row__note-wrap {
+  grid-column: 1 / 2;
+  margin: 0.2rem 0 0;
 }
 
 .row__note {
   color: var(--muted);
   font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+/* Long notes clamp to three lines and open on click. The text is all in the
+   `<summary>`, so find-in-page and a screen reader still reach it; only the
+   clamp moves. `-webkit-line-clamp` is the unprefixed behaviour everywhere that
+   matters - the prefix is the standard spelling. */
+summary.row__note {
+  cursor: pointer;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+details[open] > summary.row__note {
+  -webkit-line-clamp: none;
+  overflow: visible;
+}
+
+summary.row__note::-webkit-details-marker {
+  display: none;
 }
 
 
@@ -238,9 +361,9 @@ select.input {
   color: var(--danger);
 }
 
-/* --- hidden fiction list ------------------------------------------------- */
+/* --- the hidden and dropped fiction lists ---------------------------------- */
 
-.hidden-list {
+.fic-list {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -251,7 +374,7 @@ select.input {
   list-style: none;
 }
 
-.hidden-item {
+.fic-item {
   display: flex;
   gap: 0.7rem;
   align-items: center;
@@ -260,7 +383,7 @@ select.input {
   border-radius: 0.4rem;
 }
 
-.hidden-item__cover {
+.fic-item__cover {
   flex: none;
   width: 2.6rem;
   height: 3.9rem;
@@ -269,12 +392,12 @@ select.input {
   border-radius: 0.2rem;
 }
 
-.hidden-item__body {
+.fic-item__body {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.hidden-item__title {
+.fic-item__title {
   display: block;
   overflow: hidden;
   color: inherit;
@@ -284,12 +407,12 @@ select.input {
   white-space: nowrap;
 }
 
-.hidden-item__title:hover {
+.fic-item__title:hover {
   color: var(--primary);
   text-decoration: underline;
 }
 
-.hidden-item__meta {
+.fic-item__meta {
   color: var(--muted);
   font-size: 0.78rem;
 }
@@ -309,6 +432,25 @@ select.input {
   margin-top: 1.25rem;
 }
 
+/* Six identical "leave alone / open / closed" dropdowns, one per section of a
+   fiction page. As a column they read as six unrelated decisions; side by side
+   the shared shape is the point, and the run is half as tall. */
+.group--grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  column-gap: 1.5rem;
+}
+
+.group--grid .group__title {
+  grid-column: 1 / -1;
+}
+
+/* The first row of each column keeps its rule, unlike a plain column where the
+   rule reads as a separator from the row above. */
+.group--grid .row {
+  min-width: 0;
+}
+
 .group__title {
   margin: 0 0 0.25rem;
   font-size: 0.7rem;
@@ -323,9 +465,10 @@ select.input {
   padding-top: 0;
 }
 
-/* The hidden-fiction manager sits inside the Fiction lists box, so it drops the
-   card chrome it would otherwise carry and reads as one more group. */
-#hidden-section.card {
+/* Both managers sit inside the Fiction lists box, so they drop the card chrome
+   they would otherwise carry and read as two more groups. */
+#hidden-section.card,
+#dropped-section.card {
   padding: 0;
   margin-top: 1.25rem;
   background: none;

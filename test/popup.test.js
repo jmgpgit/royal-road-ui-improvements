@@ -180,3 +180,30 @@ test('the design row sits above the page sections', () => {
     'the design row comes first'
   );
 });
+
+test('the list width slider is not tied to the chapter reader', async () => {
+  // Every slider used to be disabled by `reader.enabled`, which was true while
+  // the reader owned all of them. The list width is one now, and has nothing to
+  // do with whether chapter text is being restyled.
+  const w = await open('https://www.royalroad.com/fictions/rising-stars');
+  const listWidth = w.document.querySelector('[data-setting="list.maxWidthPx"]');
+  assert.ok(listWidth, 'the popup offers it');
+  assert.equal(listWidth.type, 'range');
+  assert.equal(listWidth.disabled, false, 'usable with the chapter reader off');
+
+  const readerWidth = w.document.querySelector('[data-setting="reader.maxWidthPx"]');
+  assert.equal(readerWidth.disabled, true, 'while the reader’s own width is not');
+  w.close();
+});
+
+test('an unset width reads "default" rather than parking on a number', async () => {
+  const w = await open('https://www.royalroad.com/fictions/rising-stars');
+  const out = w.document.getElementById('p-listWidth-out');
+  assert.equal(out.textContent, 'default', 'nothing chosen yet');
+  assert.equal(
+    w.document.querySelector('[data-setting="list.maxWidthPx"]').value,
+    '700',
+    'and the thumb parks at the low end'
+  );
+  w.close();
+});

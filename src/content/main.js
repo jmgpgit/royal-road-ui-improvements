@@ -17,6 +17,8 @@
     settings: RRX.normalizeSettings(null),
     hidden: {},
     hiddenSet: new Set(),
+    dropped: {},
+    droppedSet: new Set(),
     /** 'list' | 'chapter' | 'fiction' | 'home' | 'other' */
     page: 'other',
     isListPage: false,
@@ -25,6 +27,8 @@
     filterCounts: null,
     hide,
     unhide,
+    drop,
+    undrop,
     setSetting,
     setSettings,
   };
@@ -35,16 +39,18 @@
 
   // --- state ---------------------------------------------------------------
 
-  function adoptState(settings, hidden) {
+  function adoptState(settings, hidden, dropped) {
     ctx.settings = RRX.normalizeSettings(settings);
     ctx.hidden = RRX.normalizeHidden(hidden);
     ctx.hiddenSet = new Set(RRX.hiddenIds(ctx.hidden));
+    ctx.dropped = RRX.normalizeDropped(dropped);
+    ctx.droppedSet = new Set(RRX.droppedIds(ctx.dropped));
   }
 
   /** Push current state everywhere: stylesheet, mirror, toolbar, card controls. */
   function applyState() {
-    RRX.boot.apply(ctx.settings, [...ctx.hiddenSet]);
-    RRX.store.writeMirror(ctx.settings, ctx.hidden);
+    RRX.boot.apply(ctx.settings, [...ctx.hiddenSet], [...ctx.droppedSet]);
+    RRX.store.writeMirror(ctx.settings, ctx.hidden, ctx.dropped);
     // Cards first: filtering sets ctx.filterCounts, which the toolbar reports.
     syncCards(document);
     renderToolbar();
@@ -56,24 +62,44 @@
 
   /** Batched: the filter panel applies ~20 settings in one go. */
   async function setSettings(patch) {
-    adoptState({ ...ctx.settings, ...patch }, ctx.hidden);
+    adoptState({ ...ctx.settings, ...patch }, ctx.hidden, ctx.dropped);
     applyState(); // optimistic: the UI must not wait on storage
     await RRX.store.saveSettings(patch);
   }
 
+  const titleOf = (id, meta) => (meta && meta.title) || `Fiction ${id}`;
+
   async function hide(id, meta) {
-    adoptState(ctx.settings, { ...ctx.hidden, [id]: { ...meta, hiddenAt: Date.now() } });
+    adoptState(ctx.settings, { ...ctx.hidden, [id]: { ...meta, hiddenAt: Date.now() } }, ctx.dropped);
     applyState();
-    ui.toast(`Hidden “${(meta && meta.title) || `Fiction ${id}`}”`, 'Undo', () => unhide(id));
+    ui.toast(`Hidden “${titleOf(id, meta)}”`, 'Undo', () => unhide(id));
     await RRX.store.hide(id, meta);
   }
 
   async function unhide(id) {
     const next = { ...ctx.hidden };
     delete next[Number(id)];
-    adoptState(ctx.settings, next);
+    adoptState(ctx.settings, next, ctx.dropped);
     applyState();
     await RRX.store.unhide(id);
+  }
+
+  async function drop(id, meta) {
+    adoptState(ctx.settings, ctx.hidden, {
+      ...ctx.dropped,
+      [id]: { ...meta, droppedAt: Date.now() },
+    });
+    applyState();
+    ui.toast(`Marked “${titleOf(id, meta)}” as dropped`, 'Undo', () => undrop(id));
+    await RRX.store.drop(id, meta);
+  }
+
+  async function undrop(id) {
+    const next = { ...ctx.dropped };
+    delete next[Number(id)];
+    adoptState(ctx.settings, ctx.hidden, next);
+    applyState();
+    await RRX.store.undrop(id);
   }
 
   // --- page shape ----------------------------------------------------------
@@ -165,7 +191,7 @@
       ui.actionButton({
         id: 'manage',
         label: 'Manage',
-        title: 'Open settings and the hidden-fiction list',
+        title: 'Open settings and the hidden and dropped lists',
         iconName: 'manage',
         // The background listener sends no reply, which some browsers surface as
         // a rejected promise.
@@ -194,7 +220,30 @@
 
   // --- cards ---------------------------------------------------------------
 
+  /**
+   * Mark Royal Road's "show the rest of the tags" toggles, so the stylesheet can
+   * hide them where a setting has already opened the row.
+   *
+   * By shape, not by id: the lists call it `tags-toggle-<fiction id>` and a
+   * fiction page calls it `show-more-tags`. Guessing the second from the first
+   * is exactly how this was missed the first time. What both share is a label
+   * wrapping an `sr-only` checkbox with a tag link after it - which is also what
+   * makes Tailwind's `peer-has-checked:` work, so it cannot drift.
+   *
+   * `classList.add` of a class already there changes no attribute and so emits
+   * no mutation record, which is what keeps this off the observer's back.
+   */
+  function markTagToggles(scope) {
+    const root = scope && scope.querySelectorAll ? scope : document;
+    for (const label of root.querySelectorAll('label:has(> input.sr-only[type="checkbox"])')) {
+      if (label.parentElement && label.parentElement.querySelector('a[href*="tagsAdd="]')) {
+        label.classList.add('rrx-tag-toggle');
+      }
+    }
+  }
+
   function syncCards(scope) {
+    markTagToggles(scope);
     for (const feature of activeFeatures()) {
       if (feature.syncCards) feature.syncCards(scope, ctx);
     }
@@ -202,6 +251,14 @@
 
   /** One-shot work a feature wants done per page load (accordions, notes, …). */
   function runOnce() {
+    // Learn the tag vocabulary from the page the reader already opened. A list
+    // page carries ~600 tag links and a fiction page its own handful, so this
+    // costs a querySelectorAll and no request at all. It used to be learnt only
+    // by opening the filter panel, which is optional and which many readers
+    // never do - and until it is learnt, a tag colour has no name recorded and
+    // so cannot reach the home page, where the chips carry no slug.
+    if (RRX.tags) RRX.tags.harvest();
+
     for (const feature of activeFeatures()) {
       if (!feature.onPage) continue;
       try {
@@ -258,6 +315,25 @@
   }
 
   async function init() {
+    // Housekeeping, before anything about this page matters: it ages out the
+    // stored maps whether or not the features that fill them are still on, and
+    // it is one read of a single number on all but one page load a day. Runs on
+    // the legacy layout too - the data is the same data.
+    RRX.store.tidy().catch((err) => RRX.warn('housekeeping failed', err));
+
+    // "Forget reading history" runs on the options page, which cannot reach the
+    // scroll scratchpad: that lives in royalroad.com's localStorage and only a
+    // content script can touch it. Started here so the read overlaps `boot.ready`
+    // and awaited below, before anything can restore a position out of it.
+    const forgotten = RRX.store.honourForget();
+
+    // The same press, heard live by a tab that was already open. Keyed on the
+    // stamp rather than on `chapters` going empty: housekeeping dropping the last
+    // record leaves an empty map too, and that is not a reader asking to forget.
+    RRX.ext.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && changes[RRX.store.KEY_FORGOT]) RRX.store.honourForget();
+    });
+
     if (!document.querySelector(SEL.newUiProbe)) {
       // Not the redesign. Release the pre-paint guard: boot.js sets it from the
       // URL alone, which cannot tell the two layouts apart, and legacy has a
@@ -267,19 +343,20 @@
       RRX.boot.legacy = true;
       document.documentElement.classList.remove(RRX.ROOT_CLASS.filtersPending);
 
-      const { settings, hidden } = await RRX.boot.ready;
+      const { settings, hidden, dropped } = await RRX.boot.ready;
 
       // The mirror is the only way a legacy page leaves behind what the next one
       // needs to switch before it paints.
-      RRX.store.writeMirror(settings, hidden);
+      RRX.store.writeMirror(settings, hidden, dropped);
 
       // Follow a layout change from the popup straight away, or the popup appears
       // to do nothing on the page you changed it for.
       RRX.store.onChange(({ settings: next }) => RRX.boot.enforceDesign(next));
       return;
     }
-    const { settings, hidden } = await RRX.boot.ready;
-    adoptState(settings, hidden);
+    const { settings, hidden, dropped } = await RRX.boot.ready;
+    await forgotten;
+    adoptState(settings, hidden, dropped);
     refreshPageShape();
     healthCheck();
     applyState();
@@ -287,11 +364,11 @@
     document.documentElement.classList.add(RRX.ROOT_CLASS.ready);
 
     // Options page, popup, or another tab changed something.
-    RRX.store.onChange(({ settings: s, hidden: h }) => {
+    RRX.store.onChange(({ settings: s, hidden: h, dropped: d }) => {
       // Switching to the old layout ends this page, so it comes before anything
       // that would restyle a page about to go.
       if (RRX.boot.enforceDesign(s)) return;
-      adoptState(s, h);
+      adoptState(s, h, d);
       applyState();
       runOnce();
     });

@@ -2,7 +2,8 @@
 
 /**
  * Which box each setting lives in, what it is called, and the note under it.
- * Boxes follow the parts of the site touched: lists, fiction pages, chapters.
+ * Boxes follow a reader through the site: the layout the rest depend on, then
+ * lists, a fiction, a chapter, its comments.
  *
  * Built from this rather than hand-written HTML so a key added to schema.js and
  * forgotten here fails a test instead of quietly becoming unreachable.
@@ -68,6 +69,19 @@
       unit: 'px',
       step: 20,
     },
+    'tags.colorHome': {
+      label: 'Colour tags on the home page too',
+      note: 'The home page writes its tags slightly differently, so it merits a toggle.',
+    },
+    'list.tagsExpand': {
+      label: 'Show every tag on a card',
+      note: 'Royal Road shows the first few and hides the rest behind a + on each card. This opens them without the click. Cards get taller.',
+      optionLabels: {
+        off: 'Leave the + alone',
+        hover: 'Open while the pointer is over the card',
+        always: 'Always open',
+      },
+    },
     'list.cleanTitles': {
       label: 'Trim tags out of titles',
       note: 'Drops bracketed tags from titles in the lists, so "Some Title [LitRPG, Dungeon Core]" reads as "Some Title". Hover to see the full title. A fiction’s own page is left alone.',
@@ -86,6 +100,10 @@
       label: 'Show hidden fictions in place',
       note: 'Hidden fictions stay in the lists, dimmed and labelled, each with a plus button to bring it back.',
     },
+    'drop.enabled': {
+      label: 'Mark fictions you tried and dropped',
+      note: 'Puts a bookmark button on every card. A fiction you mark dims and is labelled Dropped wherever it comes up, so you can see you have already given it a go — but it stays in the list and stays clickable, in case you change your mind. To stop them appearing at all, add Dropped to “Hide mine” in the Filters panel. Turning this off keeps your list for later.',
+    },
 
     // ── filters ───────────────────────────────────────────────────────────
     'filters.enabled': {
@@ -94,7 +112,7 @@
     },
     'list.infiniteScroll': {
       label: 'Keep loading as you scroll',
-      note: 'When you reach the bottom of a list, the next page is added underneath instead of you having to click through. Filters and hidden fictions still apply to whatever comes in.',
+      note: 'The fiction lists get infinite scroll. Filters and hidden fictions still apply to whatever comes in — so a strict filter can add a page and show you nothing from it. Royal Road serves twenty at a time and each scroll asks for one more page, rather than fetching until the screen is full.',
     },
 
     // ── fiction pages ─────────────────────────────────────────────────────
@@ -121,6 +139,14 @@
     'fiction.reviewsAutoLoad': {
       label: 'Keep loading reviews as you scroll',
       note: 'Adds the next page to the bottom instead of replacing the reviews you have already read.',
+    },
+    'fiction.tagsExpandAll': {
+      label: 'Show every tag',
+      note: 'Royal Road hides a long tag list behind a +. This opens it.',
+    },
+    'fiction.statDeltas': {
+      label: 'Show what has changed since you last looked',
+      note: 'This writes the changes in statistics since the last time you visited a fiction, in case you weren\'t convinced the first time around. The numbers are saved as you open the page, and forgotten after a year. Nothing is shown until you come back to a fiction you have already opened, and switching this off deletes everything it has saved.',
     },
 
     // ── chapter text ──────────────────────────────────────────────────────
@@ -154,7 +180,7 @@
     },
     'reader.fontFamily': {
       label: 'Font',
-      note: 'One font name. Several separated by commas are fallbacks rather than choices: you get the first one that is installed, and the rest are only tried if it is missing. Only fonts already on this computer work, as Royal Road blocks new ones from loading.',
+      note: 'One font name. Several separated by commas are fallbacks rather than choices; you get the first one that is installed, and the rest are only tried if it is missing. Only fonts already on your computer work, as Royal Road blocks new ones from loading.',
       placeholder: 'Georgia, serif',
     },
 
@@ -180,11 +206,11 @@
     },
     'chapter.catchUp': {
       label: 'Show how many chapters you have left',
-      note: 'Which chapter of the fiction this is, and how many come after it, on the line above the chapter. The count comes from the same list Royal Road fills its own "Select a chapter" dropdown from, fetched once per fiction and kept for the tab. Nothing is fetched while this is off.',
+      note: 'Which chapter of the fiction this is, and how many come after it, on the line above the chapter. Chapter numbers are Royal Road\'s own, so they might not match the chapter name.',
     },
     'chapter.resume': {
       label: 'Come back to where you stopped reading',
-      note: 'Remembers how far down a chapter you got, and returns you there next time you open it. Opening a link to a particular comment goes to that comment instead. Nothing is remembered while this is off, and it is kept on this device.',
+      note: 'Remembers how far down a chapter you got, and returns you there next time you open it. Reading a chapter fully or going to the next chapter clears the value, since it assumes you have finished it.',
       optionLabels: {
         off: 'Do not remember',
         ask: 'Offer it at the top of the chapter',
@@ -193,7 +219,7 @@
     },
     'recap.mode': {
       label: 'Show the end of the previous chapter',
-      note: 'Puts the closing paragraphs of the chapter before at the top of this one, for when you are reading several fictions at once and cannot remember how the last one left off. Nothing is fetched while this is off.',
+      note: 'Puts the closing paragraphs of the chapter before at the top of this one, for when you are reading several fictions at once and cannot remember how the last one left off.',
       optionLabels: {
         off: 'Do not show it',
         always: 'Always show it',
@@ -203,7 +229,7 @@
     },
     'recap.paragraphs': {
       label: 'How much to show',
-      note: 'Paragraphs from the end of the previous chapter. A closing line of asterisks does not count towards it.',
+      note: 'Paragraphs from the end of the previous chapter.',
       unit: 'paragraphs',
     },
 
@@ -219,7 +245,7 @@
     },
     'notes.hideAuthorPanel': {
       label: 'Hide the About Author panel',
-      note: 'Hides the author panel and its heading from chapter pages.',
+      note: 'Hides the author panel at the bottom from chapter pages; the top panel is left alone.',
     },
 
     // ── comments ──────────────────────────────────────────────────────────
@@ -256,24 +282,24 @@
       optionLabels: ACTION_LABELS,
     },
     'comments.patternAction': {
-      label: 'Comments matching your own patterns',
+      label: 'Comments matching your own regex patterns',
       note: 'What happens to comments that match the patterns below. It works on its own, whatever the setting above is set to.',
       optionLabels: ACTION_LABELS,
     },
     'comments.foldPatterns': {
-      label: 'Your patterns',
-      note: 'One per line. Capital letters do not matter. A line matches anywhere in a comment, so "nice" also catches "that was nice". To match the whole comment only, put ^ at the start and $ at the end, as in ^nice$. Pasting a comment straight in works too.',
+      label: 'Your regex patterns',
+      note: 'One per line. Capital letters do not matter. A line matches anywhere in a comment, so "nice" also catches "that was nice". To match the whole comment only, put ^ at the start and $ at the end, as in ^nice$.',
       placeholder: 'first!\n^nice$',
       multiline: true,
       rows: 4,
     },
     'comments.foldAuthors': {
       label: 'Apply comment filtering to the author too',
-      note: 'Off by default. The author’s own comments are left alone, because a short reply from them is usually the one worth reading. They are never hidden either way; the most this can do is collapse them.',
+      note: 'Off by default. The author’s own comments are left alone, because a short reply from them is sometimes worth reading. They are never hidden either way; the most this can do is collapse them.',
     },
     'comments.seen': {
       label: 'Mark comments posted since you last read the chapter',
-      note: 'Compares when each comment was posted against when you last had this chapter open. It does not follow which comments you actually read, so an older one further down the list counts as read whether or not you ever scrolled to it. Nothing is ever hidden: the older ones can collapse to a dimmed line that opens on hover, and anything with a newer reply underneath it stays open. Your visit is recorded once the comments have been on screen for a few seconds, and forgotten after 60 days — so coming back to a chapter much later shows its comments afresh.',
+      note: 'Compares when each comment was posted against when you last had this chapter open. It does not follow which comments you actually read, so an older one further down the list counts as read whether or not you ever scrolled to it. Nothing is ever hidden: the older ones can collapse to a dimmed line that opens on hover, and anything with a newer reply underneath it stays open. Your visit is recorded once the comments have been on screen for a few seconds, and forgotten after 60 days by default — so coming back to a chapter much later shows its comments afresh.',
       optionLabels: {
         off: 'Leave alone',
         mark: 'Mark the newer ones',
@@ -288,48 +314,57 @@
     },
     'comments.autoLoad': {
       label: 'Keep loading comments as you scroll',
-      note: 'Adds the next page to the bottom instead of replacing the comments you have already read.',
+      note: 'Turns the comment section into an infinite scroll.',
     },
   };
 
-  /** The boxes and what goes in each. `groups` splits a box into labelled runs,
-   *  so a long box reads as a few short lists. */
+  /** The boxes and what goes in each, following a reader through the site:
+   *  the layout everything depends on, then lists, a fiction, a chapter, its
+   *  comments. Inside a box the order is down the page, so a setting sits where
+   *  the thing it changes sits.
+   *
+   *  `groups` splits a box into labelled runs. `manager` renders one of the two
+   *  fiction lists inside that group rather than after the box; `layout: 'grid'`
+   *  lays a run of identical dropdowns out in columns. A box with one group
+   *  needs no heading inside it. */
   const SECTIONS = [
     {
       id: 'design',
       title: 'Royal Road’s design',
-      blurb:
-        'Royal Road serves two layouts. This extension only works on the newer one, so this is the setting the rest depend on.',
-      groups: [{ title: 'Which layout to use', keys: ['design.mode'] }],
+      blurb: 'This extension only works on the newer of Royal Road’s two layouts.',
+      groups: [{ keys: ['design.mode'] }],
     },
     {
       id: 'lists',
       title: 'Fiction lists',
       blurb: 'Rising Stars, Trending, Best Rated, Latest Updates, Search and the rest.',
       groups: [
+        // The toolbar first: it is the only way to the filter panel, which is
+        // why the switch that applies filters is on this page at all.
+        { title: 'The toolbar and filters', keys: ['list.showToolbar', 'filters.enabled'] },
+        { title: 'The list itself', keys: ['list.view', 'list.maxWidthPx', 'list.infiniteScroll'] },
         {
-          title: 'Descriptions and layout',
+          title: 'Each card',
           keys: [
+            'list.cleanTitles',
             'list.expandAll',
             'list.hoverExpand',
             'list.hoverDelayMs',
-            'list.view',
-            'list.maxWidthPx',
-            'list.cleanTitles',
-            'list.showToolbar',
+            'list.tagsExpand',
           ],
         },
-        { title: 'Filters', keys: ['filters.enabled', 'list.infiniteScroll'] },
-        { title: 'Hiding fictions', keys: ['hide.enabled', 'hide.showHidden'] },
+        { title: 'Hiding fictions', keys: ['hide.enabled', 'hide.showHidden'], manager: 'hidden' },
+        { title: 'Tried and dropped', keys: ['drop.enabled'], manager: 'dropped' },
       ],
     },
     {
       id: 'fiction',
       title: 'Fiction pages',
-      blurb: 'The sections on a fiction’s own page, listed in the order they appear.',
+      blurb: 'A fiction’s own page, top to bottom.',
       groups: [
         {
-          title: 'Page sections',
+          title: 'Which sections are open',
+          layout: 'grid',
           keys: [
             'fiction.about',
             'fiction.stats',
@@ -339,16 +374,32 @@
             'fiction.reviews',
           ],
         },
-        { title: 'Reviews', keys: ['fiction.reviewSort', 'fiction.reviewsAutoLoad'] },
+        { title: 'What has changed since last time', keys: ['fiction.statDeltas'] },
+        { title: 'Tags', keys: ['fiction.tagsExpandAll'] },
+        { title: 'Reading reviews', keys: ['fiction.reviewSort', 'fiction.reviewsAutoLoad'] },
       ],
     },
     {
       id: 'chapter',
       title: 'Chapter pages',
-      blurb: 'The chapter text, the notes around it, and the comments underneath.',
+      blurb: 'The chapter itself, and what sits above and below it.',
       groups: [
+        // chapter-top.js places these above .chapter-content, in this order:
+        // SLOTS = { resume: 5, meta: 10, recap: 20 }.
         {
-          title: 'Text',
+          title: 'Before the chapter starts',
+          keys: [
+            'chapter.resume',
+            'chapter.topTimestamp',
+            'chapter.wordCount',
+            'chapter.wpm',
+            'chapter.catchUp',
+            'recap.mode',
+            'recap.paragraphs',
+          ],
+        },
+        {
+          title: 'The chapter text',
           keys: [
             'reader.enabled',
             'reader.lineHeight',
@@ -359,37 +410,37 @@
             'reader.fontFamily',
           ],
         },
+        { title: 'After the chapter', keys: ['notes.mode', 'notes.hideAuthorPanel'] },
+      ],
+    },
+    {
+      id: 'comments',
+      title: 'Comments',
+      blurb: 'Underneath every chapter.',
+      groups: [
         {
-          title: 'Author notes and extras',
-          keys: ['notes.mode', 'notes.hideAuthorPanel'],
-        },
-        {
-          title: 'Chapter facts',
-          keys: ['chapter.topTimestamp', 'chapter.wordCount', 'chapter.wpm', 'chapter.catchUp'],
-        },
-        {
-          title: 'Continuing a story',
-          keys: ['chapter.resume', 'recap.mode', 'recap.paragraphs'],
-        },
-        {
-          title: 'Comments',
+          title: 'The comment list',
           keys: [
-            'comments.seen',
-            'comments.seenDays',
             'comments.threading',
             'comments.separators',
             'comments.dividerOpacity',
             'comments.collapsible',
             'comments.threadColor',
+            'comments.autoLoad',
+          ],
+        },
+        {
+          title: 'Comments you would rather skip',
+          keys: [
             'comments.thanks',
             'comments.emotes',
             'comments.patternAction',
             'comments.foldPatterns',
-            // Last of the group: it qualifies every rule above it.
+            // Last: it qualifies every rule above it.
             'comments.foldAuthors',
-            'comments.autoLoad',
           ],
         },
+        { title: 'Since your last visit', keys: ['comments.seen', 'comments.seenDays'] },
       ],
     },
   ];
@@ -401,6 +452,8 @@
    *  section or here, or the options test fails. */
   const NOT_IN_OPTIONS = {
     'notes.blockedAuthors': 'a list of author ids, set by editing an exported settings file',
+    'tags.colors': 'edited in its own card on this page, the way the two fiction lists are',
+    'tags.colorHome': 'a checkbox in that same card, beside the colours it widens',
   };
 
   /** Filter values are set in the panel on the list pages, not here. */

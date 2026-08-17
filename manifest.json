@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "UI Improvements for Royal Road",
-  "version": "1.4.2",
+  "version": "1.5.0",
   "minimum_chrome_version": "121",
   "description": "Filter and re-lay-out Royal Road fiction lists, hide fictions for good, and improve chapter typography and comments.",
   "homepage_url": "https://github.com/jmgpgit/royal-road-ui-improvements",
@@ -89,6 +89,7 @@
         "src/content/features/expand-all.js",
         "src/content/features/hover-expand.js",
         "src/content/features/hide-fictions.js",
+        "src/content/features/dropped-fictions.js",
         "src/content/features/list-filters.js",
         "src/content/features/list-loadmore.js",
         "src/content/features/view-modes.js",
@@ -100,6 +101,7 @@
         "src/content/features/comments.js",
         "src/content/features/comments-new.js",
         "src/content/features/fiction-page.js",
+        "src/content/features/fiction-stats.js",
         "src/content/main.js"
       ]
     }

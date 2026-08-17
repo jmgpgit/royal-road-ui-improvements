@@ -277,6 +277,17 @@
   function syncCards(scope, ctx) {
     if (ctx.page !== 'chapter') return;
 
+    // A re-sort replaces the list, taking our appended pages with it. Noticed
+    // here because nothing else runs afterwards unless the reader scrolls, and
+    // by then the run has already stopped for good.
+    // Three ways in. The click hook is the reliable one - it knows a re-sort
+    // happened rather than inferring it - and `noticeReplacement` stays as the
+    // fallback for a list Royal Road replaces for its own reasons. `owed` is
+    // what keeps either of them trying: one `loadNext` is not enough, because
+    // the container is not always there the instant the list is swapped.
+    const restarted = pager.noticeReplacement();
+    if ((restarted || pager.owed()) && ctx.settings['comments.autoLoad']) pager.loadNext();
+
     const collapsible = ctx.settings['comments.collapsible'];
 
     /* Can any rule reach a verdict other than "leave alone"? On the shipped
@@ -332,11 +343,17 @@
    *  its "next" moves you forward and loses everything behind. The shared pager
    *  fetches the same endpoint and appends instead: content/pager.js, which
    *  reviews uses too. */
+  /** The sort hook is attached once, from `onPage`. */
+  let sortHooked = false;
+
   const pager = RRX.pager.create({
     rootSelector: SEL.commentsPaginate,
     container: () => document.querySelector(SEL.commentsContainer),
     // Royal Road waits for a click before it fetches page one at all.
     ready: () => !!document.querySelector(SEL.commentsContainer),
+    // The fetch URL's own `sorting` is whatever the page was rendered with, and
+    // Royal Road does not rewrite it when the reader re-sorts.
+    sortDropdown: SEL.commentSortDropdown,
     prime: () => {
       const loader = document.querySelector(SEL.commentLoader);
       if (!loader || loader.dataset.rrxClicked) return;
@@ -351,7 +368,15 @@
     id: 'comments',
     pages: ['chapter'],
     syncCards,
+    /** Once, and only on a chapter: the listener is at the document, and a fiction
+     *  page carries a sort dropdown of its own. */
     onPage: (ctx) => {
+      // Once, and from here rather than the module body: the listener is at the
+      // document, and a fiction page carries a sort dropdown of its own.
+      if (!sortHooked) {
+        sortHooked = true;
+        RRX.pager.restartOnSort(pager, SEL.commentSortDropdown);
+      }
       if (ctx.settings['comments.autoLoad']) watchCommentScroll();
       // The colour is a plain custom property so the CSS can stay static.
       const colour = ctx.settings['comments.threadColor'];

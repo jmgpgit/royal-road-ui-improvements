@@ -56,6 +56,18 @@
         <select id="p-view" class="select" data-setting="list.view"></select>
       </label>
 
+      <label class="row row--stack" for="p-listWidth">
+        <span>Maximum list width <b id="p-listWidth-out" class="count">-</b></span>
+        <input
+          type="range"
+          id="p-listWidth"
+          data-setting="list.maxWidthPx"
+          min="700"
+          max="2400"
+          step="20"
+        />
+      </label>
+
       <label class="row" for="p-infiniteScroll">
         <input type="checkbox" id="p-infiniteScroll" data-setting="list.infiniteScroll" />
         <span>Keep loading as you scroll</span>
@@ -64,6 +76,14 @@
       <label class="row" for="p-cleanTitles">
         <input type="checkbox" id="p-cleanTitles" data-setting="list.cleanTitles" />
         <span>Trim tags out of titles</span>
+      </label>
+
+      <!-- Beside the titles, because both decide what a card tells you at a
+           glance - and which tags are showing is a decision made while
+           scrolling, not once in options. -->
+      <label class="row row--stack" for="p-tagsExpand">
+        <span>Show every tag on a card</span>
+        <select id="p-tagsExpand" class="select" data-setting="list.tagsExpand"></select>
       </label>
 
       <label class="row" for="p-showHidden">
@@ -176,7 +196,7 @@
       Nothing to change here. Open a Royal Road fiction list, fiction or chapter.
     </p>
 
-    <button type="button" id="p-manage" class="btn">All settings &amp; hidden fictions…</button>
+    <button type="button" id="p-manage" class="btn">All settings, hidden &amp; dropped…</button>
 
     <script src="../common/browser.js"></script>
     <script src="../common/selectors.js"></script>
