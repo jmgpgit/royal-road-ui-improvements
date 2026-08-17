@@ -60,6 +60,18 @@ nodeTest.after(() => {
  * @param {object} [settings] seeded into the fake storage
  */
 async function boot(fixtureName, url, settings = {}, hidden = {}, dropped = {}, stats = {}) {
+  // These documents run to 1.8 MB each and the suite booted one per test, all
+  // held until the file finished - which eventually exhausted the heap rather
+  // than failing any single test. Tests in a file run one at a time, so anything
+  // from a finished one is dead weight; `after` still sweeps what is left.
+  while (windows.length > 1) {
+    try {
+      windows.shift().close();
+    } catch {
+      /* already gone */
+    }
+  }
+
   const dom = new JSDOM(fixture(fixtureName), { url, runScripts: 'outside-only' });
   const w = dom.window;
   windows.push(w);
@@ -1050,6 +1062,16 @@ test('the page numbers stay gone if Royal Road re-renders its paginator', async 
 /** A stand-in for an element's on-screen box. */
 const boxOf = (over) => ({ top: 0, left: 0, right: 0, width: 0, height: 0, bottom: 0, ...over });
 
+/** A list that moves out of trigger range as it grows, the way a real one does.
+ *  A box pinned near the bottom forever makes the pager's own poll walk every
+ *  page a fixture declares - 135 of them on the reviews root - which is a
+ *  harness artefact rather than a bug, but it exhausts the heap all the same. */
+const growingBox = (host, extra = 0) => {
+  const start = host.children.length;
+  return () =>
+    boxOf({ width: 900, height: 900, bottom: host.children.length > start + extra ? 5000 : 10 });
+};
+
 async function fictionPage(settings) {
   const { w } = await boot(
     'fiction-detail.new.html',
@@ -1076,7 +1098,7 @@ test('a collapsed reviews panel is never paged into', async () => {
   assert.equal(w.__fetched.length, before, 'a closed panel asks Royal Road for nothing');
 
   // Opened, and scrolled to its end, it pages as normal.
-  host.getBoundingClientRect = () => boxOf({ width: 900, height: 900, bottom: 10 });
+  host.getBoundingClientRect = growingBox(host);
   w.RRX.fictionPage.reviewPager.check();
   await new Promise((r) => setTimeout(r, 120));
   assert.ok(w.__fetched.length > before, 'an open panel at its end does page');
@@ -1107,24 +1129,45 @@ test('Royal Road’s review numbers survive until we have appended something', a
   assert.ok(root.classList.contains('rrx-endless'), 'once something is appended, they go');
 });
 
-test('paging follows the sort the reader chose, not the one the page loaded with', async () => {
-  // Royal Road leaves data-rr-paginate-fetch-url on the ordering the page was
-  // rendered with. Ask it for page 2 after a re-sort and it answers with rows
-  // from the OLD order: on a fiction with few reviews those are all already on
-  // screen, every one deduplicates away, and the pager concludes there is
-  // nothing left and stops for good having added nothing.
+test('the order is the one on screen, not the one the fetch URL was rendered with', async () => {
+  // Read from Royal Road's own source: its paginator takes
+  // `data-rr-paginate-fetch-url` once, in its constructor, into a `fetchUrl`
+  // property, and a re-sort assigns that property - `fetchUpdateUrlAndHook` -
+  // without ever writing the attribute back. From the first re-sort onwards the
+  // attribute describes an order nobody is looking at, and page two of it comes
+  // back as rows already on screen: they all deduplicate away, nothing is
+  // added, and the run stops with the page numbers up.
+  //
+  // `fiction.reviewSort` reaches Royal Road by clicking its own dropdown item,
+  // so the list really is in that order. This asserted the opposite for a
+  // while, on the strength of a capture whose scripts never run and so never
+  // rewrite anything.
   const w = await fictionPage({ 'fiction.reviewsAutoLoad': true, 'fiction.reviewSort': 'oldest' });
   const root = w.document.querySelector(w.RRX.SEL.reviewsPaginate);
+  const url = w.RRX.fictionPage.reviewPager.urlFor(2);
+
   assert.match(
     root.getAttribute('data-rr-paginate-fetch-url'),
     /sorting=top/,
-    'Royal Road’s own URL still says top, which is the whole problem'
+    'the attribute keeps saying what the page was built with'
   );
+  assert.match(url, /sorting=oldest/, 'and we ask in the order actually on screen');
+  assert.doesNotMatch(url, /sorting=top/);
+  assert.match(url, /page=2/);
+});
 
-  const url = w.RRX.fictionPage.reviewPager.urlFor(2);
-  assert.match(url, /sorting=oldest/, 'we ask for the order actually on screen');
-  assert.match(url, /page=2/, 'and the next page of it');
-  assert.equal((url.match(/sorting=/g) || []).length, 1, 'the old sort is replaced, not appended');
+test('a reader picking an order beats the one we asked for', async () => {
+  const w = await fictionPage({ 'fiction.reviewsAutoLoad': true, 'fiction.reviewSort': 'oldest' });
+  const pager = w.RRX.fictionPage.reviewPager;
+  assert.equal(pager.sorting(), 'oldest');
+
+  const item = [...w.document.querySelectorAll(w.RRX.SEL.reviewSortDropdown + ' [data-rr-dropdown-item]')].find(
+    (el) => el.getAttribute('data-rr-dropdown-option-value') === 'upvotes'
+  );
+  item.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+
+  assert.equal(pager.sorting(), 'upvotes');
+  assert.match(pager.urlFor(2), /sorting=upvotes/);
 });
 
 test('with no sort of our own, Royal Road’s own fetch URL is left untouched', async () => {
@@ -1318,6 +1361,160 @@ test('a re-sort while a page is in flight drops that page rather than mixing it 
   assert.equal(pager.state.added, restarted.added);
 });
 
+test('a re-sorted list keeps loading instead of dropping back to pagination', async () => {
+  // Reported twice. A re-sort leaves one page on screen, so the end of the list
+  // is nowhere near the viewport and `check` refuses to load - while
+  // `noticeReplacement` has already put Royal Road's page numbers back, because
+  // they are true again. Nothing then loaded until the reader scrolled all the
+  // way down, which reads as infinite scroll having simply stopped.
+  const w = await fictionPage({ 'fiction.reviewsAutoLoad': true });
+  const pager = w.RRX.fictionPage.reviewPager;
+  const host = w.document.querySelector(w.RRX.SEL.reviewsContainer);
+  const root = w.document.querySelector(w.RRX.SEL.reviewsPaginate);
+  root.setAttribute('data-rr-paginate-max-page', '5');
+
+  const appended = w.document.createElement('div');
+  appended.setAttribute('data-rr-paginate-item', '');
+  appended.setAttribute('data-rrx-appended', '1');
+  host.appendChild(appended);
+  Object.assign(pager.state, { added: 6, next: 3, done: true });
+  pager.hideFooter(true);
+
+  // Royal Road re-sorts: one page, and its bottom is far below the fold.
+  host.innerHTML = '<div data-rr-paginate-item><div id="sorted-1"></div></div>';
+  // Far below the fold, which is what a one-page list looks like: the trigger
+  // geometry alone would never fire, which is the whole point of the test.
+  host.getBoundingClientRect = growingBox(host);
+
+  w.RRX.main.syncCards(w.document);
+  for (let i = 0; i < 50 && host.children.length < 2; i += 1) {
+    await new Promise((r) => setTimeout(r, 20));
+  }
+
+  assert.ok(host.children.length > 1, 'the next page loaded without waiting for a scroll');
+  assert.ok(
+    root.classList.contains('rrx-endless'),
+    'so Royal Road’s page numbers stay put away'
+  );
+});
+
+test('picking a different order throws our pages away and waits for the new first one', async () => {
+  // Driven by the click rather than inferred from what is missing afterwards.
+  // Two things that inference could not do: our appended rows go at once, so
+  // they cannot be stranded under Royal Road's new page one if Royal Road only
+  // clears the rows it rendered itself; and nothing is fetched until the list
+  // has visibly changed, because until then the fetch URL still describes the
+  // order the reader has just left.
+  const w = await fictionPage({ 'fiction.reviewsAutoLoad': true });
+  const pager = w.RRX.fictionPage.reviewPager;
+  const host = w.document.querySelector(w.RRX.SEL.reviewsContainer);
+  const root = w.document.querySelector(w.RRX.SEL.reviewsPaginate);
+
+  const ours = w.document.createElement('div');
+  ours.setAttribute('data-rr-paginate-item', '');
+  ours.setAttribute('data-rrx-appended', '1');
+  ours.innerHTML = '<div id="review-ours"></div>';
+  host.appendChild(ours);
+  Object.assign(pager.state, { added: 3, next: 4, done: true });
+  pager.hideFooter(true);
+
+  // The reader picks a different order from Royal Road's own dropdown.
+  const option = [...w.document.querySelectorAll(w.RRX.SEL.dropdownItem)].find(
+    (el) => el.getAttribute('data-rr-dropdown-option-value') === 'newest'
+  );
+  option.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+
+  assert.equal(w.document.getElementById('review-ours'), null, 'our pages went at once');
+  assert.equal(pager.state.next, 2, 'and the run is back to the beginning');
+  assert.equal(root.classList.contains('rrx-endless'), false, 'its page numbers are true again');
+
+  // The debt, not a fetch: driving a real one appends a 1.8 MB fixture, and this
+  // suite already holds a jsdom document per test. That the restart then loads
+  // is covered by "a re-sorted list keeps loading instead of dropping back to
+  // pagination"; what is unique here is that it waits first.
+  assert.equal(pager.owed(), false, 'nothing is owed while the old list is still up');
+
+  // Royal Road finishes and puts page one of the new order in.
+  host.innerHTML = '<div data-rr-paginate-item><div id="review-new-1"></div></div>';
+  assert.equal(pager.owed(), true, 'now the restart is owed its first page');
+  assert.match(pager.urlFor(pager.state.next), /page=2/, 'from page two');
+});
+
+test('a reader on page two carries on from page three, not back to page two', async () => {
+  // Reported as "I was on the second page, reordered, and got three reviews".
+  // The run started at page two whatever was on screen, so a reader who had
+  // used Royal Road's own pagination refetched the page they were already
+  // looking at: every row deduplicated away, `added` came out zero, and the run
+  // ended before it began - leaving Royal Road's page numbers up, which is the
+  // "it still paginates" half.
+  const w = await fictionPage({ 'fiction.reviewsAutoLoad': true });
+  const pager = w.RRX.fictionPage.reviewPager;
+  const root = w.document.querySelector(w.RRX.SEL.reviewsPaginate);
+  const host = w.document.querySelector(w.RRX.SEL.reviewsContainer);
+
+  root.setAttribute('data-rr-paginate-current-page', '2');
+  root.setAttribute('data-rr-paginate-max-page', '12');
+  host.getBoundingClientRect = growingBox(host);
+
+  const before = w.__fetched.length;
+  pager.loadNext();
+  for (let i = 0; i < 50 && w.__fetched.length === before; i += 1) {
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  assert.match(w.__fetched[w.__fetched.length - 1], /page=3/, 'the page after the one on screen');
+
+  // Waited for the response, not just the request: the assertion below is about
+  // what the run does once rows have actually landed.
+  for (let i = 0; i < 50 && !pager.state.added; i += 1) {
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  assert.ok(pager.state.added > 0, 'the page landed');
+
+  // ...and once we are appending, Royal Road's number is stale: it describes
+  // what it rendered, not what we have added since.
+  root.setAttribute('data-rr-paginate-current-page', '2');
+  assert.ok(pager.state.next > 3, 'so it is not consulted again mid-run');
+});
+
+test('an id used elsewhere in the list does not swallow an arriving row', async () => {
+  // Reported as "12 reviews before the reorder, 11 after". The duplicate check
+  // compared an arriving item's first id against *every* id in the container,
+  // so anything else carrying that id - a tooltip, a widget, a reply - dropped
+  // the row silently. It has to compare item markers with item markers.
+  const w = await fictionPage({ 'fiction.reviewsAutoLoad': true });
+  const pager = w.RRX.fictionPage.reviewPager;
+  const host = w.document.querySelector(w.RRX.SEL.reviewsContainer);
+  const root = w.document.querySelector(w.RRX.SEL.reviewsPaginate);
+  root.setAttribute('data-rr-paginate-max-page', '9');
+
+  // Something in the container that is not an item, wearing the id the next row
+  // will arrive with.
+  host.innerHTML =
+    '<div data-rr-paginate-item><div id="review-onscreen"></div></div>' +
+    '<div class="tooltip"><span id="review-arriving"></span></div>';
+  host.getBoundingClientRect = growingBox(host);
+  w.eval(`globalThis.fetch = async (url) => {
+    globalThis.__fetched.push(String(url));
+    return { ok: true, status: 200, text: async () =>
+      '<div data-rr-paginate-item><div id="review-arriving"></div></div>' };
+  };`);
+
+  const before = host.querySelectorAll('[data-rr-paginate-item]').length;
+  pager.loadNext();
+  for (let i = 0; i < 50 && !pager.state.added; i += 1) {
+    await new Promise((r) => setTimeout(r, 20));
+  }
+
+  assert.equal(pager.state.added, 1, 'the row was appended, not swallowed');
+  assert.equal(host.querySelectorAll('[data-rr-paginate-item]').length, before + 1);
+
+  // ...and a genuine repeat is still dropped.
+  pager.state.busy = false;
+  pager.loadNext();
+  await new Promise((r) => setTimeout(r, 60));
+  assert.equal(pager.state.added, 1, 'the same row a second time is still refused');
+});
+
 test('a list we never appended to is left alone', async () => {
   // Royal Road replaces its own list for its own reasons. Before we have added
   // anything there is nothing to restart, and resetting would be noise.
@@ -1350,7 +1547,7 @@ test('after a re-sort the run really does start again, not just reset its counte
   pager.noticeReplacement();
 
   // At the end of the list, so a check should want the next page.
-  host.getBoundingClientRect = () => boxOf({ width: 900, height: 900, bottom: 10 });
+  host.getBoundingClientRect = growingBox(host);
   const before = w.__fetched.length;
   pager.check();
   // Waited for rather than slept through: a fixed delay is a race, and this one

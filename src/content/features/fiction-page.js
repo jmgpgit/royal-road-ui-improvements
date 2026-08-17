@@ -154,18 +154,12 @@
     if (section) section.classList.toggle('rrx-note-hidden', want === 'hide');
   }
 
-  /** The ordering the reader asked for, '' while Royal Road's own is in use.
-   *  Read by the pager's `params` hook below. */
-  let sortInUse = '';
-
   /** Royal Road always opens reviews sorted by "Top". Picking its own dropdown
-   *  item routes the re-sort through Royal Road's handler, not around it. */
+   *  item routes the re-sort through Royal Road's handler, not around it - and
+   *  through our own click listener, which restarts the pager in the new order.
+   *  `rrxSorted` stops it clicking again on every settings change. */
   function setReviewSort(want) {
-    if (want === 'leave') return;
-    sortInUse = want;
-    const paginate = document.querySelector(SEL.reviewsPaginate);
-    const current = paginate && paginate.getAttribute('data-rr-paginate-fetch-url');
-    if (current && current.includes(`sorting=${want}`)) return; // already there
+    if (want === 'leave' || reviewPager.sorting() === want) return;
     const dropdown = document.querySelector(SEL.reviewSortDropdown);
     if (!dropdown || dropdown.dataset.rrxSorted === want) return;
 
@@ -175,21 +169,16 @@
     if (!item) return;
     dropdown.dataset.rrxSorted = want;
     item.click();
-    // Everything the pager appended was in the old order.
-    reviewPager.reset();
   }
 
-  /**
-   * Reviews paginate exactly like comments, so they share the pager. The ordering
-   * must be passed explicitly: Royal Road leaves its `data-rr-paginate-fetch-url`
-   * on whatever the page was rendered with, so after a re-sort the pager asks for
-   * page 2 of the old order - on a fiction with few reviews, entirely rows already
-   * on screen. They deduplicate away, the pager sees nothing added, and stops.
-   */
+  /** Reviews paginate exactly like comments, so they share the pager. */
+  /** The sort hook is attached once, from `onPage`. */
+  let sortHooked = false;
+
   const reviewPager = RRX.pager.create({
     rootSelector: SEL.reviewsPaginate,
     container: () => document.querySelector(SEL.reviewsContainer),
-    params: () => (sortInUse ? { sorting: sortInUse } : {}),
+    sortDropdown: SEL.reviewSortDropdown,
   });
 
   features.list.push({
@@ -200,11 +189,22 @@
      *  at init and on a settings change only. In `onPage` it could only ever
      *  see a run that had not started yet, so it did nothing at all. */
     syncCards: (scope, ctx) => {
-      if (reviewPager.noticeReplacement() && ctx.settings['fiction.reviewsAutoLoad']) {
-        reviewPager.check();
+      // `owed` keeps this trying on later sweeps: one attempt is not enough,
+      // because the container is not always there the instant the list is
+      // swapped, and a `loadNext` that finds nothing arranges nothing.
+      const restarted = reviewPager.noticeReplacement();
+      if ((restarted || reviewPager.owed()) && ctx.settings['fiction.reviewsAutoLoad']) {
+        reviewPager.loadNext();
       }
     },
     onPage: (ctx) => {
+      // Once. Royal Road's review sort is a dropdown of the same shape as the
+      // comment one, so the same hook serves both.
+      if (!sortHooked) {
+        sortHooked = true;
+        RRX.pager.restartOnSort(reviewPager, SEL.reviewSortDropdown);
+      }
+
       for (const [id, key] of Object.entries(FICTION_ACCORDIONS)) {
         const want = ctx.settings[key];
         if (want === 'open' || want === 'closed') setAccordion(id, want);

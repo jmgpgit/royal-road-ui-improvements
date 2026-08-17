@@ -189,6 +189,8 @@
     chapterContainer: '#chapter-page-container',
     commentLoader: '#comment-loader',
     commentsPaginate: '#comments-pagination',
+    /** The comment sort control, `data-reader-preference-binding="commentSorting"`. */
+    commentSortDropdown: '#comment-sort-dropdown',
     /** The list Royal Road's comment AJAX fills, and that we append pages to. */
     commentsContainer: '#comments-container',
     comment: '[data-comment-id]',
@@ -240,6 +242,12 @@
     recommendationsAccordion: '#recommendations-accordion',
     reviewsPaginate: '#reviews-pagination',
     reviewsContainer: '#reviews-pagination [data-rr-paginate-items-container]',
+    /** The sort control. Reading which option is *chosen* from it is a trap and
+     *  was tried: once Royal Road has initialised the dropdown the reviews one
+     *  marks its choice `aria-selected="true"` while leaving
+     *  `data-rr-dropdown-selected="false"` on every option, the comments one
+     *  sets both, and the captures predate initialisation so they show neither.
+     *  The order in effect is on the paginate root's own fetch URL instead. */
     reviewSortDropdown: '#review-sort-dropdown',
     dropdownItem: '[data-rr-dropdown-item]',
 
