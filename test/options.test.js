@@ -329,3 +329,26 @@ test('the colour settings reach the page', async () => {
     assert.ok(w.document.querySelector(`[data-setting="${key}"]`), `${key}: no control`);
   }
 });
+
+test('the switch inside the tag card is a settings row like every other', async () => {
+  // Hand-written markup here carried its own copy of the label and note, so
+  // editing COPY changed nothing on screen; and it kept the pre-rework geometry,
+  // control first with the label right-aligned after it, so the one row on this
+  // page that was not built by `rowFor` was also the only one facing backwards.
+  const w = await render();
+  const copy = COPY['tags.colorHome'];
+  const row = w.document.querySelector('#tagc-home-row .row');
+
+  assert.ok(row, 'the switch is not a row at all');
+  assert.equal(row.querySelector('.row__title').textContent, copy.label);
+  assert.match(row.querySelector('.row__note').textContent, /home page/);
+
+  // Label first in the DOM, control after it: the shape every other row has.
+  const title = row.querySelector('.row__title');
+  const control = row.querySelector('.row__control');
+  assert.ok(
+    title.compareDocumentPosition(control) & w.Node.DOCUMENT_POSITION_FOLLOWING,
+    'the control comes before its label'
+  );
+  assert.equal(control.querySelector('input[type="checkbox"]').dataset.setting, 'tags.colorHome');
+});

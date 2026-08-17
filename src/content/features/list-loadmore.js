@@ -162,14 +162,17 @@
     if (paginate) paginate.classList.toggle('rrx-endless', state.added > 0);
   }
 
-  /** How many tags Royal Road is filtering site-wide for this reader, off the
-   *  badge on its own button.
+  /** How many tags the reader has filtered site-wide, off the badge on Royal
+   *  Road's own button. Theirs rather than Royal Road's: the dialog reads
+   *  "Customize your experience by including or excluding tags across the
+   *  entire site", and signed out only "You must be logged in to use global
+   *  tag filters".
    *
    *  The button itself is on the list pages either way - it is in the signed-out
    *  captures - so its presence says nothing. Only the badge does, and it is
-   *  there only when the count is above zero. The dialog behind the button is
-   *  not in the DOM until it is opened, so the count is all that can be read,
-   *  and all that is needed. */
+   *  there only when the count is above zero. The dialog is in the DOM, but
+   *  signed out it holds that login prompt and nothing else, so the badge is all
+   *  there is to read and all that is needed. */
   function globalFilterCount() {
     const trigger = document.querySelector(SEL.globalFiltersTrigger);
     if (!trigger) return 0;
@@ -184,7 +187,7 @@
     if (state.dry < DRY_PAGES) return '';
     const global = globalFilterCount();
     if (!global) return '';
-    return ` · Royal Road's own Global Filters hide ${global} tag${global > 1 ? 's' : ''} site-wide, which may be why`;
+    return ` · Your own Global Filters hide ${global} tag${global > 1 ? 's' : ''} site-wide, which may be why there are no results. Or you have very niche tastes.`;
   }
 
   /** A quiet status line at the end of the list. */

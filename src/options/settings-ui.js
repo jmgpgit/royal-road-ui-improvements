@@ -71,7 +71,7 @@
     },
     'tags.colorHome': {
       label: 'Colour tags on the home page too',
-      note: 'The home page writes its tags as plain chips rather than links, with no slug on them, so they are matched by name instead. A tag added before its name was known is coloured on the fiction lists and fiction pages only.',
+      note: 'The home page writes its tags slightly differently, so it merits a toggle.',
     },
     'list.tagsExpand': {
       label: 'Show every tag on a card',
@@ -295,7 +295,7 @@
     },
     'comments.foldAuthors': {
       label: 'Apply comment filtering to the author too',
-      note: 'Off by default. The author’s own comments are left alone, because a short reply from them is usually the one worth reading. They are never hidden either way; the most this can do is collapse them.',
+      note: 'Off by default. The author’s own comments are left alone, because a short reply from them is sometimes worth reading. They are never hidden either way; the most this can do is collapse them.',
     },
     'comments.seen': {
       label: 'Mark comments posted since you last read the chapter',

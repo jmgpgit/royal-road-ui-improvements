@@ -106,27 +106,86 @@
     return link ? link.getAttribute('href') : null;
   };
 
+  /** The fiction's own title, off the one link on a chapter page that points at
+   *  the fiction root and nothing deeper. */
+  function fictionTitleIn(doc) {
+    for (const link of doc.querySelectorAll('a[href*="/fiction/"]')) {
+      const href = link.getAttribute('href') || '';
+      if (!/^(?:https?:\/\/[^/]+)?\/fiction\/\d+\/[^/?#]+\/?$/.test(href)) continue;
+      const text = (link.textContent || '').replace(/\s+/g, ' ').trim();
+      if (text) return text;
+    }
+    return '';
+  }
+
+  /**
+   * A chapter's own title, taken off the page's `<title>`.
+   *
+   * A chapter page has no `h1` at all, and the heading that does carry the title
+   * is an `h3` known only by Tailwind classes. `<title>` is
+   * "<chapter> - <fiction>" on both captures, so the fiction title read off the
+   * page removes the half we do not want by exact match rather than by splitting
+   * on " - ", which appears inside both halves in real titles.
+   *
+   * @returns {string} '' when it cannot be worked out, which shows the label alone
+   */
+  function titleOf(doc) {
+    const full = (doc.title || '').replace(/\s+/g, ' ').trim();
+    const fiction = fictionTitleIn(doc);
+    if (!full || !fiction) return '';
+    const suffix = ` - ${fiction}`;
+    return full.endsWith(suffix) ? full.slice(0, -suffix.length).trim() : '';
+  }
+
+  /**
+   * The cache holds `{t, x}` now rather than the tail alone. A tab open across
+   * an update still holds the old plain strings, so anything that does not parse
+   * is read as the text it used to be: the recap keeps working and simply has no
+   * name to show until that entry is refetched.
+   */
+  function unpack(raw) {
+    try {
+      const data = JSON.parse(raw);
+      if (data && typeof data === 'object' && typeof data.x === 'string') {
+        return { title: typeof data.t === 'string' ? data.t : '', text: data.x };
+      }
+    } catch {
+      /* written before this shape existed */
+    }
+    return { title: '', text: raw };
+  }
+
   async function fetchTail(url, wanted) {
     const key = chapterKey(url);
-    if (!key) return '';
+    if (!key) return { title: '', text: '' };
 
     const cached = cacheGet(key);
-    if (cached !== null) return cached;
+    if (cached !== null) return unpack(cached);
 
     const response = await fetch(url, { credentials: 'same-origin' });
     if (!response.ok) throw new Error(`Royal Road returned ${response.status}`);
     const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
 
     // Cached whole, so changing the paragraph count does not refetch.
-    const full = tailOf(doc, 999);
-    cacheSet(key, full);
+    const full = { title: titleOf(doc), text: tailOf(doc, 999) };
+    cacheSet(key, JSON.stringify({ t: full.title, x: full.text }));
     return full;
   }
 
   const trim = (text, wanted) => text.split('\n\n').slice(-wanted).join('\n\n');
 
+  /** "Previously", and the chapter it is previously *of* when that is known.
+   *  The name is a child rather than part of the label's own text, because the
+   *  label is uppercased and letter-spaced and a title set in that is shouting. */
+  const label = (tag, title) =>
+    ui.el(
+      tag,
+      { class: 'rrx-recap__label', text: 'Previously' },
+      title ? [ui.el('span', { class: 'rrx-recap__chapter', text: title })] : []
+    );
+
   /** Build the block. `mode` decides whether it starts open and what opens it. */
-  function render(text, mode, href) {
+  function render(text, mode, href, title) {
     const paragraphs = text.split('\n\n').map((line) => ui.el('p', { text: line }));
     const body = ui.el('div', { class: 'rrx-recap__body' }, [
       ...paragraphs,
@@ -139,14 +198,14 @@
 
     if (mode === 'always') {
       return ui.el('aside', { id: BLOCK_ID, class: 'rrx-ui rrx-recap rrx-recap--open' }, [
-        ui.el('p', { class: 'rrx-recap__label', text: 'Previously' }),
+        label('p', title),
         body,
       ]);
     }
 
     // `<details>` for click: a real disclosure control, keyboard reachable and
     // findable by the browser's own find-in-page.
-    const summary = ui.el('summary', { class: 'rrx-recap__label', text: 'Previously' });
+    const summary = label('summary', title);
     const block = ui.el(
       'details',
       { id: BLOCK_ID, class: `rrx-ui rrx-recap rrx-recap--${mode}` },
@@ -230,8 +289,8 @@
     state.busy = true;
     try {
       const full = await fetchTail(url, wanted);
-      if (!full) return;
-      const block = render(trim(full, wanted), mode, url);
+      if (!full.text) return;
+      const block = render(trim(full.text, wanted), mode, url, full.title);
       if (!RRX.chapterTop.place(block, RRX.chapterTop.SLOTS.recap)) return;
       state = { url, mode, wanted, busy: false };
     } catch {
@@ -250,5 +309,15 @@
     },
   });
 
-  RRX.recap = { tailOf, trim, previousUrl, apply, cacheSet, CACHE_MAX, SEPARATOR_ONLY };
+  RRX.recap = {
+    tailOf,
+    titleOf,
+    fictionTitleIn,
+    trim,
+    previousUrl,
+    apply,
+    cacheSet,
+    CACHE_MAX,
+    SEPARATOR_ONLY,
+  };
 })(globalThis);

@@ -392,7 +392,9 @@
 
   function renderTagColors() {
     const list = $('tagc-list');
-    $('tagc-home').checked = !!state.settings['tags.colorHome'];
+    const home = $('tagc-home-row');
+    home.textContent = '';
+    home.appendChild(rowFor('tags.colorHome'));
     backfillTagNames();
     const entries = RRX.parseTagColors(state.settings['tags.colors']);
     $('tagc-empty').hidden = entries.length > 0;
@@ -468,7 +470,8 @@
   };
 
   function wireTagColors() {
-    $('tagc-home').addEventListener('change', (e) => commit('tags.colorHome', e.target.checked));
+    // No handler for the home-page switch: `rowFor` builds it with the same
+    // `commit` every other setting uses, and it is rebuilt on each render.
 
     $('tagc-add').addEventListener('click', async () => {
       const slug = slugFor($('tagc-name').value);

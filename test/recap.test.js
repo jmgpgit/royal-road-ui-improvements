@@ -232,3 +232,94 @@ test('the cache is capped, so a long session cannot crowd out the site', () => {
   assert.ok(w.sessionStorage.getItem('rrx:recap:60'), 'the newest chapter survived');
   assert.equal(w.sessionStorage.getItem('rrx:recap:1'), null, 'the oldest was dropped');
 });
+
+// --- naming the chapter ------------------------------------------------------
+
+const ORC = 'CHAPTER 3 _ The Cry of Victory - Reincarnated as an Orc_ From Tribe to Empire [Kingdom Building] - no infinite scroll with comments loaded.htm';
+
+test('the previous chapter is named, on both captures', () => {
+  const w = load();
+  const parse = (html) => new w.DOMParser().parseFromString(html, 'text/html');
+
+  // A chapter page has no h1, and the heading carrying the title is an h3 known
+  // only by Tailwind classes - so the title comes off <title>, with the fiction
+  // half removed by exact match rather than by splitting on " - ".
+  assert.equal(
+    w.RRX.recap.titleOf(parse(fixture('chapter.new.html'))),
+    '24 – Alone at Home'
+  );
+  if (!need(ORC)) {
+    assert.equal(w.RRX.recap.titleOf(parse(fixture(ORC))), 'CHAPTER 3 : The Cry of Victory');
+  }
+});
+
+test('a title is not split on " - ", which appears inside both halves', () => {
+  const w = load();
+  const doc = new w.DOMParser().parseFromString(
+    `<html><head><title>23 - Interlude: The Lass - Part Three - A Tale - Of Two</title></head>
+     <body><a href="/fiction/149588/a-tale-of-two">A Tale - Of Two</a></body></html>`,
+    'text/html'
+  );
+  // Splitting on the first " - " keeps "23", on the last it keeps the fiction's
+  // own dash. Removing the fiction title itself is the only thing that works.
+  assert.equal(w.RRX.recap.titleOf(doc), '23 - Interlude: The Lass - Part Three');
+});
+
+test('an unreadable title shows the label alone rather than a guess', () => {
+  const w = load();
+  const parse = (html) => new w.DOMParser().parseFromString(html, 'text/html');
+
+  // No fiction link to measure against.
+  assert.equal(w.RRX.recap.titleOf(parse('<title>Some Chapter - Some Fiction</title>')), '');
+  // A <title> that does not end in the fiction title says nothing reliable.
+  assert.equal(
+    w.RRX.recap.titleOf(
+      parse('<title>Some Chapter</title><a href="/fiction/1/x">Some Fiction</a>')
+    ),
+    ''
+  );
+  // Deeper links are not the fiction's own page.
+  assert.equal(
+    w.RRX.recap.fictionTitleIn(
+      parse('<a href="/fiction/1/x/chapter/2/y">Chapter Two</a>')
+    ),
+    ''
+  );
+});
+
+test('the name is shown beside the label, and is the whole of its own text', async () => {
+  const w = load({ settings: { 'recap.mode': 'always', 'recap.paragraphs': 2 } });
+  await w.RRX.recap.apply(w.__ctx);
+  await settle();
+
+  const name = w.document.querySelector('.rrx-recap__chapter');
+  assert.ok(name, 'the recap did not name the chapter');
+  // The separator is CSS: find-in-page and a screen reader get the title alone.
+  assert.equal(name.textContent, '24 – Alone at Home');
+  assert.match(w.document.querySelector('.rrx-recap__label').textContent, /^Previously/);
+});
+
+test('a chapter whose name cannot be read still gets its recap', async () => {
+  const w = load({
+    previousHtml: '<html><head><title>no fiction link here</title></head><body><div class="chapter-content"><p>It ended.</p></div></body></html>',
+    settings: { 'recap.mode': 'always', 'recap.paragraphs': 2 },
+  });
+  await w.RRX.recap.apply(w.__ctx);
+  await settle();
+
+  assert.ok(w.document.getElementById('rrx-recap'), 'no name cost the reader the recap itself');
+  assert.equal(w.document.querySelector('.rrx-recap__chapter'), null);
+});
+
+test('a cache entry written before the name existed still reads as text', async () => {
+  // sessionStorage outlives an update inside one tab, and those entries are the
+  // bare tail string. Read as text with no name, rather than as a failure.
+  const w = load({ settings: { 'recap.mode': 'always', 'recap.paragraphs': 2 } });
+  w.sessionStorage.setItem('rrx:recap:3752453', 'An older ending.');
+  await w.RRX.recap.apply(w.__ctx);
+  await settle();
+
+  assert.equal(w.eval('globalThis.__fetched').length, 0, 'the old entry was ignored and refetched');
+  assert.match(w.document.querySelector('.rrx-recap__body').textContent, /An older ending\./);
+  assert.equal(w.document.querySelector('.rrx-recap__chapter'), null);
+});

@@ -134,6 +134,14 @@ body {
   padding: 0;
 }
 
+/* The switch is a settings row like any other, so it brings its own rule above
+   it. What it needs is room below: its note sat directly on top of the coloured
+   tags, and "No tag has a colour yet." read as the end of that note rather than
+   as the state of the list. */
+.tagc__toggle {
+  margin-bottom: 1rem;
+}
+
 .tagc__list {
   list-style: none;
   margin: 0;

@@ -85,15 +85,13 @@
         </div>
         <p id="tagc-error" class="status" hidden></p>
 
-        <label class="row" for="tagc-home">
-          <input type="checkbox" id="tagc-home" data-setting="tags.colorHome" />
-          <span class="row__title">Colour tags on the home page too</span>
-        </label>
-        <p class="muted tagc__note">
-          The home page writes its tags as plain chips with no tag id on them, so they are matched
-          by name instead. A colour added before the extension had seen Royal Road’s tag list has
-          no name recorded yet; it picks one up the next time you open a fiction list.
-        </p>
+        <!-- Filled by the same row builder the generated settings use, so this
+             one checkbox cannot drift from the shape of every other. Hand-written
+             markup here had the control first and the label right-aligned after
+             it - the exact geometry the one-shape-per-row rework removed - and
+             its own copy of the label and note, so editing COPY changed nothing
+             on screen. -->
+        <div id="tagc-home-row" class="tagc__toggle"></div>
 
         <p id="tagc-empty" class="muted">No tag has a colour yet.</p>
         <ul id="tagc-list" class="tagc__list"></ul>

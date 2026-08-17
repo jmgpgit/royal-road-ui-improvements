@@ -69,8 +69,14 @@
     /** Mark a fiction as one you tried and stopped reading. Its card dims and
      *  says so wherever it turns up, but stays where it is and stays clickable -
      *  changing your mind is the point, and hiding already covers "never show me
-     *  this again". Off by default: it puts a second button on every card. */
-    'drop.enabled': { type: 'bool', default: false },
+     *  this again".
+     *
+     *  On by default, beside hiding: the two are the same gesture on the same
+     *  card, and a reader who never presses either sees two buttons and nothing
+     *  else happens. Still its own switch, so the drop button can go without
+     *  taking hiding with it. Nothing is marked until a button is pressed, and
+     *  the filter chip works whatever this says. */
+    'drop.enabled': { type: 'bool', default: true },
 
     // ── filters ───────────────────────────────────────────────────────────
     'filters.enabled': { type: 'bool', default: true },

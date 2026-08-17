@@ -165,13 +165,17 @@ test('the toolbar renders with the expected controls', async () => {
   );
 });
 
-test('every card gets a hide button and a parsed record', async () => {
+test('every card gets both card buttons and a parsed record', async () => {
+  // Hiding and dropping both ship on, so a default install puts two buttons on
+  // each card and neither does anything until it is pressed.
   const { w } = await boot(
     'fictions-rising-stars.new.html',
     'https://www.royalroad.com/fictions/rising-stars'
   );
   assert.equal(w.document.querySelectorAll('[data-rrx-fid]').length, 50);
-  assert.equal(w.document.querySelectorAll('.rrx-card-btn').length, 50);
+  assert.equal(w.document.querySelectorAll('[data-rrx-btn="hide"]').length, 50);
+  assert.equal(w.document.querySelectorAll('[data-rrx-btn="drop"]').length, 50);
+  assert.equal(w.document.querySelectorAll('.rrx-card-btn').length, 100);
 });
 
 test('a stored filter narrows the page, and the toolbar says by how much', async () => {
@@ -1070,10 +1074,12 @@ test('Royal Road’s page numbers go once we have appended beneath them', async 
   assert.equal(paginate.classList.contains('rrx-endless'), false, 'restored on reset');
 });
 
-test('an empty list says so, and names Royal Road’s own filters when it can', async () => {
+test('an empty list says so, and names the reader’s own global filters when it can', async () => {
   // An empty list is indistinguishable from a page that genuinely has nothing -
-  // and, signed in, from Royal Road's own Global Filters cutting the results
-  // before we ever see them.
+  // and, signed in, from the reader's own Global Filters cutting the results
+  // before we ever see them. Theirs, not Royal Road's: the dialog says
+  // "Customize your experience by including or excluding tags across the entire
+  // site", and signed out only "You must be logged in to use global tag filters".
   const w = await atListBottom({
     'list.infiniteScroll': false,
     'filters.enabled': true,
@@ -1087,14 +1093,19 @@ test('an empty list says so, and names Royal Road’s own filters when it can', 
   assert.ok(counts.total > 0, 'the page has cards');
   assert.equal(counts.shown, 0, 'and the filter hides every one');
   assert.ok(note(), 'so the list says so');
-  assert.doesNotMatch(note().textContent, /Royal Road is also hiding/, 'no badge, nothing to add');
+  assert.doesNotMatch(note().textContent, /Global Filters/, 'no badge, nothing to add');
 
-  // Signed in, Royal Road badges its own button with the count.
+  // Signed in, Royal Road badges its own button with the reader's count.
   const badge = w.document.createElement('span');
   badge.textContent = '10';
   w.document.querySelector(w.RRX.SEL.globalFiltersTrigger).appendChild(badge);
   w.RRX.main.syncCards(w.document);
-  assert.match(note().textContent, /hiding 10 tags of its own/);
+  assert.match(note().textContent, /Your own Global Filters hide 10 tags site-wide/);
+  assert.doesNotMatch(
+    note().textContent,
+    /Royal Road is (also )?hiding|tags? of its own/,
+    'the note calls the reader’s own filters Royal Road’s'
+  );
 
 });
 

@@ -77,9 +77,9 @@
    *
    *  The button itself is on the list pages either way - it is in the signed-out
    *  captures - so its presence says nothing. Only the badge does, and it is
-   *  there only when the count is above zero. The dialog behind the button is
-   *  not in the DOM until it is opened, so the count is all that can be read,
-   *  and all that is needed. */
+   *  there only when the count is above zero. The dialog is in the DOM, but
+   *  signed out it holds a login prompt and nothing else, so the badge is all
+   *  there is to read and all that is needed. */
   function globalFilterCount() {
     const trigger = document.querySelector(SEL.globalFiltersTrigger);
     if (!trigger) return 0;
@@ -90,9 +90,12 @@
   /**
    * Said out loud when a filter leaves nothing, because an empty list is
    * indistinguishable from a page that genuinely has no matches - and, signed
-   * in, from Royal Road's own Global Filters hiding things before we ever see
-   * them. The count comes off Royal Road's own button, so it is only mentioned
-   * when there really is one.
+   * in, from the reader's own Global Filters cutting the list before we ever see
+   * it. Theirs, not Royal Road's: its own dialog reads "Customize your
+   * experience by including or excluding tags across the entire site", and
+   * signed out offers only "You must be logged in to use global tag filters".
+   * The count comes off Royal Road's button, so it is only mentioned when there
+   * really is one.
    */
   function renderEmpty(ctx, counts) {
     const list = document.querySelector(SEL.listRoot);
@@ -107,7 +110,7 @@
     // scanned and found nothing, so only speak for it when there is no loader.
     const global = ctx.settings['list.infiniteScroll'] ? 0 : globalFilterCount();
     const text = global
-      ? `Nothing on this page matches your filters. Royal Road is also hiding ${global} tag${global > 1 ? 's' : ''} of its own, site-wide - see its Global Filters button.`
+      ? `Nothing on this page matches your filters. Your own Global Filters hide ${global} tag${global > 1 ? 's' : ''} site-wide as well - see Royal Road's Global Filters button.`
       : 'Nothing on this page matches your filters.';
 
     // Compared before writing: this runs on every sweep, and replacing an
