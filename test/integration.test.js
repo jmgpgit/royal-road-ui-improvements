@@ -752,6 +752,50 @@ test('housekeeping prunes against the reader’s own expiry, not the built-in on
   assert.equal(w.__store.chapters[3766643].s, days(200), 'watermark and all');
 });
 
+test('forgetting the reading history reaches the scratchpad with no tab open', async () => {
+  // The options page cannot touch it: the scratchpad is royalroad.com's
+  // localStorage. A listener in an open tab handled the easy case, and the daily
+  // housekeeping was supposed to catch the rest - but it keeps anything written
+  // in the last day, and only runs once a day, so a position could outlive the
+  // press by two days and then be handed straight back, since a scratchpad entry
+  // outranks a missing record. The press is stamped now, and read on load.
+  const { w } = await boot(
+    'fictions-rising-stars.new.html',
+    'https://www.royalroad.com/fictions/rising-stars'
+  );
+  const nowS = Math.floor(Date.now() / 1000);
+  w.RRX.store.writePosition(3766643, { a: nowS, p: 42 });
+  assert.ok(w.RRX.store.readPositions()[3766643], 'a position is in the scratchpad');
+
+  await w.RRX.store.forgetChapters();
+  assert.ok(w.__store.forgotAt, 'the press is recorded where any tab can find it');
+
+  // The next Royal Road page load, in a browser where none was open at the time.
+  assert.equal(await w.RRX.store.honourForget(), true, 'it acts on the press');
+  assert.equal(
+    Object.keys(w.RRX.store.readPositions()).length,
+    0,
+    'and the position does not come back'
+  );
+
+  assert.equal(await w.RRX.store.honourForget(), false, 'once, not on every load after');
+});
+
+test('a position written after the forget is left alone', async () => {
+  // The stamp, not an empty map: a reader who finishes what they open has no
+  // records either, and their unflushed position is what the scratchpad is for.
+  const { w } = await boot(
+    'fictions-rising-stars.new.html',
+    'https://www.royalroad.com/fictions/rising-stars'
+  );
+  await w.RRX.store.forgetChapters();
+  await w.RRX.store.honourForget();
+
+  w.RRX.store.writePosition(3766643, { a: Math.floor(Date.now() / 1000), p: 7 });
+  assert.equal(await w.RRX.store.honourForget(), false, 'nothing new to act on');
+  assert.ok(w.RRX.store.readPositions()[3766643], 'so the fresh position stands');
+});
+
 test('resetting and importing delete the readings too, not just the toggle', async () => {
   // saveSettings noticed the on->off transition; resetSettings writes the
   // settings key directly and import replaces it wholesale, so both reached

@@ -127,10 +127,17 @@
     return hit ? hit.slug : null;
   };
 
-  /** Tags whose label or slug contains `query`, best matches first. */
+  /**
+    * Tags whose label or slug contains `query`, best matches first.
+    *
+    * `limit` bounds ranking noise, so it does not apply to an empty query: there
+    * is nothing to rank, and with nothing typed the menu is the only way to find
+    * out which tags exist. Eight of seventy-odd, alphabetically, read as a list
+    * that had failed to load. The menu scrolls.
+    */
   function search(query, limit = 10) {
     const q = query.trim().toLowerCase();
-    if (!q) return catalogue.slice(0, limit);
+    if (!q) return catalogue.slice();
     const starts = [];
     const contains = [];
     for (const tag of catalogue) {

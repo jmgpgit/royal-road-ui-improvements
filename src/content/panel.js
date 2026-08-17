@@ -174,9 +174,13 @@
       if (e.key !== 'Enter') return;
       e.preventDefault();
       e.stopPropagation(); // Enter here means "add this tag", not "apply"
-      const [best] = RRX.tags.search(input.value, 1);
+      const typed = input.value.trim();
+      // An empty field used to add whatever sorted first: `search('')` answers
+      // with the whole catalogue, and the first of it is not a choice anyone made.
+      if (!typed) return;
+      const [best] = RRX.tags.search(typed, 1);
       // Typed text falls back to a slug, so anyone who knows one can skip the picker.
-      add(best ? best.slug : input.value.trim().toLowerCase().replace(/\s+/g, '_'));
+      add(best ? best.slug : typed.toLowerCase().replace(/\s+/g, '_'));
       input.value = '';
       openMenu();
     });

@@ -2,7 +2,8 @@
 
 /**
  * Which box each setting lives in, what it is called, and the note under it.
- * Boxes follow the parts of the site touched: lists, fiction pages, chapters.
+ * Boxes follow a reader through the site: the layout the rest depend on, then
+ * lists, a fiction, a chapter, its comments.
  *
  * Built from this rather than hand-written HTML so a key added to schema.js and
  * forgotten here fails a test instead of quietly becoming unreachable.
@@ -264,12 +265,12 @@
       optionLabels: ACTION_LABELS,
     },
     'comments.patternAction': {
-      label: 'Comments matching your own patterns',
+      label: 'Comments matching your own regex patterns',
       note: 'What happens to comments that match the patterns below. It works on its own, whatever the setting above is set to.',
       optionLabels: ACTION_LABELS,
     },
     'comments.foldPatterns': {
-      label: 'Your patterns',
+      label: 'Your regex patterns',
       note: 'One per line. Capital letters do not matter. A line matches anywhere in a comment, so "nice" also catches "that was nice". To match the whole comment only, put ^ at the start and $ at the end, as in ^nice$. Pasting a comment straight in works too.',
       placeholder: 'first!\n^nice$',
       multiline: true,
@@ -300,45 +301,47 @@
     },
   };
 
-  /** The boxes and what goes in each. `groups` splits a box into labelled runs,
-   *  so a long box reads as a few short lists. */
+  /** The boxes and what goes in each, following a reader through the site:
+   *  the layout everything depends on, then lists, a fiction, a chapter, its
+   *  comments. Inside a box the order is down the page, so a setting sits where
+   *  the thing it changes sits.
+   *
+   *  `groups` splits a box into labelled runs. `manager` renders one of the two
+   *  fiction lists inside that group rather than after the box; `layout: 'grid'`
+   *  lays a run of identical dropdowns out in columns. A box with one group
+   *  needs no heading inside it. */
   const SECTIONS = [
     {
       id: 'design',
       title: 'Royal Road’s design',
-      blurb:
-        'Royal Road serves two layouts. This extension only works on the newer one, so this is the setting the rest depend on.',
-      groups: [{ title: 'Which layout to use', keys: ['design.mode'] }],
+      blurb: 'This extension only works on the newer of Royal Road’s two layouts.',
+      groups: [{ keys: ['design.mode'] }],
     },
     {
       id: 'lists',
       title: 'Fiction lists',
       blurb: 'Rising Stars, Trending, Best Rated, Latest Updates, Search and the rest.',
       groups: [
+        // The toolbar first: it is the only way to the filter panel, which is
+        // why the switch that applies filters is on this page at all.
+        { title: 'The toolbar and filters', keys: ['list.showToolbar', 'filters.enabled'] },
+        { title: 'The list itself', keys: ['list.view', 'list.maxWidthPx', 'list.infiniteScroll'] },
         {
-          title: 'Descriptions and layout',
-          keys: [
-            'list.expandAll',
-            'list.hoverExpand',
-            'list.hoverDelayMs',
-            'list.view',
-            'list.maxWidthPx',
-            'list.cleanTitles',
-            'list.showToolbar',
-          ],
+          title: 'Each card',
+          keys: ['list.cleanTitles', 'list.expandAll', 'list.hoverExpand', 'list.hoverDelayMs'],
         },
-        { title: 'Filters', keys: ['filters.enabled', 'list.infiniteScroll'] },
-        { title: 'Hiding fictions', keys: ['hide.enabled', 'hide.showHidden'] },
-        { title: 'Tried and dropped', keys: ['drop.enabled'] },
+        { title: 'Hiding fictions', keys: ['hide.enabled', 'hide.showHidden'], manager: 'hidden' },
+        { title: 'Tried and dropped', keys: ['drop.enabled'], manager: 'dropped' },
       ],
     },
     {
       id: 'fiction',
       title: 'Fiction pages',
-      blurb: 'The sections on a fiction’s own page, listed in the order they appear.',
+      blurb: 'A fiction’s own page, top to bottom.',
       groups: [
         {
-          title: 'Page sections',
+          title: 'Which sections are open',
+          layout: 'grid',
           keys: [
             'fiction.about',
             'fiction.stats',
@@ -348,17 +351,31 @@
             'fiction.reviews',
           ],
         },
-        { title: 'Reviews', keys: ['fiction.reviewSort', 'fiction.reviewsAutoLoad'] },
-        { title: 'Statistics', keys: ['fiction.statDeltas'] },
+        { title: 'What has changed since last time', keys: ['fiction.statDeltas'] },
+        { title: 'Reading reviews', keys: ['fiction.reviewSort', 'fiction.reviewsAutoLoad'] },
       ],
     },
     {
       id: 'chapter',
       title: 'Chapter pages',
-      blurb: 'The chapter text, the notes around it, and the comments underneath.',
+      blurb: 'The chapter itself, and what sits above and below it.',
       groups: [
+        // chapter-top.js places these above .chapter-content, in this order:
+        // SLOTS = { resume: 5, meta: 10, recap: 20 }.
         {
-          title: 'Text',
+          title: 'Before the chapter starts',
+          keys: [
+            'chapter.resume',
+            'chapter.topTimestamp',
+            'chapter.wordCount',
+            'chapter.wpm',
+            'chapter.catchUp',
+            'recap.mode',
+            'recap.paragraphs',
+          ],
+        },
+        {
+          title: 'The chapter text',
           keys: [
             'reader.enabled',
             'reader.lineHeight',
@@ -369,37 +386,37 @@
             'reader.fontFamily',
           ],
         },
+        { title: 'After the chapter', keys: ['notes.mode', 'notes.hideAuthorPanel'] },
+      ],
+    },
+    {
+      id: 'comments',
+      title: 'Comments',
+      blurb: 'Underneath every chapter.',
+      groups: [
         {
-          title: 'Author notes and extras',
-          keys: ['notes.mode', 'notes.hideAuthorPanel'],
-        },
-        {
-          title: 'Chapter facts',
-          keys: ['chapter.topTimestamp', 'chapter.wordCount', 'chapter.wpm', 'chapter.catchUp'],
-        },
-        {
-          title: 'Continuing a story',
-          keys: ['chapter.resume', 'recap.mode', 'recap.paragraphs'],
-        },
-        {
-          title: 'Comments',
+          title: 'The comment list',
           keys: [
-            'comments.seen',
-            'comments.seenDays',
             'comments.threading',
             'comments.separators',
             'comments.dividerOpacity',
             'comments.collapsible',
             'comments.threadColor',
+            'comments.autoLoad',
+          ],
+        },
+        {
+          title: 'Comments you would rather skip',
+          keys: [
             'comments.thanks',
             'comments.emotes',
             'comments.patternAction',
             'comments.foldPatterns',
-            // Last of the group: it qualifies every rule above it.
+            // Last: it qualifies every rule above it.
             'comments.foldAuthors',
-            'comments.autoLoad',
           ],
         },
+        { title: 'Since your last visit', keys: ['comments.seen', 'comments.seenDays'] },
       ],
     },
   ];

@@ -14,6 +14,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
+const { JSDOM } = require('jsdom');
+
 const { SCHEMA } = require('../src/common/schema.js');
 const {
   COPY,
@@ -96,19 +98,38 @@ test('both extension pages load the schema before anything that reads it', () =>
   }
 });
 
-test('the page is four boxes, in the order the site is used', () => {
+test('the page is five boxes, in the order the site is used', () => {
   // The design box comes first because it decides whether any of the rest apply:
   // on Royal Road's legacy layout every other setting on this page does nothing.
-  // The three that follow are in the order somebody moves through the site.
+  // The four that follow are in the order somebody moves through the site.
+  // Comments left the chapter box because it held 26 of the 40-odd rows, 13 of
+  // them under one heading; reading a chapter and reading its comments are two
+  // stops, with their own part of the page.
   assert.deepEqual(
     SECTIONS.map((s) => s.title),
-    ['Royal Road’s design', 'Fiction lists', 'Fiction pages', 'Chapter pages']
+    ['Royal Road’s design', 'Fiction lists', 'Fiction pages', 'Chapter pages', 'Comments']
   );
   for (const section of SECTIONS) {
     assert.ok(section.groups.length > 0, `${section.title}: no groups`);
+    // A heading on every group except a box that has only one, where the box
+    // title has already said it.
     for (const group of section.groups) {
-      assert.ok(group.title, `${section.title}: a group with no heading`);
+      assert.ok(
+        group.title || section.groups.length === 1,
+        `${section.title}: a group with no heading in a box that has several`
+      );
       assert.ok(group.keys.length > 0, `${section.title} / ${group.title}: empty`);
+    }
+  }
+});
+
+test('no box is long enough to be a wall', () => {
+  // The complaint that started the rework: "hard to read with so many options".
+  for (const section of SECTIONS) {
+    const rows = section.groups.reduce((n, g) => n + g.keys.length, 0);
+    assert.ok(rows <= 16, `${section.title}: ${rows} rows in one box`);
+    for (const group of section.groups) {
+      assert.ok(group.keys.length <= 7, `${section.title} / ${group.title}: ${group.keys.length}`);
     }
   }
 });
@@ -120,3 +141,100 @@ test('the pattern box explains anchoring, since ^ and $ are not obvious', () => 
   assert.match(note, /whole comment/i, 'says what anchoring is for');
 });
 
+// --- the page as it actually renders -----------------------------------------
+
+const windows = [];
+test.after(() => {
+  for (const w of windows) {
+    try {
+      w.close();
+    } catch {
+      /* already gone */
+    }
+  }
+});
+
+/** The options page, booted with an empty store. */
+async function render() {
+  const dom = new JSDOM(fs.readFileSync(path.join(ROOT, 'src/options/options.html'), 'utf8'), {
+    url: 'https://example.invalid/options.html',
+    runScripts: 'outside-only',
+  });
+  const w = dom.window;
+  windows.push(w);
+  w.eval('globalThis.__s = { settings: {}, hidden: {}, dropped: {}, stats: {}, chapters: {} };');
+  w.eval(
+    'globalThis.browser = { storage: { local: {' +
+      ' get: async () => JSON.parse(JSON.stringify(globalThis.__s)),' +
+      ' set: async (p) => Object.assign(globalThis.__s, p) },' +
+      ' onChanged: { addListener() {}, removeListener() {} } },' +
+      ' runtime: { getURL: (p) => p, sendMessage: async () => {}, onMessage: { addListener() {} } } };'
+  );
+  for (const file of [
+    'src/common/browser.js',
+    'src/common/schema.js',
+    'src/common/model.js',
+    'src/common/store.js',
+    'src/options/settings-ui.js',
+    'src/options/options.js',
+  ]) {
+    w.eval(fs.readFileSync(path.join(ROOT, file), 'utf8'));
+  }
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  return w;
+}
+
+test('a note is never part of the control it explains', async () => {
+  // A checkbox row wrapped label and note in one <label for=...>, so the whole
+  // note became the checkbox's accessible name: a screen reader read 400
+  // characters of explanation before saying what the control was. The other
+  // three row shapes went the other way and associated their note with nothing.
+  const w = await render();
+  const d = w.document;
+
+  assert.ok(d.querySelectorAll('.row').length > 40, 'the page rendered');
+  assert.equal(
+    d.querySelectorAll('label .row__note').length,
+    0,
+    'no note inside a label'
+  );
+
+  for (const control of d.querySelectorAll('#sections [data-setting]')) {
+    const key = control.getAttribute('data-setting');
+    if (!COPY[key] || !COPY[key].note) continue;
+    assert.equal(
+      control.getAttribute('aria-describedby'),
+      `note-${key}`,
+      `${key}: control does not point at its note`
+    );
+    assert.ok(d.getElementById(`note-${key}`), `${key}: no note with that id`);
+  }
+});
+
+test('a clamped note keeps its text on the page', async () => {
+  // Long notes fold, but into a <summary> rather than a <details> body: text in
+  // the body is invisible to find-in-page and reads as absent until opened.
+  const w = await render();
+  const summaries = [...w.document.querySelectorAll('summary.row__note')];
+  assert.ok(summaries.length > 0, 'some notes are long enough to clamp');
+
+  for (const summary of summaries) {
+    const key = summary.id.replace(/^note-/, '');
+    assert.equal(summary.textContent, COPY[key].note, `${key}: clamped text is the whole note`);
+  }
+});
+
+test('every box is reachable from the jump strip', async () => {
+  const w = await render();
+  const targets = [...w.document.querySelectorAll('.jump__link')].map((a) =>
+    a.getAttribute('href')
+  );
+  assert.deepEqual(
+    targets,
+    SECTIONS.map((s) => `#card-${s.id}`),
+    'one link per box, in page order'
+  );
+  for (const href of targets) {
+    assert.ok(w.document.querySelector(href), `${href}: nothing to jump to`);
+  }
+});

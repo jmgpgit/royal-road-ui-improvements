@@ -16,10 +16,11 @@
     stats: {},
   };
 
-  /** Hand-written markup rather than generated rows, so render moves them into
-   *  the list settings box. They live here until then, so the listeners below
-   *  find them. */
-  const managerSections = [$('hidden-section'), $('dropped-section')];
+  /** Hand-written markup rather than generated rows, so render moves each into
+   *  the group whose switches turn it on. They live here until then, so the
+   *  listeners below find them. */
+  const managers = { hidden: $('hidden-section'), dropped: $('dropped-section') };
+  const managerSections = Object.values(managers);
 
   // --- element helpers -------------------------------------------------------
 
@@ -47,6 +48,51 @@
 
   // --- one control per schema type ------------------------------------------
 
+  /** Three lines at the note's measure. Below this, clamping saves nothing. */
+  const LONG_NOTE = 190;
+
+  /** Which long notes are open. Out here because `render` rebuilds the page on
+   *  every write, and the reader did not ask for it to close again. */
+  const openNotes = new Set();
+
+  /** The whole note goes in the `<summary>`, clamped by CSS rather than hidden:
+   *  `<details>` that holds its text in the body is invisible to find-in-page
+   *  and reads as absent until opened. Nothing here is a secret - it is long. */
+  function noteFor(key, copy) {
+    if (!copy.note) return null;
+    if (copy.note.length <= LONG_NOTE) {
+      return el('p', { class: 'row__note', id: `note-${key}`, text: copy.note });
+    }
+    const wrap = el('details', { class: 'row__note-wrap', open: openNotes.has(key) }, [
+      el('summary', { class: 'row__note', id: `note-${key}`, text: copy.note }),
+    ]);
+    wrap.addEventListener('toggle', () => {
+      if (wrap.open) openNotes.add(key);
+      else openNotes.delete(key);
+    });
+    return wrap;
+  }
+
+  /** One shape for all 51 rows: label left, control right, note under the label.
+   *
+   *  The note is a sibling of the label rather than inside it. A checkbox row
+   *  used to wrap both in one `<label for=…>`, which made a 400-character
+   *  explanation the checkbox's accessible name - a screen reader read the essay
+   *  before saying what the control was - and the other three row types
+   *  associated their note with nothing at all. */
+  function row(key, copy, control, opts) {
+    const options = opts || {};
+    if (copy.note) control.setAttribute('aria-describedby', `note-${key}`);
+    return el('div', { class: `row${options.wide ? ' row--wide' : ''}` }, [
+      el('label', { class: 'row__title', for: `opt-${key}`, text: copy.label }),
+      el('div', { class: 'row__control' }, [
+        control,
+        options.unit ? el('span', { class: 'row__unit', text: options.unit }) : null,
+      ]),
+      noteFor(key, copy),
+    ]);
+  }
+
   function boolRow(key, copy) {
     const input = el('input', {
       type: 'checkbox',
@@ -55,13 +101,7 @@
       onChange: (e) => commit(key, e.target.checked),
     });
     input.checked = !!state.settings[key];
-    return el('label', { class: 'row', for: `opt-${key}` }, [
-      input,
-      el('span', { class: 'row__body' }, [
-        el('span', { class: 'row__title', text: copy.label }),
-        copy.note ? el('span', { class: 'row__note', text: copy.note }) : null,
-      ]),
-    ]);
+    return row(key, copy, input);
   }
 
   function enumRow(key, copy, spec) {
@@ -79,11 +119,7 @@
       if (state.settings[key] === value) option.selected = true;
       select.appendChild(option);
     }
-    return el('div', { class: 'row row--stack' }, [
-      el('label', { class: 'row__title', for: `opt-${key}`, text: copy.label }),
-      select,
-      copy.note ? el('p', { class: 'row__note', text: copy.note }) : null,
-    ]);
+    return row(key, copy, select);
   }
 
   function numberRow(key, copy, spec) {
@@ -105,14 +141,7 @@
     });
     input.value = value === null || value === undefined ? '' : String(value);
 
-    return el('div', { class: 'row row--stack' }, [
-      el('label', { class: 'row__title', for: `opt-${key}`, text: copy.label }),
-      el('div', { class: 'row__inline' }, [
-        input,
-        copy.unit ? el('span', { class: 'row__unit', text: copy.unit }) : null,
-      ]),
-      copy.note ? el('p', { class: 'row__note', text: copy.note }) : null,
-    ]);
+    return row(key, copy, input, { unit: copy.unit });
   }
 
   function stringRow(key, copy) {
@@ -136,11 +165,7 @@
           onChange: (e) => commit(key, e.target.value.trim()),
         });
     input.value = state.settings[key] || '';
-    return el('div', { class: 'row row--stack' }, [
-      el('label', { class: 'row__title', for: `opt-${key}`, text: copy.label }),
-      input,
-      copy.note ? el('p', { class: 'row__note', text: copy.note }) : null,
-    ]);
+    return row(key, copy, input, { wide: !!copy.multiline });
   }
 
   function rowFor(key) {
@@ -187,17 +212,20 @@
     host.textContent = '';
     for (const section of SECTIONS) {
       const groups = section.groups.map((group) =>
-        el('div', { class: 'group' }, [
-          el('h3', { class: 'group__title', text: group.title }),
+        el('div', { class: `group${group.layout ? ` group--${group.layout}` : ''}` }, [
+          group.title ? el('h3', { class: 'group__title', text: group.title }) : null,
           ...group.keys.map(rowFor).filter(Boolean),
+          // Beside the switches that fill it, not appended after every group in
+          // the box - which put the hidden manager between the drop switch and
+          // the dropped list it belongs to.
+          group.manager ? managers[group.manager] : null,
         ])
       );
       host.appendChild(
-        el('section', { class: 'card', 'aria-labelledby': `h-${section.id}` }, [
+        el('section', { class: 'card', id: `card-${section.id}`, 'aria-labelledby': `h-${section.id}` }, [
           el('h2', { id: `h-${section.id}`, text: section.title }),
           section.blurb ? el('p', { class: 'muted card__blurb', text: section.blurb }) : null,
           ...groups,
-          ...(section.id === 'lists' ? managerSections : []),
         ])
       );
     }
@@ -311,6 +339,20 @@
             },
           }),
         ])
+      );
+    }
+  }
+
+  /** A strip of links to the boxes, built from SECTIONS so it cannot fall out
+   *  of step with them. Plain anchors: tab order, Enter, middle-click and
+   *  find-in-page all work without a line of script. Rendered once - the boxes
+   *  do not change between renders, only the controls in them. */
+  function renderNav() {
+    const nav = $('jump');
+    nav.textContent = '';
+    for (const section of SECTIONS) {
+      nav.appendChild(
+        el('a', { class: 'jump__link', href: `#card-${section.id}`, text: section.title })
       );
     }
   }
@@ -467,6 +509,8 @@
     state = { ...state, ...next };
     render();
   });
+
+  renderNav();
 
   Promise.all([RRX.store.load(), RRX.store.loadChapters(), RRX.store.loadStats()]).then(
     ([next, chapters, stats]) => {

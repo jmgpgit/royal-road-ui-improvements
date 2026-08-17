@@ -191,7 +191,7 @@
       ui.actionButton({
         id: 'manage',
         label: 'Manage',
-        title: 'Open settings and the hidden-fiction list',
+        title: 'Open settings and the hidden and dropped lists',
         iconName: 'manage',
         // The background listener sends no reply, which some browsers surface as
         // a rejected promise.
@@ -292,11 +292,15 @@
 
     // "Forget reading history" runs on the options page, which cannot reach the
     // scroll scratchpad: that lives in royalroad.com's localStorage and only a
-    // content script can touch it. Without this the positions came straight back
-    // on the next visit, since a scratchpad entry outranks a missing record.
+    // content script can touch it. Started here so the read overlaps `boot.ready`
+    // and awaited below, before anything can restore a position out of it.
+    const forgotten = RRX.store.honourForget();
+
+    // The same press, heard live by a tab that was already open. Keyed on the
+    // stamp rather than on `chapters` going empty: housekeeping dropping the last
+    // record leaves an empty map too, and that is not a reader asking to forget.
     RRX.ext.storage.onChanged.addListener((changes, area) => {
-      const emptied = area === 'local' && changes.chapters && changes.chapters.newValue;
-      if (emptied && !Object.keys(emptied).length) RRX.store.clearPositions();
+      if (area === 'local' && changes[RRX.store.KEY_FORGOT]) RRX.store.honourForget();
     });
 
     if (!document.querySelector(SEL.newUiProbe)) {
@@ -320,6 +324,7 @@
       return;
     }
     const { settings, hidden, dropped } = await RRX.boot.ready;
+    await forgotten;
     adoptState(settings, hidden, dropped);
     refreshPageShape();
     healthCheck();

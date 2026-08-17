@@ -19,6 +19,7 @@
   const KEY_STATS = 'stats';
   /** When housekeeping last ran. One number, and the reason it exists is below. */
   const KEY_TIDIED = 'tidiedAt';
+  const KEY_FORGOT = 'forgotAt';
   const TIDY_EVERY_MS = 24 * 60 * 60 * 1000;
 
   /** Scroll scratchpad, in royalroad.com's own localStorage. See `writePosition`. */
@@ -144,19 +145,15 @@
    *  to hear it. Recent ones are kept: the scratchpad exists precisely because
    *  the flush on the way out may not have landed yet. */
   function prunePositions(chapters) {
-    try {
-      const pos = readPositions();
-      const cutoff = Math.floor((Date.now() - TIDY_EVERY_MS) / 1000);
-      let dropped = false;
-      for (const id of Object.keys(pos)) {
-        if (chapters[id] || (pos[id] && (pos[id].a || 0) > cutoff)) continue;
-        delete pos[id];
-        dropped = true;
-      }
-      if (dropped) root.localStorage.setItem(POS_KEY, JSON.stringify({ v: 1, pos }));
-    } catch {
-      /* no-op */
+    const { f, pos } = readScratch();
+    const cutoff = Math.floor((Date.now() - TIDY_EVERY_MS) / 1000);
+    let dropped = false;
+    for (const id of Object.keys(pos)) {
+      if (chapters[id] || (pos[id] && (pos[id].a || 0) > cutoff)) continue;
+      delete pos[id];
+      dropped = true;
     }
+    if (dropped) writeScratch(f, pos);
   }
 
   /**
@@ -207,7 +204,9 @@
   }
 
   async function forgetChapters() {
-    await ext.storage.local.set({ [KEY_CHAPTERS]: {} });
+    // Stamped in the same write as the emptying, so a tab that hears one hears
+    // both. `honourForget` is what turns this into a cleared scratchpad.
+    await ext.storage.local.set({ [KEY_CHAPTERS]: {}, [KEY_FORGOT]: Date.now() });
     return {};
   }
 
@@ -352,19 +351,37 @@
   // storage.local gets one write per visit on the way out; whatever did not make
   // it is reconciled from here on the next load.
 
-  function readPositions() {
+  /** The scratchpad is `{ v, f, pos }`: the positions, and `f`, the "forget
+   *  reading history" stamp already acted on. See `honourForget`. Read and
+   *  written in one place each, because every writer has to carry `f` through -
+   *  dropping it would make the next page load forget all over again. */
+  function readScratch() {
     try {
       const raw = root.localStorage.getItem(POS_KEY);
       const data = raw ? JSON.parse(raw) : null;
-      return data && data.v === 1 && data.pos && typeof data.pos === 'object' ? data.pos : {};
+      if (!data || data.v !== 1) return { f: 0, pos: {} };
+      const pos = data.pos && typeof data.pos === 'object' ? data.pos : {};
+      return { f: Number(data.f) || 0, pos };
     } catch {
-      return {};
+      return { f: 0, pos: {} };
     }
+  }
+
+  function writeScratch(f, pos) {
+    try {
+      root.localStorage.setItem(POS_KEY, JSON.stringify({ v: 1, f, pos }));
+    } catch {
+      /* blocked or full storage costs the fast path, not correctness */
+    }
+  }
+
+  function readPositions() {
+    return readScratch().pos;
   }
 
   function writePosition(chapterId, position) {
     try {
-      const pos = readPositions();
+      const { f, pos } = readScratch();
       pos[Number(chapterId)] = position;
 
       // Oldest out first, bounded because this shares royalroad.com's origin
@@ -380,7 +397,7 @@
           .slice(0, keys.length - POS_MAX)
           .forEach((key) => delete pos[key]);
       }
-      root.localStorage.setItem(POS_KEY, JSON.stringify({ v: 1, pos }));
+      writeScratch(f, pos);
     } catch {
       /* blocked or full storage costs the fast path, not correctness */
     }
@@ -390,21 +407,44 @@
    *  royalroad.com's localStorage, not the extension's - so the options page
    *  cannot, and `tidy` and the storage listener in main.js do it instead. */
   function clearPositions() {
+    // Emptied rather than removed: `f` has to survive, or `honourForget` sees an
+    // unstamped scratchpad and clears it again on every page load.
+    writeScratch(readScratch().f, {});
+  }
+
+  /**
+   * Act on a "forget reading history" that this origin has not seen yet.
+   *
+   * The options page cannot reach the scratchpad - it is royalroad.com's
+   * `localStorage` and only a content script can touch it - so the press is
+   * recorded as a timestamp in `storage.local` and honoured here. The listener
+   * in `main.js` catches it when a Royal Road tab is already open; this catches
+   * the case where none was, which used to leave a position behind for up to two
+   * days and then hand it back, because a scratchpad entry outranks a missing
+   * record.
+   *
+   * A stamp, not an empty map: a reader who finishes everything they open has no
+   * records either, and their unflushed position is the one thing the scratchpad
+   * is for.
+   */
+  async function honourForget() {
     try {
-      root.localStorage.removeItem(POS_KEY);
+      const raw = await ext.storage.local.get(KEY_FORGOT);
+      const at = Number(raw[KEY_FORGOT]) || 0;
+      if (!at) return false;
+      const { f } = readScratch();
+      if (f >= at) return false;
+      writeScratch(at, {});
+      return true;
     } catch {
-      /* no-op */
+      return false;
     }
   }
 
   function clearPosition(chapterId) {
-    try {
-      const pos = readPositions();
-      delete pos[Number(chapterId)];
-      root.localStorage.setItem(POS_KEY, JSON.stringify({ v: 1, pos }));
-    } catch {
-      /* no-op */
-    }
+    const { f, pos } = readScratch();
+    delete pos[Number(chapterId)];
+    writeScratch(f, pos);
   }
 
   RRX.store = {
@@ -433,6 +473,8 @@
     writePosition,
     clearPosition,
     clearPositions,
+    honourForget,
     POS_KEY,
+    KEY_FORGOT,
   };
 })(globalThis);
