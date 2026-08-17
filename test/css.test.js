@@ -615,3 +615,176 @@ test('names with spaces and punctuation survive intact', () => {
     /\[tagname="Portal Fantasy \/ Isekai"\]/
   );
 });
+
+// --- the covers overlay, against the markup it is written for ------------------
+
+const viewsCss = fs.readFileSync(path.join(ROOT, 'src/content/inject-views.css'), 'utf8');
+
+/** The selector list of the first rule after `from` whose body carries `decl`.
+ *  Both delimiters are measured to their end: `lastIndexOf('*​/')` points at the
+ *  star, and starting one past it leaves a stray slash on the front of the
+ *  selector, which parses as nothing and matches nothing. */
+function selectorFor(text, decl, from = 0) {
+  const at = text.indexOf(decl, from);
+  assert.ok(at > 0, `no rule sets ${decl}`);
+  const open = text.lastIndexOf('{', at);
+  const comment = text.lastIndexOf('*/', open);
+  const rule = text.lastIndexOf('}', open);
+  const prev = Math.max(comment >= 0 ? comment + 2 : 0, rule >= 0 ? rule + 1 : 0);
+  return text
+    .slice(prev, open)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const OVERLAY_AT = () => {
+  const at = viewsCss.indexOf('5. Following and Favourite');
+  assert.ok(at > 0, 'the covers overlay section is gone');
+  return at;
+};
+
+test('the covers overlay reaches the Following and Favourite icons, and only those', () => {
+  // Dissolving the title row makes these two icons items of the tile with no
+  // order, so they sorted ahead of everything and pushed the cover down on
+  // marked cards only. jsdom has no layout, so what is checkable is that the
+  // selector reaches the elements it was written for - a rule matching nothing
+  // is the failure this catches.
+  const selector = selectorFor(viewsCss, 'position: absolute', OVERLAY_AT());
+  const d = docFor('card-loggedin-marked.html', 'rrx-view-grid').window.document;
+
+  const hit = [...d.querySelectorAll(selector)];
+  assert.equal(hit.length, 2, `expected the two icons, matched ${hit.length}: ${selector}`);
+  for (const node of hit) {
+    assert.ok(
+      node.querySelector('i.fa-bookmark, i.fa-heart'),
+      'matched something that is not one of the two icons'
+    );
+  }
+
+  // The other two children of that row must stay in flow: the title is the
+  // tile's last item and the buttons its first, and taking either out of flow
+  // would empty the tile rather than tidy it.
+  // Reached through the matched icon rather than by selector: the row's class
+  // is literally "md:flex", and one lost backslash turns the escape into an
+  // unknown pseudo-class that matches nothing and fails silently.
+  const row = hit[0].parentElement;
+  assert.ok(row, 'the shared title row is no longer shaped the way the rule expects');
+  assert.ok(row.querySelector('a[data-vt-trigger] > h2'), 'not the title row');
+  assert.ok(!hit.includes(row.querySelector('a[data-vt-trigger]')), 'the title was taken out of flow');
+  assert.ok(
+    !hit.includes(row.querySelector('div:has(> form[data-bookmark-form])')),
+    'the Read / Read Later row was taken out of flow'
+  );
+});
+
+test('a card with neither mark is left entirely alone', () => {
+  const selector = selectorFor(viewsCss, 'position: absolute', OVERLAY_AT());
+  const d = docFor('card-loggedin.html', 'rrx-view-grid').window.document;
+
+  assert.ok(d.querySelector('.fiction-card-expanded'), 'the unmarked fixture has no card at all');
+  assert.equal(d.querySelectorAll(selector).length, 0, 'an unmarked card got an overlay');
+});
+
+test('the overlay and the button row read the same height, not two guesses', () => {
+  // The offset only lands on the cover because the row above it is pinned. If
+  // one of these two stops naming the variable, the icons drift onto the
+  // buttons or into the middle of the cover, and no test of either alone sees it.
+  const defined = viewsCss.match(/--rrx-grid-actions-h:/g) || [];
+  assert.equal(defined.length, 1, 'the height is declared more than once, so they can disagree');
+
+  const actions = selectorFor(viewsCss, 'height: var(--rrx-grid-actions-h)');
+  assert.match(actions, /form\[data-bookmark-form\]/, 'the pinned height is not on the button row');
+
+  // The overlay reads it through `--rrx-grid-mark-top`, which is the button row
+  // plus the column gap - where the cover starts, so the first chip is level
+  // with the cover's top edge rather than floating below it.
+  assert.match(
+    viewsCss,
+    /--rrx-grid-mark-top: calc\(var\(--rrx-grid-actions-h\) \+ [\d.]+rem\)/,
+    'the chip top is no longer derived from the button row'
+  );
+  assert.match(viewsCss.slice(OVERLAY_AT()), /top: var\(--rrx-grid-mark-top\)/, 'the overlay ignores it');
+
+  // And the definition has to sit on an ancestor of both, or `var()` resolves
+  // to nothing and `top` is dropped entirely.
+  const owner = selectorFor(viewsCss, '--rrx-grid-actions-h:');
+  assert.match(owner, /^html\.rrx-view-grid \.fiction-card-expanded > div > div > div$/);
+});
+
+test('the overlay is pulled out by the tile inset, which is what the card pads by', () => {
+  // The icons sit on the tile's edge rather than on the artwork, and the tile
+  // box clips its descendants - so the pull-out has to match the padding
+  // exactly. Too little and it is back on the cover; too much and the chip is
+  // cut in half by `overflow: hidden`, with nothing in a test to say so.
+  const padding = viewsCss.match(/\.fiction-card-expanded > div \{\s*padding: ([\d.]+)rem/);
+  assert.ok(padding, 'the covers view no longer sets the card padding it is measured from');
+
+  const inset = viewsCss.match(/--rrx-grid-inset: ([\d.]+)rem/);
+  assert.ok(inset, 'the inset is gone');
+
+  // Tailwind's `p-1`, on the box between the padded card and the column.
+  const P1_REM = 0.25;
+  assert.equal(
+    Number(inset[1]),
+    Number(padding[1]) + P1_REM,
+    `inset ${inset[1]}rem does not match ${padding[1]}rem of card padding plus p-1`
+  );
+
+  const overlay = viewsCss.slice(OVERLAY_AT());
+  assert.match(overlay, /left: calc\(var\(--rrx-grid-inset\) \* -1\)/, 'the overlay does not use it');
+});
+
+test('the second mark stacks under the first, sharing its column', () => {
+  // Side by side, the second chip reached into the middle of the cover. Stacked
+  // it needs the chip height to be known rather than left to the icon, or the
+  // two overlap by however much the guess was wrong.
+  const overlay = viewsCss.slice(OVERLAY_AT());
+
+  assert.match(overlay, /height: var\(--rrx-grid-mark-h\)/, 'the chip height is not pinned');
+  assert.match(
+    overlay,
+    /top: calc\(var\(--rrx-grid-mark-top\) \+ var\(--rrx-grid-mark-h\)/,
+    'the second chip is not offset by a whole chip'
+  );
+
+  // And it must not set a left of its own, or it is beside the first again.
+  const second = overlay.slice(overlay.indexOf(':nth-of-type(2)'));
+  const body = second.slice(second.indexOf('{'), second.indexOf('}'));
+  assert.doesNotMatch(body, /left:/, 'the second chip still moves sideways');
+});
+
+test('both marks are the same size, with their glyphs on one axis', () => {
+  // The heart and the bookmark are different widths in Font Awesome, so a chip
+  // that hugs its icon is a different width per mark and the two glyphs sit on
+  // different centres - visible the moment they are stacked.
+  const overlay = viewsCss.slice(OVERLAY_AT());
+
+  assert.match(overlay, /width: var\(--rrx-grid-mark-w\)/, 'the chip width is not pinned');
+  assert.match(overlay, /justify-content: center/, 'the glyph is not centred in the chip');
+  assert.match(overlay, /width: 1em/, 'the glyphs keep their own advance widths');
+
+  // Both chips take the width from the same variable, so neither can drift.
+  const declared = viewsCss.match(/--rrx-grid-mark-w: [\d.]+rem/g) || [];
+  assert.equal(declared.length, 1, 'the chip width is declared more than once');
+
+  const second = overlay.slice(overlay.indexOf(':nth-of-type(2)'));
+  const body = second.slice(second.indexOf('{'), second.indexOf('}'));
+  assert.doesNotMatch(body, /width:/, 'the second chip sets a width of its own');
+});
+
+test('the marks drop the margin Royal Road gives them for the title row', () => {
+  // Both icons carry `mt-1`, which lined them up with the title they used to sit
+  // beside. Inside a chip that centres its contents that margin is dead weight
+  // pushing the glyph off centre, and no amount of centring fixes it.
+  const marked = docFor('card-loggedin-marked.html', 'rrx-view-grid').window.document;
+  const icons = [...marked.querySelectorAll('div.hidden i.fa-bookmark, div.hidden i.fa-heart')];
+  assert.ok(icons.length > 0, 'the capture no longer carries the icons this is about');
+  assert.ok(
+    icons.every((i) => i.className.includes('mt-')),
+    'Royal Road stopped setting a top margin, so this override can go'
+  );
+
+  const overlay = viewsCss.slice(OVERLAY_AT());
+  const rule = overlay.slice(overlay.indexOf('> div[data-rr-tooltip] i'));
+  assert.match(rule.slice(0, rule.indexOf('}')), /margin: 0/, 'the margin is not cleared');
+});

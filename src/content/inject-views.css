@@ -190,6 +190,23 @@ html.rrx-view-grid .fiction-card-expanded > div {
 html.rrx-view-grid .fiction-card-expanded > div > div > div {
   flex-direction: column;
   flex-wrap: nowrap;
+  /* Everything the Following/Favourite overlay at the end of this section is
+     placed by. The inset is how far this column sits from the tile's edge:
+     0.45rem of card padding, set above, plus Tailwind's `p-1` on the box
+     between them. The chip height is pinned rather than left to the icon, so
+     the second chip can be stacked exactly one chip below the first. */
+  position: relative;
+  --rrx-grid-actions-h: 2.4rem;
+  --rrx-grid-inset: 0.7rem;
+  /* A little larger than the glyph rather than fitted to it. A Font Awesome
+     icon's ink can reach past the em box its line height is measured from, so a
+     chip sized to the em clips the top and bottom of the mark - which is why
+     this is not 1.15rem. Enough to clear it and no more. */
+  --rrx-grid-mark-h: 1.4rem;
+  --rrx-grid-mark-w: 1.5rem;
+  /* The button row plus the column gap, and nothing else: that is exactly where
+     the cover starts, so the first chip's top edge is the cover's top edge. */
+  --rrx-grid-mark-top: calc(var(--rrx-grid-actions-h) + 0.4rem);
 }
 
 /*
@@ -284,11 +301,16 @@ html.rrx-view-grid .fiction-card-expanded [class*='grid-cols-5'] > div:first-chi
 
 /* 1. Read / Read Later, small, across the top.
    Scoped to `.hidden` so it takes the desktop copy only: a card ships the pair
-   twice, and matching both puts two rows of buttons on every tile. */
+   twice, and matching both puts two rows of buttons on every tile.
+
+   The height is pinned rather than left to the buttons, so the overlay at the
+   end of this section knows where the cover starts: both read the same number
+   instead of one guessing at the other. */
 html.rrx-view-grid .fiction-card-expanded div.hidden:has(> form[data-bookmark-form]) {
   order: 1;
   display: flex !important;
   width: 100%;
+  height: var(--rrx-grid-actions-h);
   gap: 0.25rem !important;
   justify-content: stretch !important;
 }
@@ -327,6 +349,92 @@ html.rrx-view-grid .fiction-card-expanded div.hidden:has(> form[data-bookmark-fo
    contest against the rule above, which is how it came back. */
 html.rrx-view-grid .fiction-card-expanded div.md\:hidden:has(> form[data-bookmark-form]) {
   display: none !important;
+}
+
+/*
+ * 5. Following and Favourite, over the cover rather than above it.
+ *
+ * These two icons are the other thing the title row holds, and dissolving that
+ * row makes them items of the tile in their own right - with no `order`, so
+ * they sort at 0, ahead of the buttons at 1. Every marked fiction then started
+ * its buttons, cover, rating and title one icon-height lower than its
+ * neighbours, and a grid of covers that do not line up is the one thing this
+ * view cannot afford. Only marked cards carry them, so only some tiles moved.
+ *
+ * Taken out of flow rather than given an order of their own: an order would
+ * still spend a band of tile height on two small icons, and put it back for
+ * every marked card. Absolute costs nothing and cannot move anything.
+ *
+ * The top offset is the pinned height of the button row plus the column gap,
+ * which puts them level with the top of the cover. Sideways they are pulled out
+ * onto the tile's own edge instead of sitting on the artwork, so they cover the
+ * gutter and the border rather than any part of the picture.
+ *
+ * `--rrx-grid-inset` is exactly as far as that can go: the tile box carries
+ * `overflow: hidden`, and these are its descendants, so anything past its
+ * padding edge is clipped rather than hanging outside. Squared off on the left
+ * for the same reason - flush against the border, a rounded corner there reads
+ * as a chip that missed rather than one attached to the edge.
+ *
+ * `nth-of-type` rather than a flex row, because their parent no longer
+ * generates a box to lay them out in; a card with only one of the two puts that
+ * one first, so it takes the left-hand slot either way.
+ *
+ * Royal Road already gives each wrapper Tailwind's `.relative`. This wins on
+ * specificity without `!important`: two classes, one attribute and a `:has()`
+ * that counts as `a[data-vt-trigger] > h2`, against a single class.
+ */
+html.rrx-view-grid
+  .fiction-card-expanded
+  div.hidden.md\:flex:has(> a[data-vt-trigger] > h2)
+  > div[data-rr-tooltip] {
+  position: absolute;
+  top: var(--rrx-grid-mark-top);
+  left: calc(var(--rrx-grid-inset) * -1);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--rrx-grid-mark-w);
+  height: var(--rrx-grid-mark-h);
+  margin: 0 !important;
+  padding: 0;
+  border-radius: 0 0.3rem 0.3rem 0;
+  /* Its own colour, not a variable: the chip straddles the tile edge and the
+     cover, and cover art is any brightness, so an icon left to inherit the
+     theme disappears against half of it. Nearly opaque for the same reason -
+     a translucent chip is a different colour on every cover it lands on. */
+  background: rgba(0, 0, 0, 0.9);
+  line-height: 1;
+}
+
+/* Font Awesome glyphs do not share an advance width - the heart is wider than
+   the bookmark - so hugging the icon gave the two chips different widths and
+   put the glyphs on different centres. This is what `fa-fw` does: one em of
+   space each, glyph centred in it, so the chips match and the icons stack on a
+   single axis.
+
+   The margin is Royal Road's: the icon carries `mt-1` to sit level with the
+   title it used to stand beside. Inside a chip that centres its contents, that
+   quarter-rem is simply pushed down from the middle - the centring was right
+   and the thing being centred was not. */
+html.rrx-view-grid
+  .fiction-card-expanded
+  div.hidden.md\:flex:has(> a[data-vt-trigger] > h2)
+  > div[data-rr-tooltip] i {
+  width: 1em;
+  margin: 0;
+  text-align: center;
+}
+
+/* Stacked under the first rather than beside it: side by side, the second chip
+   reaches into the middle of the cover, which is the width this view has least
+   of. Directly below costs nothing - the left edge is already clear. */
+html.rrx-view-grid
+  .fiction-card-expanded
+  div.hidden.md\:flex:has(> a[data-vt-trigger] > h2)
+  > div[data-rr-tooltip]:nth-of-type(2) {
+  top: calc(var(--rrx-grid-mark-top) + var(--rrx-grid-mark-h) + 0.2rem);
 }
 
 /* Everything else is dropped. These carry `.hidden.md\:flex` so they outrank

@@ -4,6 +4,18 @@ Notable changes, newest first. Versions follow [semantic versioning](https://sem
 the patch number for fixes, the minor for new settings, the major for anything that changes
 what an existing setting does.
 
+## 1.5.1
+
+**Fixes**
+
+- **The cover grid lines up again when you follow or favourite things.** Royal Road puts those
+  two icons in the same row as the title, and this view takes that row apart so the buttons,
+  cover, rating and title can be placed independently — but the icons were never given a place,
+  so they landed above everything and pushed the whole tile down. Only marked fictions have them,
+  so only some covers moved, which is what made a grid of them look shuffled.
+- The icons now sit on the tile's own edge, stacked, over the border and the gutter rather than
+  over the cover: a view made of pictures should not spend the pictures on badges.
+
 ## 1.5.0
 
 **Tried and dropped**
