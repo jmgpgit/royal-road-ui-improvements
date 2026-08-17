@@ -175,7 +175,11 @@
     if (spec.type === 'bool') return boolRow(key, copy);
     if (spec.type === 'enum') return enumRow(key, copy, spec);
     if (spec.type === 'int' || spec.type === 'number') return numberRow(key, copy, spec);
-    if (spec.type === 'string') return stringRow(key, copy);
+    // `color` is a string with a validator, and its note offers "#e8e8e8 or
+    // white" and "leave empty" - neither of which `<input type=color>` can say.
+    // Without this branch `rowFor` returned null and both colour settings
+    // rendered no control at all, reachable only by editing an exported backup.
+    if (spec.type === 'string' || spec.type === 'color') return stringRow(key, copy);
     return null; // lists are edited in context, not here
   }
 
@@ -357,8 +361,146 @@
     }
   }
 
+  // --- tag colours -----------------------------------------------------------
+
+  /** Royal Road's own vocabulary, as the filter panel cached it. The options
+   *  page cannot fetch it - that is a content script's job, on a Royal Road tab -
+   *  so it reads whatever is there and falls back to accepting a typed slug. */
+  let tagCatalogue = [];
+
+  const slugFor = (typed) => {
+    const text = typed.trim();
+    if (!text) return '';
+    const hit = tagCatalogue.find((t) => t.label.toLowerCase() === text.toLowerCase());
+    if (hit) return hit.slug;
+    // A slug typed straight in, for anyone who knows one and for the case where
+    // nothing has warmed the cache yet.
+    return /^[a-z0-9_-]+$/i.test(text) ? text.toLowerCase() : '';
+  };
+
+  const labelFor = (slug) => {
+    const hit = tagCatalogue.find((t) => t.slug === slug);
+    return hit ? hit.label : slug;
+  };
+
+  function setTagError(message) {
+    const box = $('tagc-error');
+    box.textContent = message || '';
+    box.hidden = !message;
+    box.className = `status${message ? ' status--error' : ''}`;
+  }
+
+  function renderTagColors() {
+    const list = $('tagc-list');
+    $('tagc-home').checked = !!state.settings['tags.colorHome'];
+    backfillTagNames();
+    const entries = RRX.parseTagColors(state.settings['tags.colors']);
+    $('tagc-empty').hidden = entries.length > 0;
+    list.textContent = '';
+
+    for (const { slug, label, color } of entries) {
+      const shown = label || labelFor(slug);
+      list.appendChild(
+        el('li', { class: 'tagc__row' }, [
+          el('span', { class: 'tagc__chip', text: shown, style: `background:${color}` }),
+          el('code', { class: 'muted tagc__slug', text: slug }),
+          el('input', {
+            type: 'color',
+            value: color,
+            'aria-label': `Colour for ${shown}`,
+            onChange: (e) => writeTagColor(slug, e.target.value, label),
+          }),
+          el('button', {
+            type: 'button',
+            class: 'btn btn--quiet',
+            text: 'Remove',
+            onClick: () => writeTagColor(slug, null),
+          }),
+        ])
+      );
+    }
+  }
+
+  /** One writer, so add, recolour and remove cannot drift apart.
+   *
+   *  The label is stored beside the slug because the home page has no slug to
+   *  match on - it writes a tag as `<span tagname="Magic">`. It is omitted when
+   *  unknown, which is what happens if nothing has cached Royal Road's tag list
+   *  yet: that entry then colours everywhere except the home page. */
+  async function writeTagColor(slug, color, label) {
+    const kept = RRX.parseTagColors(state.settings['tags.colors']).filter((e) => e.slug !== slug);
+    if (color) kept.push({ slug, label: label || '', color });
+    await commit(
+      'tags.colors',
+      kept.map((e) => (e.label ? `${e.slug}|${e.label} ${e.color}` : `${e.slug} ${e.color}`))
+    );
+  }
+
+  /**
+   * Fill in names that were not known when a colour was chosen.
+   *
+   * The home page can only be matched by name, and the name comes from Royal
+   * Road's own tag list - which nothing has fetched on a first run. Without this
+   * such an entry stayed nameless for good and never coloured there, which is a
+   * poor answer to "it did not work the first time".
+   */
+  async function backfillTagNames() {
+    // Both halves load independently - the catalogue supplies the names, the
+    // settings say which are wanted - so this runs from `render`, which happens
+    // after either. No "already done" flag: the no-change check below is what
+    // stops it, and a flag set by an early pass with no settings yet would
+    // simply never let the real one run.
+    if (!tagCatalogue.length || !state.settings) return;
+    const entries = RRX.parseTagColors(state.settings['tags.colors']);
+    const filled = entries.map((e) => (e.label ? e : { ...e, label: nameFor(e.slug) }));
+    if (filled.every((e, i) => e.label === entries[i].label)) return;
+    await commit(
+      'tags.colors',
+      filled.map((e) => (e.label ? `${e.slug}|${e.label} ${e.color}` : `${e.slug} ${e.color}`))
+    );
+  }
+
+  /** '' rather than the slug: a name we invented would be stored and then never
+   *  match anything on the home page. */
+  const nameFor = (slug) => {
+    const hit = tagCatalogue.find((t) => t.slug === slug);
+    return hit ? hit.label : '';
+  };
+
+  function wireTagColors() {
+    $('tagc-home').addEventListener('change', (e) => commit('tags.colorHome', e.target.checked));
+
+    $('tagc-add').addEventListener('click', async () => {
+      const slug = slugFor($('tagc-name').value);
+      if (!slug) {
+        setTagError('Pick a tag from the list, or type its slug.');
+        return;
+      }
+      setTagError('');
+      const label = labelFor(slug);
+      $('tagc-name').value = '';
+      await writeTagColor(slug, $('tagc-color').value, label === slug ? '' : label);
+    });
+
+    RRX.ext.storage.local
+      .get('tagCatalogue')
+      .then((raw) => {
+        const cached = raw && raw.tagCatalogue;
+        if (!cached || !Array.isArray(cached.tags)) return;
+        tagCatalogue = cached.tags;
+        const options = $('tagc-options');
+        options.textContent = '';
+        for (const tag of tagCatalogue) options.appendChild(el('option', { value: tag.label }));
+        renderTagColors();
+      })
+      .catch(() => {
+        /* no cache yet: typing a slug still works */
+      });
+  }
+
   function render() {
     renderSections();
+    renderTagColors();
     renderManager('hidden');
     renderManager('dropped');
     renderHistorySize();
@@ -511,6 +653,7 @@
   });
 
   renderNav();
+  wireTagColors();
 
   Promise.all([RRX.store.load(), RRX.store.loadChapters(), RRX.store.loadStats()]).then(
     ([next, chapters, stats]) => {

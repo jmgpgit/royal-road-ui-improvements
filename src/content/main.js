@@ -220,7 +220,30 @@
 
   // --- cards ---------------------------------------------------------------
 
+  /**
+   * Mark Royal Road's "show the rest of the tags" toggles, so the stylesheet can
+   * hide them where a setting has already opened the row.
+   *
+   * By shape, not by id: the lists call it `tags-toggle-<fiction id>` and a
+   * fiction page calls it `show-more-tags`. Guessing the second from the first
+   * is exactly how this was missed the first time. What both share is a label
+   * wrapping an `sr-only` checkbox with a tag link after it - which is also what
+   * makes Tailwind's `peer-has-checked:` work, so it cannot drift.
+   *
+   * `classList.add` of a class already there changes no attribute and so emits
+   * no mutation record, which is what keeps this off the observer's back.
+   */
+  function markTagToggles(scope) {
+    const root = scope && scope.querySelectorAll ? scope : document;
+    for (const label of root.querySelectorAll('label:has(> input.sr-only[type="checkbox"])')) {
+      if (label.parentElement && label.parentElement.querySelector('a[href*="tagsAdd="]')) {
+        label.classList.add('rrx-tag-toggle');
+      }
+    }
+  }
+
   function syncCards(scope) {
+    markTagToggles(scope);
     for (const feature of activeFeatures()) {
       if (feature.syncCards) feature.syncCards(scope, ctx);
     }

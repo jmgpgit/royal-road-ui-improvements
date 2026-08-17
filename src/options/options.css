@@ -110,6 +110,59 @@ body {
   align-items: center;
 }
 
+/* --- tag colours ---------------------------------------------------------- */
+
+.tagc__add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.tagc__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.tagc__field--color input {
+  width: 3rem;
+  height: 2rem;
+  padding: 0;
+}
+
+.tagc__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.tagc__row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+/* The chip is the point of the card: it is what the tag will look like. */
+.tagc__chip {
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #111;
+}
+
+.tagc__slug {
+  font-size: 0.75rem;
+  margin-right: auto;
+}
+
 /* --- the jump strip ------------------------------------------------------- */
 
 .jump {

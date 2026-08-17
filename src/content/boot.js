@@ -69,6 +69,7 @@
     const css = [
       s['hide.enabled'] ? RRX.buildHideCss(ids) : '',
       s['drop.enabled'] ? RRX.buildDropCss(dropped) : '',
+      RRX.buildTagCss(s['tags.colors'], { home: s['tags.colorHome'] }),
     ]
       .filter(Boolean)
       .join('\n');

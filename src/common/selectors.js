@@ -92,6 +92,9 @@
      *  carries the count, and only appears when there is one. Its dialog is not
      *  in the DOM until opened. */
     globalFiltersTrigger: '[data-rr-global-filters-trigger]',
+    /** The fiction's own header, which is where its tags are. Scoping to it
+     *  keeps the tag rules off every other tag row on the page. */
+    fictionHero: '#fiction-hero',
     listCard: '.fiction-card-expanded',
 
     // --- description "show more" widget (pure CSS on RR's side) --------------

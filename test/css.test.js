@@ -5,6 +5,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
+const { JSDOM } = require('jsdom');
+
 const css = require('../src/common/css.js');
 const { CARD_VARIANTS, CARD_GROUPS } = require('../src/common/selectors.js');
 
@@ -423,4 +425,193 @@ test('nothing visible depends on color-mix resolving', () => {
       );
     }
   }
+});
+
+// --- the tag rules, against the markup they are written for -------------------
+
+const ROOT = path.join(__dirname, '..');
+const listCss = fs.readFileSync(path.join(ROOT, 'src/content/inject-list.css'), 'utf8');
+
+/** jsdom has no cascade, so what is checkable is whether a rule's selector
+ *  reaches the elements it was written for. A rule that matches nothing is the
+ *  failure mode worth catching: Royal Road renames a class and the setting
+ *  quietly stops doing anything. */
+const docFor = (fixture, rootClass) => {
+  const dom = new JSDOM(fs.readFileSync(path.join(ROOT, 'test/fixtures', fixture), 'utf8'));
+  dom.window.document.documentElement.classList.add(rootClass);
+  return dom;
+};
+
+test('the always-open tag rule reaches the tags Royal Road hides', () => {
+  const dom = docFor('fictions-weekly-popular.new.html', 'rrx-tags-all');
+  const d = dom.window.document;
+
+  const hidden = d.querySelectorAll('.fiction-card-expanded a[href*="tagsAdd="].hidden');
+  assert.ok(hidden.length > 0, 'the capture has cards with tags folded away');
+
+  const reached = d.querySelectorAll(
+    '.rrx-tags-all .fiction-card-expanded a[href*="tagsAdd="].hidden'
+  );
+  assert.equal(reached.length, hidden.length, 'every one of them is reached');
+
+  // And the +/- goes, since it would have nothing left to reveal.
+  assert.ok(
+    d.querySelectorAll('.rrx-tags-all .fiction-card-expanded label[for^="tags-toggle"]').length > 0,
+    'the toggle is reached too'
+  );
+  dom.window.close();
+});
+
+test('the fiction-page tag rule stays inside the fiction’s own header', () => {
+  const dom = docFor('fiction-detail.new.html', 'rrx-fiction-tags-all');
+  const d = dom.window.document;
+
+  assert.ok(d.querySelector('#fiction-hero'), 'the hero is the anchor');
+  assert.ok(
+    d.querySelectorAll('#fiction-hero a[href*="tagsAdd="]').length > 0,
+    'the fiction’s tags are inside it'
+  );
+  // Every tag chip on the page belongs to the fiction itself in this capture,
+  // so scoping cannot be shown to exclude anything here - what it guards
+  // against is the recommendation and review blocks further down a live page.
+  assert.equal(
+    d.querySelectorAll('.fiction-card-expanded a[href*="tagsAdd="]').length,
+    0,
+    'and a fiction page carries no list cards'
+  );
+  dom.window.close();
+});
+
+test('both shapes of Royal Road’s tag toggle are found by shape, not by id', () => {
+  // The lists call it `tags-toggle-<fiction id>`; a fiction page calls it
+  // `show-more-tags`. Extrapolating the second from the first is how the + was
+  // left sitting on an already-open row. What both share is a label wrapping an
+  // `sr-only` checkbox with a tag link beside it - the same thing that makes
+  // Tailwind's `peer-has-checked:` work, so it cannot drift from the markup.
+  const SHAPE = 'label:has(> input.sr-only[type="checkbox"])';
+  const isTagToggle = (label) =>
+    !!label.parentElement && !!label.parentElement.querySelector('a[href*="tagsAdd="]');
+
+  const dom = new JSDOM(
+    fs.readFileSync(path.join(ROOT, 'test/fixtures/fictions-weekly-popular.new.html'), 'utf8')
+  );
+  const list = [...dom.window.document.querySelectorAll(SHAPE)].filter(isTagToggle);
+  assert.ok(list.length > 0, 'the list capture has toggles');
+  assert.equal(
+    list.length,
+    dom.window.document.querySelectorAll('label[for^="tags-toggle"]').length,
+    'and the shape finds exactly the ones the id would have'
+  );
+  dom.window.close();
+
+  // A fiction page's, which no capture holds: its checkbox is `show-more-tags`.
+  const hero = new JSDOM(
+    '<div class="flex flex-row gap-1 flex-wrap">' +
+      '<a href="/fictions/search?tagsAdd=male_lead">Male Lead</a>' +
+      '<label for="show-more-tags" class="peer">' +
+      '<input type="checkbox" id="show-more-tags" class="sr-only"></label>' +
+      '<a href="/fictions/search?tagsAdd=magic" class="hidden peer-has-checked:flex">Magic</a>' +
+      '</div>'
+  );
+  const fiction = [...hero.window.document.querySelectorAll(SHAPE)].filter(isTagToggle);
+  assert.equal(fiction.length, 1, 'the fiction-page toggle is found too');
+  hero.window.close();
+});
+
+test('every tag rule is gated behind a root class', () => {
+  // The stylesheet ships on every royalroad.com page, so an ungated tag rule
+  // would restyle chips on pages no setting was asked about - /home among them.
+  const tagRules = listCss
+    .replace(/\/\*[\s\S]*?\*\//g, '') // comments name these selectors too
+    .split('}')
+    .map((block) => block.split('{')[0].trim())
+    .filter((selector) => selector.includes('tagsAdd=') || selector.includes('tags-toggle'));
+
+  assert.ok(tagRules.length > 0, 'there are tag rules to check');
+  for (const selector of tagRules) {
+    for (const part of selector.split(',')) {
+      const gate = ['.rrx-tags-all ', '.rrx-tags-hover ', '.rrx-fiction-tags-all '];
+      assert.ok(
+        gate.some((prefix) => part.trim().startsWith(prefix)),
+        `ungated tag rule: ${part.trim()}`
+      );
+    }
+  }
+});
+
+// --- reader-chosen tag colours -----------------------------------------------
+
+test('a tag colour matches that tag and no other', () => {
+  // Royal Road links a tag as `?tagsAdd=<slug>` with nothing after it, so the
+  // match is anchored at the end. `*=` would have made "romance" colour
+  // "romance_main" too, and the two are different tags.
+  const text = css.buildTagCss(['romance #c084fc']);
+  assert.match(text, /a\[href\$="tagsAdd=romance"\]/);
+  assert.doesNotMatch(text, /tagsAdd=romance_main/);
+});
+
+test('anything that is not a slug and a colour is dropped', () => {
+  // A slug goes straight into a selector, so it is rejected rather than escaped.
+  assert.equal(css.buildTagCss(['litrpg;} body{display:none} a #fff']), '');
+  assert.equal(css.buildTagCss(['litrpg']), '');
+  assert.equal(css.buildTagCss(['litrpg #zzz']), '');
+  assert.equal(css.buildTagCss(['#c084fc']), '');
+  assert.equal(css.buildTagCss('not even a list'), '');
+  assert.equal(css.buildTagCss([]), '');
+});
+
+test('the text colour follows the background, not the theme', () => {
+  // Without this a dark pick keeps Royal Road's own light-on-dark chip text and
+  // the tag is unreadable at exactly the moment the reader chose to mark it.
+  assert.match(css.buildTagCss(['a #ffffff']), /color:#111/);
+  assert.match(css.buildTagCss(['a #000000']), /color:#fff/);
+});
+
+test('one tag named twice keeps its first colour', () => {
+  const text = css.buildTagCss(['litrpg #111111', 'litrpg #eeeeee']);
+  assert.equal(text.split('\n').length, 1, 'one rule');
+  assert.match(text, /#111111/);
+});
+
+test('colouring nothing leaves the stylesheet and the root class alone', () => {
+  assert.equal(css.buildTagCss([]), '');
+  assert.ok(!css.rootClassesFor({ 'tags.colors': [] }).includes('rrx-tag-colors'));
+  assert.ok(css.rootClassesFor({ 'tags.colors': ['litrpg #c084fc'] }).includes('rrx-tag-colors'));
+});
+
+test('the home page is coloured by tag name, since it has no slug', () => {
+  // /home writes a tag as `<span filterable tagname="Magic">`: no href and no
+  // slug anywhere on the element, so the name is the only handle there is.
+  const on = css.buildTagCss(['magic|Magic #c084fc'], { home: true });
+  assert.match(on, /a\[href\$="tagsAdd=magic"\]/, 'still coloured where there is a slug');
+  assert.match(on, /\[tagname="Magic"\]/, 'and by name where there is not');
+
+  const off = css.buildTagCss(['magic|Magic #c084fc'], { home: false });
+  assert.doesNotMatch(off, /tagname/, 'left alone until asked for');
+
+  // An entry added before Royal Road's tag list had been cached has no name to
+  // match on. It still colours everywhere a slug is enough.
+  const slugOnly = css.buildTagCss(['magic #c084fc'], { home: true });
+  assert.match(slugOnly, /tagsAdd=magic/);
+  assert.doesNotMatch(slugOnly, /tagname/);
+});
+
+test('a tag name cannot break out of its attribute selector', () => {
+  // The name reaches a selector verbatim, so a quote in it would end the
+  // attribute and let the rest through as CSS. Dropped, not escaped - and the
+  // slug rule survives, so the tag is still coloured where it can be.
+  const text = css.buildTagCss(['x|bad"] * {display:none} [a #ffffff'], { home: true });
+  assert.doesNotMatch(text, /display:none/);
+  assert.doesNotMatch(text, /tagname/);
+  assert.match(text, /tagsAdd=x/);
+});
+
+test('names with spaces and punctuation survive intact', () => {
+  const [tag] = css.parseTagColors(['summoned_hero|Portal Fantasy / Isekai #abcdef']);
+  assert.equal(tag.label, 'Portal Fantasy / Isekai');
+  assert.equal(tag.slug, 'summoned_hero');
+  assert.match(
+    css.buildTagCss(['summoned_hero|Portal Fantasy / Isekai #abcdef'], { home: true }),
+    /\[tagname="Portal Fantasy \/ Isekai"\]/
+  );
 });

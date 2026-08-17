@@ -56,6 +56,11 @@
     /** Widen the fiction lists past Royal Road's own container. */
     'list.maxWidthPx': { type: 'int', default: null, nullable: true, min: 700, max: 4000 },
     'list.view': { type: 'enum', default: 'default', values: VIEWS },
+    'list.tagsExpand': { type: 'enum', default: 'off', values: ['off', 'hover', 'always'] },
+    /** `<slug> <#hex>` per entry. A list rather than a map because the schema
+     *  has no map type, and one more type is a worse trade than one encoding. */
+    'tags.colors': { type: 'list', default: [] },
+    'tags.colorHome': { type: 'bool', default: false },
 
     // ── hiding individual fictions (v1 feature) ───────────────────────────
     'hide.enabled': { type: 'bool', default: true },
@@ -225,6 +230,7 @@
      *  Off by default, and nothing is recorded while it is off - it is the only
      *  setting here that starts keeping a record of what you looked at. */
     'fiction.statDeltas': { type: 'bool', default: false },
+    'fiction.tagsExpandAll': { type: 'bool', default: false },
   };
 
   /** v1 shipped these six as bare keys. Reading them keeps existing installs'

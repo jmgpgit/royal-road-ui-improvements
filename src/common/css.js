@@ -45,6 +45,10 @@
     font: 'rrx-font',
     wide: 'rrx-wide',
     listWide: 'rrx-list-wide',
+    tagsAll: 'rrx-tags-all',
+    tagsHover: 'rrx-tags-hover',
+    fictionTagsAll: 'rrx-fiction-tags-all',
+    tagColors: 'rrx-tag-colors',
     // Not derived from settings - set and cleared by their own code paths.
     filtersPending: 'rrx-filters-pending',
     ready: 'rrx-ready',
@@ -71,6 +75,10 @@
     if (s['list.hoverExpand'] && !s['list.expandAll']) out.push(ROOT_CLASS.hoverExpand);
     if (s['list.view'] !== 'default') out.push(`rrx-view-${s['list.view']}`);
     if (s['list.maxWidthPx'] !== null) out.push(ROOT_CLASS.listWide);
+    if (s['list.tagsExpand'] === 'always') out.push(ROOT_CLASS.tagsAll);
+    if (s['list.tagsExpand'] === 'hover') out.push(ROOT_CLASS.tagsHover);
+    if (s['fiction.tagsExpandAll']) out.push(ROOT_CLASS.fictionTagsAll);
+    if (parseTagColors(s['tags.colors']).length) out.push(ROOT_CLASS.tagColors);
 
     if (s['hide.enabled'] && s['hide.showHidden']) out.push(ROOT_CLASS.showHidden);
 
@@ -166,6 +174,75 @@
    * @param {Array<number|string>} ids dropped fiction ids
    * @returns {string} CSS text ('' when nothing is dropped)
    */
+  /**
+   * Reader-chosen colours for individual tags, as `<slug> <#hex>` entries.
+   *
+   * Parsed rather than trusted: a slug goes straight into a selector, so
+   * anything outside Royal Road's own alphabet is dropped rather than escaped.
+   */
+  function parseTagColors(entries) {
+    if (!Array.isArray(entries)) return [];
+    const out = [];
+    const seen = new Set();
+    for (const entry of entries) {
+      if (typeof entry !== 'string') continue;
+      // `<slug> <#hex>`, or `<slug>|<label> <#hex>` once the label is known. The
+      // label is optional because only the home page needs it: an entry added
+      // before the tag vocabulary had been cached carries a slug alone, and
+      // still colours everywhere a slug is enough.
+      const match = /^([a-z0-9_-]+)(?:\|(.*?))?\s+(#[0-9a-f]{3}|#[0-9a-f]{6})$/i.exec(entry.trim());
+      if (!match) continue;
+      const slug = match[1].toLowerCase();
+      if (seen.has(slug)) continue;
+      seen.add(slug);
+      // The label reaches an attribute selector, so anything that could close
+      // the quoting is dropped rather than escaped. The slug rule still stands.
+      const label = (match[2] || '').trim();
+      out.push({
+        slug,
+        label: /["\\]/.test(label) ? '' : label,
+        color: match[3].toLowerCase(),
+      });
+    }
+    return out;
+  }
+
+  /** Black or white, whichever the chosen background can carry. Without this a
+   *  dark pick keeps Royal Road's dark chip text and the tag is unreadable. */
+  function readableOn(hex) {
+    const full =
+      hex.length === 4
+        ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+        : hex;
+    const channel = (i) => parseInt(full.slice(1 + i * 2, 3 + i * 2), 16) / 255;
+    const lin = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+    const luminance = 0.2126 * lin(channel(0)) + 0.7152 * lin(channel(1)) + 0.0722 * lin(channel(2));
+    return luminance > 0.36 ? '#111' : '#fff';
+  }
+
+  /**
+   * One rule per coloured tag, which is fine here: this is the handful a reader
+   * picked, not the whole vocabulary - unlike the hidden list, which is why that
+   * one goes to the trouble of keeping its rule count constant.
+   *
+   * Royal Road links a tag as `/fictions/search?tagsAdd=<slug>` and nothing
+   * follows the slug, so `$=` is an exact match and `romance` cannot also catch
+   * `romance_main`. `!important` because Royal Road sets the chip's background
+   * from a utility class of equal specificity that would otherwise win.
+   */
+  function buildTagCss(entries, options) {
+    const home = !!(options && options.home);
+    const rules = [];
+    for (const { slug, label, color } of parseTagColors(entries)) {
+      const paint = `{background:${color}!important;color:${readableOn(color)}!important}`;
+      rules.push(`.${ROOT_CLASS.tagColors} a[href$="tagsAdd=${slug}"]${paint}`);
+      // The home page writes a tag as `<span filterable tagname="Magic">`: no
+      // href and no slug anywhere on the element, so its name is the only handle.
+      if (home && label) rules.push(`.${ROOT_CLASS.tagColors} [tagname="${label}"]${paint}`);
+    }
+    return rules.join('\n');
+  }
+
   function buildDropCss(ids) {
     const clean = normalizeIds(ids);
     if (!clean.length) return '';
@@ -194,6 +271,8 @@
     rootVarsFor,
     buildHideCss,
     buildDropCss,
+    buildTagCss,
+    parseTagColors,
     hrefTest,
   };
 });

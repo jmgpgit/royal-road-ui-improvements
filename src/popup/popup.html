@@ -78,6 +78,14 @@
         <span>Trim tags out of titles</span>
       </label>
 
+      <!-- Beside the titles, because both decide what a card tells you at a
+           glance - and which tags are showing is a decision made while
+           scrolling, not once in options. -->
+      <label class="row row--stack" for="p-tagsExpand">
+        <span>Show every tag on a card</span>
+        <select id="p-tagsExpand" class="select" data-setting="list.tagsExpand"></select>
+      </label>
+
       <label class="row" for="p-showHidden">
         <input type="checkbox" id="p-showHidden" data-setting="hide.showHidden" />
         <span>Show hidden in place <b id="p-count" class="count">0</b></span>

@@ -98,6 +98,34 @@ html.rrx-page-list.rrx-filters-pending .fiction-list {
 /* Stated in the panel rather than left to be discovered as an empty list.
    Its own colours: the redesign's variables exist here, but a warning that
    silently loses its background is worse than one that never had one. */
+/* Royal Road shows the first few tags on a card and hides the rest with
+   `hidden`, revealing them from a checkbox in a sibling `<label class="peer">`
+   (`peer-has-checked:flex`). These rules only have to out-specify that `hidden`;
+   the checkbox goes on working underneath, so a reader can still close a row.
+   Scoped to the card and to the fiction's own header, because a tag chip is not
+   unique to either - the same markup turns up in several places on a page. */
+.rrx-tags-all .fiction-card-expanded a[href*='tagsAdd='].hidden,
+.rrx-tags-hover .fiction-card-expanded:hover a[href*='tagsAdd='].hidden,
+.rrx-fiction-tags-all #fiction-hero a[href*='tagsAdd='].hidden {
+  display: flex;
+}
+
+/* Nothing left for it to reveal, and left in place it says the opposite of what
+   the row is doing: a + on an already-open row reads as "not opened yet".
+   Not on hover, though: there the row is only open while the pointer is on it,
+   and the + is the one way to pin it open before moving away. Dead controls are
+   worth removing; the only control that does anything is not.
+
+   Keyed on a class of ours rather than the toggle's id: the lists call it
+   `tags-toggle-<fiction id>` and a fiction page calls it `show-more-tags`, and
+   guessing the second from the first is what made this miss. `rrx-tag-toggle`
+   is put on by `tagToggles` in cards.js, which finds it by shape - a label
+   wrapping an `sr-only` checkbox, with a tag link after it. */
+.rrx-tags-all .fiction-card-expanded label.rrx-tag-toggle,
+.rrx-fiction-tags-all #fiction-hero label.rrx-tag-toggle {
+  display: none;
+}
+
 .rrx-no-matches {
   margin: 1rem 0;
   padding: 0.7rem 0.9rem;

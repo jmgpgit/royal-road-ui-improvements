@@ -64,6 +64,41 @@
         <ul id="dropped-list" class="fic-list"></ul>
       </section>
 
+      <section class="card" id="tag-colors-section" aria-labelledby="tag-colors-heading">
+        <h2 id="tag-colors-heading">Tag colours</h2>
+        <p class="muted card__blurb">
+          Give a tag a colour and it carries it everywhere it appears, on the fiction lists and on
+          a fiction’s own page. Tags you do not pick are left as Royal Road styles them.
+        </p>
+
+        <div class="tagc__add">
+          <label class="tagc__field" for="tagc-name">
+            <span>Tag</span>
+            <input id="tagc-name" class="input" list="tagc-options" placeholder="LitRPG" />
+          </label>
+          <datalist id="tagc-options"></datalist>
+          <label class="tagc__field tagc__field--color" for="tagc-color">
+            <span>Colour</span>
+            <input id="tagc-color" type="color" value="#c084fc" />
+          </label>
+          <button type="button" id="tagc-add" class="btn">Add</button>
+        </div>
+        <p id="tagc-error" class="status" hidden></p>
+
+        <label class="row" for="tagc-home">
+          <input type="checkbox" id="tagc-home" data-setting="tags.colorHome" />
+          <span class="row__title">Colour tags on the home page too</span>
+        </label>
+        <p class="muted tagc__note">
+          The home page writes its tags as plain chips with no tag id on them, so they are matched
+          by name instead. A colour added before the extension had seen Royal Road’s tag list has
+          no name recorded yet; it picks one up the next time you open a fiction list.
+        </p>
+
+        <p id="tagc-empty" class="muted">No tag has a colour yet.</p>
+        <ul id="tagc-list" class="tagc__list"></ul>
+      </section>
+
       <section class="card" aria-labelledby="backup-heading">
         <h2 id="backup-heading">Backup</h2>
         <p class="muted">
@@ -89,6 +124,7 @@
     <script src="../common/schema.js"></script>
     <script src="../common/model.js"></script>
     <script src="../common/filters.js"></script>
+    <script src="../common/css.js"></script>
     <script src="../common/store.js"></script>
     <script src="settings-ui.js"></script>
     <script src="options.js"></script>

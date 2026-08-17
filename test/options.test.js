@@ -155,14 +155,15 @@ test.after(() => {
 });
 
 /** The options page, booted with an empty store. */
-async function render() {
+async function render(store) {
   const dom = new JSDOM(fs.readFileSync(path.join(ROOT, 'src/options/options.html'), 'utf8'), {
     url: 'https://example.invalid/options.html',
     runScripts: 'outside-only',
   });
   const w = dom.window;
   windows.push(w);
-  w.eval('globalThis.__s = { settings: {}, hidden: {}, dropped: {}, stats: {}, chapters: {} };');
+  const seed = { settings: {}, hidden: {}, dropped: {}, stats: {}, chapters: {}, ...(store || {}) };
+  w.eval(`globalThis.__s = ${JSON.stringify(seed)};`);
   w.eval(
     'globalThis.browser = { storage: { local: {' +
       ' get: async () => JSON.parse(JSON.stringify(globalThis.__s)),' +
@@ -174,6 +175,7 @@ async function render() {
     'src/common/browser.js',
     'src/common/schema.js',
     'src/common/model.js',
+    'src/common/css.js',
     'src/common/store.js',
     'src/options/settings-ui.js',
     'src/options/options.js',
@@ -236,5 +238,94 @@ test('every box is reachable from the jump strip', async () => {
   );
   for (const href of targets) {
     assert.ok(w.document.querySelector(href), `${href}: nothing to jump to`);
+  }
+});
+
+test('picking a tag colour writes it, and picking again replaces it', async () => {
+  // A list-typed setting renders no row of its own, so this card is the only
+  // way in - which is why it is in NOT_IN_OPTIONS rather than a group.
+  const w = await render();
+  const d = w.document;
+
+  assert.ok(d.getElementById('tag-colors-section'), 'the card is on the page');
+  assert.equal(d.getElementById('tagc-empty').hidden, false, 'and says so while empty');
+
+  d.getElementById('tagc-name').value = 'litrpg';
+  d.getElementById('tagc-color').value = '#c084fc';
+  d.getElementById('tagc-add').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 40));
+
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(w.__s.settings['tags.colors'])),
+    ['litrpg #c084fc'],
+    'stored as slug and colour'
+  );
+  assert.equal(d.querySelectorAll('.tagc__row').length, 1, 'and shown as a row');
+});
+
+test('a tag name that is neither a known tag nor a slug is refused', async () => {
+  // The slug reaches a CSS selector, so the page says no rather than storing
+  // something the builder will silently drop later.
+  const w = await render();
+  const d = w.document;
+
+  d.getElementById('tagc-name').value = 'not a slug!';
+  d.getElementById('tagc-add').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 40));
+
+  assert.equal(d.getElementById('tagc-error').hidden, false, 'it says why');
+  assert.equal(d.querySelectorAll('.tagc__row').length, 0, 'and nothing was added');
+});
+
+test('a colour chosen before the tag list was known picks up its name later', async () => {
+  // The home page can only be matched by name, and the name comes from Royal
+  // Road's own list, which nothing has fetched on a first run. Left alone, such
+  // an entry stayed nameless for good and never coloured there.
+  const w = await render({
+    settings: { 'tags.colors': ['magic #c084fc'], 'tags.colorHome': true },
+    tagCatalogue: { at: 1, tags: [{ slug: 'magic', label: 'Magic' }] },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 60));
+
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(w.__s.settings['tags.colors'])),
+    ['magic|Magic #c084fc'],
+    'the name is filled in from the catalogue'
+  );
+});
+
+test('a slug the catalogue does not know is left nameless rather than invented', async () => {
+  const w = await render({
+    settings: { 'tags.colors': ['not_a_real_tag #c084fc'] },
+    tagCatalogue: { at: 1, tags: [{ slug: 'magic', label: 'Magic' }] },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 60));
+
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(w.__s.settings['tags.colors'])),
+    ['not_a_real_tag #c084fc'],
+    'a name we made up would be stored and then match nothing'
+  );
+});
+
+test('every setting the page lists actually renders a control', () => {
+  // `rowFor` dispatches on the schema type and returned null for anything it did
+  // not name, silently. Both colour settings were in a group, had a label and a
+  // note, and rendered nothing - settable only by editing an exported backup.
+  const shown = new Set(sectionKeys().filter((key) => !isFilterValue(key)));
+  for (const key of shown) {
+    const spec = SCHEMA[key];
+    if (!spec || spec.type === 'list') continue; // lists are edited in context
+    assert.ok(
+      ['bool', 'enum', 'int', 'number', 'string', 'color'].includes(spec.type),
+      `${key}: type "${spec.type}" has no row builder, so it renders nothing`
+    );
+  }
+});
+
+test('the colour settings reach the page', async () => {
+  const w = await render();
+  for (const key of ['reader.textColor', 'comments.threadColor']) {
+    assert.ok(w.document.querySelector(`[data-setting="${key}"]`), `${key}: no control`);
   }
 });
