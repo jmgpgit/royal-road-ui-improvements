@@ -42,7 +42,7 @@
   /** A slider's label: nullable settings read "default" when unset. */
   function sliderLabel(key, value) {
     if (value === null) return 'default';
-    return key === 'reader.maxWidthPx' ? `${value}px` : String(value);
+    return key.endsWith('maxWidthPx') ? `${value}px` : String(value);
   }
 
   function render({ settings, hidden }) {
@@ -63,7 +63,11 @@
     const off = (key) => !settings[key];
     boxes.find((b) => b.dataset.setting === 'hide.showHidden').disabled = off('hide.enabled');
     boxes.find((b) => b.dataset.setting === 'reader.justify').disabled = off('reader.enabled');
-    for (const slider of sliders) slider.disabled = off('reader.enabled');
+    // By key, not "every slider": the list width is one too, and it has nothing
+    // to do with whether chapter text is being restyled.
+    for (const slider of sliders) {
+      slider.disabled = slider.dataset.setting.startsWith('reader.') && off('reader.enabled');
+    }
   }
 
   /** Which section to show. `home` falls through to the notice: it carries

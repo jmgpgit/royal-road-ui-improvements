@@ -56,6 +56,18 @@
         <select id="p-view" class="select" data-setting="list.view"></select>
       </label>
 
+      <label class="row row--stack" for="p-listWidth">
+        <span>Maximum list width <b id="p-listWidth-out" class="count">-</b></span>
+        <input
+          type="range"
+          id="p-listWidth"
+          data-setting="list.maxWidthPx"
+          min="700"
+          max="2400"
+          step="20"
+        />
+      </label>
+
       <label class="row" for="p-infiniteScroll">
         <input type="checkbox" id="p-infiniteScroll" data-setting="list.infiniteScroll" />
         <span>Keep loading as you scroll</span>

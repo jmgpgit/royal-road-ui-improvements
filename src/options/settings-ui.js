@@ -99,7 +99,7 @@
     },
     'list.infiniteScroll': {
       label: 'Keep loading as you scroll',
-      note: 'When you reach the bottom of a list, the next page is added underneath instead of you having to click through. Filters and hidden fictions still apply to whatever comes in.',
+      note: 'When you reach the bottom of a list, the next page is added underneath instead of you having to click through. Filters and hidden fictions still apply to whatever comes in — so a strict filter can add a page and show you nothing from it. Royal Road serves twenty at a time and each scroll asks for one more page, rather than fetching until the screen is full.',
     },
 
     // ── fiction pages ─────────────────────────────────────────────────────

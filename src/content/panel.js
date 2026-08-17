@@ -96,6 +96,10 @@
    * You pick by label ("Romance Subplot"); the filter stores the slug
    * (`romance`). Those differ often enough that typing slugs was a real trap.
    */
+  /** Both tag rows report here: neither can see the other's chips, and the
+   *  contradiction is only visible from outside both. */
+  let notifyTags = () => {};
+
   function tagRow(label, key) {
     const chips = el('div', { class: 'rrx-chips' });
     const menu = el('div', { class: 'rrx-combo__menu', hidden: true });
@@ -112,6 +116,7 @@
             onClick: () => {
               draft[key] = draft[key].filter((s) => s !== slug);
               renderChips();
+              notifyTags();
             },
           })
         );
@@ -122,6 +127,7 @@
       if (!slug) return;
       if (!draft[key].includes(slug)) draft[key] = [...draft[key], slug];
       renderChips();
+      notifyTags();
     };
 
     const input = el('input', {
@@ -269,6 +275,23 @@
       await ctx.setSettings(cleared);
     };
 
+    // A tag in both lists can never match anything, and the empty list that
+    // results looks exactly like a filter that is merely strict.
+    const tagWarning = el('div', { class: 'rrx-panel__warn', role: 'status', hidden: true });
+
+    notifyTags = () => {
+      const both = draft['filters.tagsAll'].filter((slug) =>
+        draft['filters.tagsNone'].includes(slug)
+      );
+      tagWarning.hidden = !both.length;
+      if (!both.length) return;
+      const names = both.map((slug) => RRX.tags.labelFor(slug)).join(', ');
+      tagWarning.textContent =
+        both.length > 1
+          ? `${names} are in both lists, so nothing can match.`
+          : `${names} is in both lists, so nothing can match.`;
+    };
+
     const body = el('div', { class: 'rrx-panel__body' }, [
       group('Score and size', [
         rangeRow(['Rating', 'filters.minRating', 'filters.maxRating', '0.1']),
@@ -280,6 +303,7 @@
       group('Tags', [
         tagRow('Must have', 'filters.tagsAll'),
         tagRow('Must not', 'filters.tagsNone'),
+        tagWarning,
       ]),
       group('Kind', [
         chipRow('Status', 'filters.status', RRX.STATUSES, (v) => v[0] + v.slice(1).toLowerCase()),
@@ -293,6 +317,9 @@
         ),
       ]),
     ]);
+
+    // Saved filters can already contradict each other before anything is typed.
+    notifyTags();
 
     const footer = el('div', { class: 'rrx-panel__footer' }, [
       el('button', { type: 'button', class: 'rrx-btn', text: 'Clear all', onClick: clear }),

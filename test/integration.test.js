@@ -1070,6 +1070,113 @@ test('Royal Road’s page numbers go once we have appended beneath them', async 
   assert.equal(paginate.classList.contains('rrx-endless'), false, 'restored on reset');
 });
 
+test('an empty list says so, and names Royal Road’s own filters when it can', async () => {
+  // An empty list is indistinguishable from a page that genuinely has nothing -
+  // and, signed in, from Royal Road's own Global Filters cutting the results
+  // before we ever see them.
+  const w = await atListBottom({
+    'list.infiniteScroll': false,
+    'filters.enabled': true,
+    'filters.minRating': 5,
+    'filters.maxRating': 5,
+  });
+  const note = () => w.document.getElementById('rrx-no-matches');
+
+  w.RRX.main.syncCards(w.document);
+  const counts = w.RRX.main.ctx.filterCounts;
+  assert.ok(counts.total > 0, 'the page has cards');
+  assert.equal(counts.shown, 0, 'and the filter hides every one');
+  assert.ok(note(), 'so the list says so');
+  assert.doesNotMatch(note().textContent, /Royal Road is also hiding/, 'no badge, nothing to add');
+
+  // Signed in, Royal Road badges its own button with the count.
+  const badge = w.document.createElement('span');
+  badge.textContent = '10';
+  w.document.querySelector(w.RRX.SEL.globalFiltersTrigger).appendChild(badge);
+  w.RRX.main.syncCards(w.document);
+  assert.match(note().textContent, /hiding 10 tags of its own/);
+
+});
+
+test('a tag in both lists is called out before it empties the page', async () => {
+  // "Must have: Magic" and "Must not: Magic" can never match anything, and the
+  // empty list it produces looks exactly like a filter that is merely strict.
+  const w = await atListBottom({ 'list.infiniteScroll': true, 'filters.enabled': true });
+  toolbar(w)
+    .querySelector('[data-rrx-toggle="filters"]')
+    .dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+
+  const warn = () => w.document.querySelector('.rrx-panel__warn');
+  assert.ok(warn(), 'the line exists');
+  assert.equal(warn().hidden, true, 'and says nothing while the lists agree');
+
+  const inputs = [...w.document.querySelectorAll('#rrx-filter-panel input[role="combobox"]')];
+  assert.equal(inputs.length, 2, 'must have, and must not');
+
+  for (const input of inputs) {
+    input.value = 'Magic';
+    input.dispatchEvent(new w.Event('input', { bubbles: true }));
+    const hit = [...input.parentElement.querySelectorAll('.rrx-combo__item')].find(
+      (b2) => b2.textContent === 'Magic'
+    );
+    assert.ok(hit, 'Magic is offered');
+    hit.dispatchEvent(new w.MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+  }
+
+  assert.equal(warn().hidden, false, 'both lists hold it, so the line shows');
+  assert.match(warn().textContent, /Magic/);
+  assert.match(warn().textContent, /nothing can match/);
+});
+
+test('a run of pages matching nothing offers a reason, without stopping', async () => {
+  // Deliberately not a stop: the one match can be on page five, so giving up at
+  // four would guarantee never finding it. What the reader gets instead is the
+  // one thing they cannot see from here - Royal Road cuts these lists to the
+  // signed-in reader's own Global Filters before we ever fetch them.
+  const w = await atListBottom({ 'list.infiniteScroll': true });
+  const loadMore = w.RRX.loadMore;
+  const line = () => {
+    const bar = w.document.getElementById('rrx-loadmore');
+    return bar ? bar.textContent : '';
+  };
+
+  Object.assign(loadMore.state, { pages: 4, added: 0, dry: 4, busy: false });
+  loadMore.render(w.RRX.main.ctx);
+  assert.match(line(), /scanned 4 extra page/, 'it says how far it has read');
+  assert.doesNotMatch(line(), /Global Filters/, 'no badge, so nothing to point at');
+  assert.equal(loadMore.state.done, '', 'and the run is not finished');
+
+  // Signed in, Royal Road badges its own button with the count. The button is
+  // already in the capture - it is there signed out too, which is why the code
+  // reads the badge rather than the button.
+  const badge = w.document.createElement('span');
+  badge.textContent = '10';
+  w.document.querySelector(w.RRX.SEL.globalFiltersTrigger).appendChild(badge);
+  loadMore.render(w.RRX.main.ctx);
+  assert.match(line(), /Global Filters hide 10 tags site-wide/);
+
+  // One page that matches resets it: the run is finding things again.
+  Object.assign(loadMore.state, { dry: 0, added: 3 });
+  loadMore.render(w.RRX.main.ctx);
+  assert.doesNotMatch(line(), /Global Filters/, 'nothing dry to explain');
+});
+
+test('the page numbers survive a page that was fetched and filtered away', async () => {
+  // `syncPaginator` keyed on pages fetched rather than rows appended, which its
+  // own paragraph already said was wrong. A filter matching nothing hid the
+  // numbers and left an empty list with no way to navigate at all.
+  const w = await atListBottom({ 'list.infiniteScroll': true });
+  const paginate = w.document.querySelector(w.RRX.SEL.paginateRoot);
+
+  Object.assign(w.RRX.loadMore.state, { pages: 3, added: 0 });
+  w.RRX.loadMore.syncPaginator();
+  assert.equal(paginate.classList.contains('rrx-endless'), false, 'fetched is not appended');
+
+  w.RRX.loadMore.state.added = 1;
+  w.RRX.loadMore.syncPaginator();
+  assert.ok(paginate.classList.contains('rrx-endless'), 'and they go once something lands');
+});
+
 test('the page numbers stay gone if Royal Road re-renders its paginator', async () => {
   // `hideFooter` used to be called from exactly one place: the end of a load.
   // Anything that re-rendered the pagination took the class with it, the page

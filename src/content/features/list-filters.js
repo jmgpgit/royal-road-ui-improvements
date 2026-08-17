@@ -13,7 +13,7 @@
   const RRX = root.RRX;
   if (!RRX) return;
   const features = (RRX.features = RRX.features || { list: [] });
-  const { SEL } = RRX;
+  const { SEL, ui } = RRX;
 
   /** Longest the list may stay hidden waiting for a filter pass. */
   const REVEAL_WATCHDOG_MS = 1000;
@@ -70,12 +70,61 @@
     return { total: cards.length, shown };
   }
 
+  const EMPTY_ID = 'rrx-no-matches';
+
+  /** How many tags Royal Road is filtering site-wide for this reader, off the
+   *  badge on its own button.
+   *
+   *  The button itself is on the list pages either way - it is in the signed-out
+   *  captures - so its presence says nothing. Only the badge does, and it is
+   *  there only when the count is above zero. The dialog behind the button is
+   *  not in the DOM until it is opened, so the count is all that can be read,
+   *  and all that is needed. */
+  function globalFilterCount() {
+    const trigger = document.querySelector(SEL.globalFiltersTrigger);
+    if (!trigger) return 0;
+    const digits = (trigger.textContent || '').match(/\d+/);
+    return digits ? Number(digits[0]) : 0;
+  }
+
+  /**
+   * Said out loud when a filter leaves nothing, because an empty list is
+   * indistinguishable from a page that genuinely has no matches - and, signed
+   * in, from Royal Road's own Global Filters hiding things before we ever see
+   * them. The count comes off Royal Road's own button, so it is only mentioned
+   * when there really is one.
+   */
+  function renderEmpty(ctx, counts) {
+    const list = document.querySelector(SEL.listRoot);
+    const existing = document.getElementById(EMPTY_ID);
+    const show = counts.total > 0 && counts.shown === 0 && RRX.hasActiveFilters(ctx.settings);
+    if (!list || !show) {
+      if (existing) existing.remove();
+      return;
+    }
+
+    // The endless-scroll status line makes this point itself once it has
+    // scanned and found nothing, so only speak for it when there is no loader.
+    const global = ctx.settings['list.infiniteScroll'] ? 0 : globalFilterCount();
+    const text = global
+      ? `Nothing on this page matches your filters. Royal Road is also hiding ${global} tag${global > 1 ? 's' : ''} of its own, site-wide - see its Global Filters button.`
+      : 'Nothing on this page matches your filters.';
+
+    // Compared before writing: this runs on every sweep, and replacing an
+    // identical node is a mutation that schedules the next one.
+    if (existing && existing.textContent === text) return;
+    const note = ui.el('div', { id: EMPTY_ID, class: 'rrx-ui rrx-no-matches', role: 'status', text });
+    if (existing) existing.replaceWith(note);
+    else list.appendChild(note);
+  }
+
   function syncCards(scope, ctx) {
     if (!ctx.isListPage) {
       reveal();
       return;
     }
     ctx.filterCounts = apply(scope, ctx);
+    if (scope === document) renderEmpty(ctx, ctx.filterCounts);
     reveal();
   }
 

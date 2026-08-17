@@ -95,6 +95,31 @@ html.rrx-page-list.rrx-filters-pending .fiction-list {
   min-width: 0;
 }
 
+/* Stated in the panel rather than left to be discovered as an empty list.
+   Its own colours: the redesign's variables exist here, but a warning that
+   silently loses its background is worse than one that never had one. */
+.rrx-no-matches {
+  margin: 1rem 0;
+  padding: 0.7rem 0.9rem;
+  border: 1px dashed rgb(140 140 140 / 45%);
+  border-radius: var(--radius-sm, 0.25rem);
+  color: var(--color-on-surface, #ccc);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.rrx-panel__warn {
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid rgb(200 140 40 / 55%);
+  border-radius: var(--radius-sm, 0.25rem);
+  background: rgb(200 140 40 / 12%);
+  color: var(--color-on-surface, #ddd);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
 .rrx-combo__menu {
   position: absolute;
   top: calc(100% + 2px);

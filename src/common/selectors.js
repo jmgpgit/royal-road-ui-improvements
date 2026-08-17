@@ -87,6 +87,11 @@
      */
     listRoot: '.fiction-list',
     paginateRoot: '[data-rr-paginate]',
+    /** Royal Road's own site-wide tag filters. The button is on every list page
+     *  signed in or out, so finding it proves nothing; the badge inside it
+     *  carries the count, and only appears when there is one. Its dialog is not
+     *  in the DOM until opened. */
+    globalFiltersTrigger: '[data-rr-global-filters-trigger]',
     listCard: '.fiction-card-expanded',
 
     // --- description "show more" widget (pure CSS on RR's side) --------------
