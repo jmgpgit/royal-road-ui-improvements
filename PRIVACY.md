@@ -7,7 +7,7 @@ below names the file that implements it.
 
 ## What is stored, and where
 
-Seven things, all in `browser.storage.local`, which is local to your browser profile:
+Seven kinds of thing, all in `browser.storage.local`, which is local to your browser profile:
 
 - **Your settings.** The list in [`src/common/schema.js`](src/common/schema.js) is exhaustive.
 - **Your hidden fictions.** For each one: its Royal Road id, title, cover URL and the time you
@@ -25,25 +25,31 @@ Seven things, all in `browser.storage.local`, which is local to your browser pro
   [`src/common/model.js`](src/common/model.js) for the exact
   shape.
 - **The public numbers on the fiction pages you open**, once you switch on "show what has
-  changed since you last looked". For each fiction: its views, followers, favourites, ratings,
-  pages, chapters and star scores, and when they were read — twice, so there is something to
+  changed since you last looked". For each fiction: its total and average views, followers,
+  favourites, ratings, pages, chapters and star scores, and when they were read — twice, so there is something to
   compare today's against. These are Royal Road's own public totals, not anything about you, and the only thing
   the record says about you is that the page was opened. Two readings per fiction, and a fiction
   you have not opened for a year is dropped. Nothing is stored while the setting is off, and
   switching it off deletes what is already there. Nothing is fetched for it either: the numbers
-  are read off the page you just opened.
-  See [`src/common/model.js`](src/common/model.js).
-- **When the housekeeping last ran** — one number. The two lists above that grow with use are
-  aged out once a day rather than only while the feature that fills them is switched on. See
-  [`src/common/store.js`](src/common/store.js).
-- **Royal Road's list of tags**, cached for a week so the filter panel does not refetch it.
-  This is Royal Road's own public vocabulary — "LitRPG", "Progression", and the rest — and says
-  nothing about you. See [`src/content/tags.js`](src/content/tags.js).
+  are read off the page you just opened. See
+  [`src/content/features/fiction-stats.js`](src/content/features/fiction-stats.js) for the
+  reading and [`src/common/model.js`](src/common/model.js) for the shape.
+- **When the housekeeping last ran, and when you last pressed "forget my reading history"** —
+  two numbers. The chapter records and the fiction statistics above are aged out once a day
+  rather than only while the feature that fills them is switched on; the second number is how a
+  Royal Road page learns to clear the `localStorage` copy below, which the options page cannot
+  reach itself. Your hidden and dropped lists are not aged out at all; they stay until you remove
+  them. See [`src/common/store.js`](src/common/store.js).
+- **Royal Road's list of tags**, cached for a week so the filter panel does not refetch it. The
+  options page reads the same cache, to name the tags you have given a colour; it never fetches
+  it, so on a cold cache a tag colour is stored under its slug alone. This is Royal Road's own
+  public vocabulary — "LitRPG", "Progression", and the rest — and says nothing about you.
+  See [`src/content/tags.js`](src/content/tags.js).
 
 A compact copy of your settings and the ids of your hidden and dropped fictions is mirrored into
-`localStorage` on royalroad.com. This exists only so the extension can read your settings before
-the page paints, which stops hidden fictions flashing up before they are hidden. It is the same
-data, on the same machine — ids only, no titles.
+`localStorage` on royalroad.com. This exists only so the extension can apply them before the page
+paints: hidden fictions never flash up before they are hidden, dropped ones are dimmed from the
+first paint. It is the same data, on the same machine — ids only, no titles.
 
 With the previous-chapter recap switched on, the closing text of each chapter it reads is kept
 in `sessionStorage` on royalroad.com, so that moving back and forth does not fetch the same
@@ -107,6 +113,11 @@ exactly five kinds of request, all of them things the site itself asks for when 
    chapters. It is off by default; while it is off nothing is fetched.
    See [`src/content/features/chapter-meta.js`](src/content/features/chapter-meta.js).
 
+Two of Royal Road's own controls also get pressed for you, and Royal Road then fetches for
+itself: the "Load Comments" button, when comment auto-loading is on, and the review sort
+dropdown, once you have chosen a default review order. Both fetch the lists in 2, at the same
+addresses.
+
 All five are GETs for public pages. None carries anything about you beyond the cookies your
 browser would already send to royalroad.com.
 
@@ -140,9 +151,12 @@ unhidden content.
 Options -> Backup exports everything the extension holds — settings, hidden fictions, dropped
 fictions, reading progress and the fiction statistics you have seen — as a JSON file, and
 imports it back. Resetting the settings leaves your hidden fictions, dropped fictions and
-reading progress alone. Options -> Backup also says how much reading history is stored and has
+reading progress alone, and deletes the fiction statistics: reset returns that setting to its
+default, which is off. Options -> Backup also says how much reading history is stored and has
 a button that forgets all of it: where you got to in every chapter, which comments you had
-seen, and every fiction statistic.
+seen, and every fiction statistic. The `localStorage` copy of your place in the chapter you are
+reading goes with it: at once in any Royal Road tab that is open, and otherwise on the next Royal
+Road page you open.
 
 Removing the extension removes everything under the extension. Three things are not under the
 extension, because they have to be readable by royalroad.com's own pages, and they outlive it:

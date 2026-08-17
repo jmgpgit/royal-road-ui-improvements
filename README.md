@@ -45,13 +45,24 @@ bookmark — and never hides an author's own comments.
   wherever it turns up, but stays in the list and stays clickable, in case you change your mind.
 - **Filters**: rating, followers, views, pages, chapters, tags in and out, status, type, last
   updated or gone quiet, and hiding what you already follow, favourited, saved for later or
-  dropped. None of these exist on Royal Road outside `/fictions/search`.
+  dropped. None of these exist on Royal Road outside `/fictions/search`. A list filtered down to
+  nothing says so, the panel warns when a tag is in both tag lists — which can never match — and
+  after four pages that match nothing the status line points at your own Global Filters, the
+  site-wide ones you set on Royal Road, which cut these lists before the extension fetches them.
 - **Infinite scroll**: the next page appends as you reach the bottom. Filters and hidden
-  fictions apply to whatever arrives.
+  fictions apply to whatever arrives, so a strict filter can append a page and show nothing from
+  it — Royal Road serves twenty at a time, and one scroll asks for one page rather than fetching
+  until the screen is full.
 - **Alternative layouts**: Royal Road's cards, compact rows, two columns, or a cover grid,
   plus a maximum list width for wide screens.
 - **Trim tags out of titles**: "Some Title [LitRPG, Dungeon Core]" reads as "Some Title". Lists
   only; the full title stays in the tooltip.
+- **Every tag on a card**: Royal Road folds all but the first few behind a `+`. Open them while
+  the pointer is over the card, or always. Its own `+` still works, so a row can be pinned open
+  or closed again.
+- **Tag colours**: give a tag a colour and it carries it wherever the tag appears — the lists, a
+  fiction's own page, and the home page behind its own switch. Only the tags you pick; the text
+  colour is computed from the background, so a dark pick stays readable.
 
 **In a chapter**
 
@@ -69,7 +80,7 @@ bookmark — and never hides an author's own comments.
 - **Author notes**: collapse cross-promotion while keeping the note, collapse notes entirely,
   or do it per author. Nothing is deleted; a chip puts it back.
 - Hide the About-author panel.
-- **A recap of the previous chapter** at the top of this one, for when you are following
+- **A recap of the previous chapter** at the top of this one, named, for when you are following
   several fictions and cannot remember how the last one ended. Always shown, behind a click, on
   hover, or off. Off by default, and it fetches nothing while off.
 - **New comments since your last visit**, marked, with what you have read optionally folded to
@@ -91,7 +102,8 @@ else working, which is why it is there: wanting it back is a fair thing to want.
 **On a fiction page**: control each section, in the order it appears. About Fiction,
 Statistics, Table of Contents, Leave A Review and Reviews are each left alone, always open or
 always closed. Others Also Liked is left alone, shown or hidden. Reviews also get a default
-sort order and their own infinite scroll.
+sort order and their own infinite scroll. A long tag list can be opened past Royal Road's `+`,
+and coloured tags are coloured here too.
 
 - **What has changed since you last looked**. Royal Road only ever shows today's total, which
   cannot tell you whether a fiction is climbing or has gone quiet. Every figure gets its own
@@ -108,6 +120,8 @@ toggle away in options:
 - **A toolbar above every fiction list**, carrying the extension's own controls.
 - **Infinite scroll on the lists.**
 - **A `−` button on every card.** Nothing is hidden until you press one.
+- **A drop-mark button beside it**, for a fiction you tried and stopped. Nothing is marked until
+  you press one, and the two are separate switches.
 - **Comment threading**: a divider between conversations, a line down each reply chain, and a
   collapse control on any comment with replies.
 - **Hyphenation**, which does nothing unless you also turn on justified text.
@@ -115,15 +129,20 @@ toggle away in options:
 Anything that alters an author's words is opt-in, and so is every rule that folds or hides a
 comment.
 
-The options page is four boxes: which layout to use, then fiction lists (with the hidden and
-dropped fiction managers), fiction pages, and chapter pages.
+The options page is six boxes, in the order a reader meets the site: which layout to use, fiction
+lists (each manager beside the switches that fill it, and the tag-colour editor), fiction pages,
+chapter pages, comments, and Backup — export, import, reset the settings, and forget your reading
+history. Within a box the order is down the page, so a setting sits where the thing it changes
+sits.
 
 ## Install
 
-**Chrome / Edge**: on the Chrome Web Store, currently 1.2.0.
+**Chrome / Edge**: on the Chrome Web Store. Review takes as long as it takes, so the published
+version can sit a release or two behind this repository; [`CHANGELOG.md`](CHANGELOG.md) is what
+this source tree is.
 
-**Firefox**: not yet. 1.2.0 is with addons.mozilla.org for review; until it is approved, the
-only way onto Firefox is from source, below.
+**Firefox**: not yet — still waiting on addons.mozilla.org review. Until it is approved, the only
+way onto Firefox is from source, below.
 
 **Firefox from source** (temporary, until the browser restarts)
 
@@ -188,6 +207,14 @@ make hiding fiction A delete every card whose blurb recommends A.
 removing: no `display: none`, no `pointer-events: none`, because the mark exists to be
 reconsidered.
 
+**Tag colours are one rule per tag**, deliberately unlike hiding. A handful of tags is not the
+whole vocabulary, so the trick that keeps the hidden list's rule count constant buys nothing
+here. The slug reaches a selector, so it is parsed rather than escaped — anything outside
+`[a-z0-9_-]` is dropped — and the match is anchored, because Royal Road links a tag as
+`?tagsAdd=<slug>` with nothing after it and `*=` would make "romance" colour "romance_main"
+too. Opening a card's folded tags is CSS as well, out-specifying the one `hidden` class with two
+classes and an attribute so that Royal Road's own checkbox still toggles underneath.
+
 **Hidden cards never flash.** `browser.storage.local` is async and would race first paint.
 Content scripts share the page's origin, so a compact copy of the hidden and dropped lists is
 mirrored into `localStorage` and read synchronously at `document_start`, before Royal Road's
@@ -197,9 +224,18 @@ correctly around them.
 **Infinite scroll appends; Royal Road's paginator replaces.** Comments and reviews use its
 `clientfetch` paginator, whose "next" swaps the list out — page 20 leaves no way back to
 comment 1. `content/pager.js` fetches the same endpoint Royal Road declares
-(`data-rr-paginate-fetch-url`), appends, and deduplicates by element id. It hides Royal Road's
-page numbers while running: leaving them visible let you click "2" mid-run and land back in
-replace-the-list, with the two disagreeing about which page you were on.
+(`data-rr-paginate-fetch-url`), appends, and deduplicates arriving items against the items
+already there. Against *every* id in the container it went wrong: a reply tree, a tooltip or a
+rating widget could collide with an arriving item and drop it with no trace.
+
+That URL is read once. Royal Road's paginator takes it in its constructor and a re-sort assigns
+its own copy without writing the attribute back, so from the first re-sort on it names an order
+nobody is looking at. The order comes from the control the reader used instead.
+
+Its page numbers go once something has been appended, not before: until then they are correct
+and the only way on from a panel that stays collapsed or never gets scrolled to. After an append
+they are a trap, since clicking "2" lands you back in replace-the-list with the two disagreeing
+about which page you were on.
 
 **Filters cannot do that**: they need parsed numbers off each card. They hold the list back
 with `visibility` (not `display`, so no reflow) until the first pass lands, only when a filter
@@ -227,8 +263,8 @@ narrowing rather than emptying the page.
 
 ```
 manifest.json               the Firefox manifest; tools/build.mjs derives Chrome's
-src/common/    browser · selectors · schema · model · cards · filters · css · store
-src/content/   boot.js (document_start) · main.js · ui.js · panel.js · inject*.css
+src/common/    browser · selectors · schema · model · design · cards · filters · css · store
+src/content/   boot.js (document_start) · ui.js · tags.js · pager.js · panel.js · main.js (last)
 src/content/features/       one file per feature, registered on RRX.features.list
 src/background/             15 lines, only so the toolbar can open the options page
 src/options/ src/popup/     settings, the two fiction managers, JSON backup
@@ -313,9 +349,23 @@ naming what is missing; `test/fixtures/README.md` covers how to re-capture each 
   default, and a dimmed comment opens on hover.
 - **Fonts are local only.** Royal Road's security policy blocks loading font files from an
   injected stylesheet, so only families already installed on the machine work.
-- **The tag vocabulary costs one request.** Opening the filter panel on a page without Royal
-  Road's own tag `<select>` fetches `/fictions/search` once for the tag list, then caches it
-  for a week. On the search page it is read from the page for free.
+- **The tag vocabulary costs one request.** `/fictions/search` is the only page that states it
+  in full — 72 tags in its own `<select>`, plus 22 genres on its buttons, which that select
+  carries none of. Opening the filter panel anywhere else fetches that page once and caches it
+  for a week; on the search page itself it is read for free. Every other page contributes the
+  tag links it already carries, which costs nothing but is a sample rather than the list, so it
+  fills the vocabulary in without ever standing in for it.
+- **A tag colour reaches the home page only once its name is known.** `/home` writes tags as
+  plain chips with no slug on them, so they can only be matched by name, and the name comes from
+  that cached tag list. Colour a tag before anything has cached it and it is coloured on the
+  lists and fiction pages; the options page fills the name in on a later visit, and `/home`
+  follows. Colouring `/home` is its own switch because the chip there is a shared element used in
+  several places.
+- **Your own Global Filters cut the lists first.** They are yours, set on Royal Road — its dialog
+  offers to "include or exclude tags across the entire site", and needs you signed in — and Royal
+  Road applies them before serving the list, so a filter here can only narrow what is left. After
+  four pages that match nothing the status line says so. Only the count is readable: the dialog
+  is in the page, but signed out it holds nothing except a login prompt.
 - **Settings changed with no Royal Road tab open** reach the synchronous boot mirror one page
   load late. The authoritative async read corrects it during that same load.
 - **Royal Road has its own `hide`** bookmark, server-side and account-bound, reachable from a
@@ -324,10 +374,13 @@ naming what is missing; `test/fixtures/README.md` covers how to re-capture each 
 
 ## Privacy
 
-Everything is stored on the device, in `browser.storage.local`. No analytics, and no server
-other than royalroad.com. It makes five kinds of request, all of them things the site itself
-asks for: the `?page=N` fetch that adds the next page of a list as you scroll, the same for
-comments and reviews, a single request for the tag vocabulary the first time you open the
+Everything is stored on the device: settings, your lists and your reading history in
+`browser.storage.local`, plus two copies in royalroad.com's own `localStorage` — the boot mirror,
+and where you are in the chapter you are reading — which a content script can read and write
+synchronously. No analytics, and no server other than royalroad.com. It makes five kinds of
+request, all of them things the site itself asks for: the `?page=N` fetch that adds the next page
+of a list as you scroll, the same for comments and reviews, which it may start by pressing Royal
+Road's own "Load Comments" button or its review sort dropdown, a single request for the tag vocabulary the first time you open the
 filter panel, and — only once you switch them on — the chapter before the one you are reading,
 and the fiction's chapter list behind Royal Road's own "Select a chapter" dropdown. It never
 writes to your Royal Road account and never fetches your account pages: what it knows about

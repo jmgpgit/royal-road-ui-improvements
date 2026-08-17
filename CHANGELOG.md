@@ -4,6 +4,212 @@ Notable changes, newest first. Versions follow [semantic versioning](https://sem
 the patch number for fixes, the minor for new settings, the major for anything that changes
 what an existing setting does.
 
+## 1.5.0
+
+**Tried and dropped**
+
+- Mark a fiction you gave a go and stopped. Its card dims and is labelled Dropped wherever it
+  turns up, but stays in the list and stays clickable: hiding already answers "never show me
+  this again", and a mark you cannot click through is no use for changing your mind.
+- On by default, beside hiding, which has shipped on since 1.0. The two are the same gesture on
+  the same card and the difference is only whether you might change your mind, so shipping one
+  and hiding the other meant the pair was found only by going looking in options. The whole cost
+  is a second button: nothing is marked, recorded or fetched until you press one. It is still its
+  own switch, so the button can go without taking hiding with it.
+- Dropped joins follows, favourites and read later as a chip in the filter panel's "Hide mine",
+  for when you do want them out of the way.
+- Its own manager in options, searchable and clearable, beside the hidden one, and exported and
+  imported with everything else. A separate list from the hidden one, because a fiction can be
+  on both and the two answer different questions.
+
+**What has changed since you last looked**
+
+- Royal Road only ever prints today's total, so "32,866 followers" cannot say whether a fiction
+  is climbing or has gone quiet. Each figure on a fiction page now carries the change since your
+  last visit — `(+312)`, `(−2)`, `(+0.02)` — across the six stat tiles and all five star ratings,
+  and the Statistics header sums it up while that section is shut.
+- No request: the numbers are already on the page you opened. Two readings per fiction are kept,
+  so a reload repeats the same answer rather than erasing the delta you just read. Twelve hours
+  between visits rolls the baseline forward, and nothing is measured against a reading more than
+  a week old — visits closer together than that used to chain into one look that never ended.
+- Nothing on a first visit, and nothing when nothing moved. Off by default: nothing is recorded
+  while it is off, switching it off deletes what it recorded, and a fiction you have not opened
+  for a year is dropped.
+
+**Every tag on a card**
+
+- Royal Road folds all but the first few tags behind a `+`. Two settings open them without the
+  click: on the lists, while the pointer is over the card or always; on a fiction's own page,
+  always. Cards get taller, so both ship off.
+- Pure CSS, and Royal Road's own `+` goes on working underneath — a row that opened on hover can
+  be pinned open, and one that opened on its own can be closed.
+- The `+` goes where it has nothing left to reveal, on a fiction page as well as on the lists.
+  It stays on hover, where pressing it is the only way to keep the row open once the pointer
+  leaves.
+
+**Tag colours**
+
+- Give a tag a colour and it carries it everywhere it appears: the fiction lists, a fiction's own
+  page, and — behind its own switch — the home page. Only the tags you pick; every other tag is
+  left as Royal Road styles it, and picking none means no stylesheet at all.
+- The text colour is computed from the background you chose, because a dark pick otherwise keeps
+  Royal Road's own light-on-dark chip text and the tag becomes unreadable at exactly the moment
+  you marked it to stand out.
+- The home page writes its tags as plain chips with no slug on them, so there they are matched by
+  name — and the name comes from Royal Road's own tag list. A colour chosen before that list has
+  been cached is stored with the slug alone and still works on the lists and fiction pages; the
+  options page fills the name in as soon as it has both halves, and the tag starts colouring on
+  the home page too.
+- The editor is its own card in options, beside the two fiction managers, and the colours are
+  settings: exported, imported and reset with everything else.
+
+**Filters that say what they are doing**
+
+- **A list filtered down to nothing now says so.** An empty list looks exactly like a page that
+  genuinely has no matches.
+- **A tag in "must have" and "must not have" at once** can never match anything, and the empty
+  list it produces reads as a filter that is merely strict. The panel says so, in the Tags group
+  where both lists are. It checks on open too: a saved filter can already contradict itself
+  before you type anything.
+- **Your own Global Filters get a mention** after four pages in a row that match nothing. They
+  are yours, set on Royal Road, and Royal Road applies them before serving the list — so a filter
+  here that looks broken may be working correctly on what is left. Read off the badge on Royal
+  Road's button; the button itself is there signed out, so its presence proves nothing.
+- Infinite scroll no longer walks to its 25-page ceiling on a list where nothing matches, and
+  Royal Road's own page numbers no longer disappear along with it, which used to leave an empty
+  list with no way on at all. The scan ahead stays: a match can be on page five, and giving up on
+  the first empty page would guarantee never finding it.
+
+**The recap names its chapter**
+
+- "Previously" now says which chapter it is previously *of*, beside the label. Not remembering
+  how the last chapter went is the whole reason the recap is there, so leaving the reader to work
+  out which one it was asked the one thing they cannot answer.
+- It costs no request: the recap already fetches that page, and this reads its title on the way
+  past. A chapter whose name cannot be read shows the label alone — a wrong name would be worse
+  than none, and the recap itself is unaffected either way.
+
+**Your reading history**
+
+- Options -> Backup says how much is stored and has a button that forgets it: where you got to
+  in every chapter, which comments you had seen, and every fiction statistic. Hidden and dropped
+  fictions each have a manager; the half you accumulate by reading rather than by choosing could
+  not be seen at all, and the only way to be rid of it was to uninstall.
+- A chapter record now goes once you have not opened that chapter for a year, whether or not the
+  settings that wrote it are still on. Both expiries lived inside their own write path, so
+  switching reading positions or seen comments off stopped the pruning along with the writing,
+  and whatever had accumulated stayed for good. Housekeeping runs once a day from any Royal Road
+  page.
+
+**The options page**
+
+- Reordered on one rule: a setting sits beside the thing it changes, in the order you meet it.
+  Box order already did that; inside the boxes it was mostly the order the features were built.
+  Comments becomes its own box — chapter pages carried 26 of the 51 rows, 13 under a single
+  heading. No box now holds more than 16, and no group more than 7.
+- Headings that did not predict what was under them are gone. The toolbar switch was filed under
+  "Descriptions and layout"; infinite scroll under "Filters"; "show what has changed" under a
+  heading identical to the label of the row three lines above it.
+- Every row is one shape now: label left, control right, note beneath. Three different geometries
+  shared the name, so no two kinds of setting lined up down the page. A note longer than about
+  three lines clamps and opens on click.
+- Each of the two fiction managers moved beside the switches that fill it, instead of both being
+  appended after every group in the box.
+- A strip of links across the top, one per box.
+- The note under a checkbox used to be part of the checkbox's own accessible name — 427
+  characters of it, in one case, read out before the control itself. The notes under the other
+  three kinds of row were associated with nothing at all. Both fixed, and a disabled row keeps
+  its note readable rather than fading it with everything else.
+- The two comment-pattern rows say "regular expression" in their labels, where the note beneath
+  was the only thing that mentioned it.
+- The buttons that open this page — in the popup and on the in-page toolbar — name all three
+  things behind it: the hidden list, the tried-and-dropped list, and forgetting your reading
+  history. Naming one of the three is how the other two stay undiscovered. Neither uses Royal
+  Road's own "favourites" or "read later" wording, so neither can be read as a claim that the
+  extension reaches your account pages.
+
+**The popup**
+
+- **The maximum list width is a slider here too**, beside Layout, which is the setting it
+  qualifies. Unset it parks at the low end and reads "default", the same way the two reader
+  widths already do.
+- **"Show every tag on a card" joins it.** Which tags a card shows is a decision you make while
+  scrolling a list, and the popup is where the list settings you change mid-scroll live.
+
+**Fixes**
+
+- **Both colour settings can be set from the options page again.** "Text colour" and the comment
+  thread colour were listed in their groups, had a label and a note, and rendered no control at
+  all: the row builder dispatches on a setting's type and quietly built nothing for a type it did
+  not know. The only way to set either was to export a backup, edit the JSON and import it back.
+  A test now walks every setting the page claims to show and fails on one whose type has no row.
+
+- **The tag filters offer every tag, not the first eight.** Opening "must have tags" listed eight
+  of about seventy, alphabetically, which reads as a list that failed to load. The picker asked
+  for eight matches, which is right while typing and wrong before it. Its menu already scrolled.
+- **And every tag Royal Road has, not the ones that happened to scroll past.** The list was taken
+  as complete once it held 72 entries — but a single Rising Stars page carries 73 tags on its
+  cards, so a busy page passed for the whole vocabulary and the real list was never fetched. A
+  rare tag simply could not be typed, and a reader with Royal Road's global filters set saw fewer
+  still. The 22 genres are in it now too: they are a separate thing on Royal Road, and not on the
+  cards, where "Fantasy" is a chip that filters exactly like any tag.
+- Tag names are also learnt from the pages you already have open, which costs no request at all —
+  a fiction list carries a few hundred tag links. Before this, nothing learnt a single tag name
+  until the filter panel was opened, which many readers never do; and until a name is known, a
+  tag colour cannot reach the home page, where the chips carry no tag id to match on.
+- **Enter in an empty tag field no longer adds a tag.** With nothing typed it took the head of
+  the catalogue and added it — and Enter in a filter field is exactly what you would press
+  meaning "apply".
+- **"Forget my reading history" now reaches the copy the options page cannot.** Where you are in
+  a chapter is written to royalroad.com's own storage as you scroll, which only a page script can
+  clear, so forgetting was delegated to whichever Royal Road tab happened to be open. With none
+  open, the daily housekeeping was the backstop — and it deliberately keeps anything written in
+  the last day, so a position could outlive the press by two days and then be handed back. The
+  press is stamped, and every Royal Road page acts on a stamp it has not seen.
+- **Re-sorting comments or reviews no longer stops infinite scroll.** Royal Road refetches page
+  one and swaps the list, taking every page appended under it, while our counters went on
+  believing the run was deep in the list and already finished — so nothing further loaded and
+  the rest of the comments were simply gone. The run now restarts from the sort control itself:
+  what was appended is cleared, Royal Road's page numbers come back until there is something to
+  hide again, and loading resumes where you are rather than waiting for you to scroll to the
+  bottom of a list one page tall.
+- **The next page is fetched in the order you are actually looking at.** Royal Road's paginator
+  reads its fetch URL once, when it starts, and a re-sort updates its own copy without ever
+  writing that URL back — so from the first re-sort onwards the page advertises an order nobody
+  is looking at. Asking for page two of it returned rows already on screen, which deduplicated
+  away to nothing and ended the run. The order now comes from the control you used. A default
+  review sort of your own travels the same path, instead of being forced onto every page long
+  after you had picked something else.
+- **Infinite scroll carries on from the page you are on.** It always started at page two:
+  arriving on page five through Royal Road's own pagination fetched page two and appended the
+  middle of the list underneath, and arriving on page two refetched what was already on screen
+  — every row a duplicate, nothing added, and the run over before it began.
+- **A review no longer goes missing when the list is reordered.** The duplicate check compared
+  an arriving item's id against every id in the container — a reply tree, a tooltip, a rating
+  widget — so any collision dropped that item with no trace. Twelve reviews before the reorder,
+  eleven after. Item ids are compared against item ids now.
+- **"Where I stopped reading" and "which comments I have seen" stop recording the moment you
+  switch them off**, in the tab you switched them off in. Their handlers are attached once and
+  never removed, so until the next page load scrolling went on writing positions and leaving the
+  page went on moving the comment watermark. Both settings promise nothing is recorded while
+  they are off, and that held on the next page load but not in the tab where it was asked for.
+- **The cached tag list refreshes weekly again.** Its week ran from the last write of the cache,
+  and a read writes the cached copy straight back — so anyone who opened the filter panel more
+  often than weekly never refreshed it, and it only aged while it went unused. The clock now
+  runs from the fetch.
+
+**Privacy policy**
+
+- Names seven kinds of stored thing rather than four: the dropped list, the fiction statistics,
+  and the two numbers saying when housekeeping last ran and when you last pressed forget.
+- Says what uninstalling does not remove. Three things live under royalroad.com rather than
+  under the extension, because its own pages have to read them: the `localStorage` mirror, your
+  place in the chapter you are reading, and the layout cookie — which lasts a year, so Royal
+  Road can go on serving the design you picked long after the extension that asked for it is
+  gone. Royal Road's own "Revert To Legacy UI" link undoes it.
+- The mirror is described for what it is: a full copy of your settings, plus the ids — no titles
+  — of your hidden and dropped fictions.
+
 ## 1.4.2
 
 Shorter prose, nothing else. No behaviour changed and no setting moved.
