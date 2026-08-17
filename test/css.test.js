@@ -69,6 +69,35 @@ test('show-hidden mode reveals rather than removes', () => {
   assert.match(text, />\*:not\(\.rrx-ui\)/);
 });
 
+test('a dropped fiction is dimmed, and nothing else', () => {
+  // The whole point of the mark is that the card stays: `display:none` is what
+  // hiding is for, and `pointer-events:none` would stop somebody changing their
+  // mind, which is the case this feature exists to serve.
+  const text = css.buildDropCss([181303]);
+  assert.match(text, /opacity:0?\.\d+/);
+  assert.equal(text.includes('display:none'), false, 'a dropped fiction is not hidden');
+  assert.equal(text.includes('pointer-events'), false, 'and stays clickable');
+  assert.match(text, /a\[href\*="\/fiction\/181303\/"\]/);
+  // Same reason as the hide stylesheet: opacity on the card cannot be undone by
+  // a child, so our own controls have to be left out of it.
+  assert.match(text, />\*:not\(\.rrx-ui\)/);
+});
+
+test('the dropped stylesheet scales the same way the hidden one does', () => {
+  assert.equal(css.buildDropCss([]), '');
+  assert.equal(css.buildDropCss(['nonsense', 0, -1]), '');
+  assert.equal(css.buildDropCss([2, 1, 2]), css.buildDropCss([1, 2]));
+
+  const one = ruleCount(css.buildDropCss([1]));
+  const many = ruleCount(css.buildDropCss(Array.from({ length: 500 }, (_, i) => i + 1)));
+  assert.equal(one, many);
+  assert.equal(one, CARD_GROUPS.length, 'one dimming rule per card group');
+
+  for (const variant of CARD_VARIANTS) {
+    assert.ok(css.buildDropCss([1]).includes(variant), `missing card variant: ${variant}`);
+  }
+});
+
 test('inject.css can only ever match the redesign or our own elements', () => {
   // This is the invariant that lets boot.js run without an old-UI check: every
   // selector must be anchored to an `rrx-` name we control or a `data-rr-` hook

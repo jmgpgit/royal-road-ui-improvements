@@ -277,6 +277,11 @@
   function syncCards(scope, ctx) {
     if (ctx.page !== 'chapter') return;
 
+    // A re-sort replaces the list, taking our appended pages with it. Noticed
+    // here because nothing else runs afterwards unless the reader scrolls, and
+    // by then the run has already stopped for good.
+    if (pager.noticeReplacement() && ctx.settings['comments.autoLoad']) pager.check();
+
     const collapsible = ctx.settings['comments.collapsible'];
 
     /* Can any rule reach a verdict other than "leave alone"? On the shipped

@@ -89,6 +89,7 @@
         "src/content/features/expand-all.js",
         "src/content/features/hover-expand.js",
         "src/content/features/hide-fictions.js",
+      "src/content/features/dropped-fictions.js",
         "src/content/features/list-filters.js",
         "src/content/features/list-loadmore.js",
         "src/content/features/view-modes.js",

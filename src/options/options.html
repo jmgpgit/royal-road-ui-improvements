@@ -35,7 +35,30 @@
         <p id="hidden-empty" class="muted">
           Nothing hidden yet. Use the &minus; button on any fiction card on Royal Road.
         </p>
-        <ul id="hidden-list" class="hidden-list"></ul>
+        <ul id="hidden-list" class="fic-list"></ul>
+      </section>
+
+      <section class="card" id="dropped-section" aria-labelledby="dropped-heading">
+        <div class="card__head">
+          <h3 class="group__title" id="dropped-heading">
+            Tried and dropped (<span id="dropped-count">0</span>)
+          </h3>
+          <div class="card__actions">
+            <input
+              type="search"
+              id="dropped-search"
+              class="input"
+              placeholder="Filter by title…"
+              aria-label="Filter dropped fictions by title"
+            />
+            <button type="button" id="undrop-all" class="btn btn--danger">Clear the list</button>
+          </div>
+        </div>
+        <p id="dropped-empty" class="muted">
+          Nothing dropped yet. Turn on “Mark fictions you tried and dropped” above, then use the
+          bookmark button on any fiction card on Royal Road.
+        </p>
+        <ul id="dropped-list" class="fic-list"></ul>
       </section>
 
       <section class="card" aria-labelledby="backup-heading">

@@ -4,10 +4,9 @@ Not promises and not a schedule. Ideas with enough reasoning attached that picki
 not mean starting from nothing. Everything here is subject to the three rules in
 [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
-Shipped as of 1.4.0: list filters and layouts, permanent hiding, chapter typography, the
-previous-chapter recap, the design switch, chapter facts (posted date, length, catch-up
-count), resume where you stopped, and
-comments posted since your last visit.
+Shipped as of 1.5.0: list filters and layouts, permanent hiding, tried-and-dropped marks,
+chapter typography, the previous-chapter recap, the design switch, chapter facts (posted date,
+length, catch-up count), resume where you stopped, and comments posted since your last visit.
 
 ## How to judge anything here
 
@@ -28,14 +27,6 @@ has 60 days.
 feature, and usually a smaller one.
 
 ## Next up
-
-**Tried and dropped** — a per-fiction mark for something you sampled and stopped: the card dims,
-it does not disappear. Hiding is permanent and silent; this is not. Design settled: generated
-CSS beside `buildHideCss`, one rule per card group, **no** `display: none`, **no**
-`pointer-events: none` — a dropped fiction stays clickable, because changing your mind is the
-point. The control is a second `.rrx-card-btn`, so `hide-fictions.js` must select
-`[data-rrx-btn="hide"]`, not `:scope > .rrx-card-btn`, or whichever runs first deletes the
-other's button. Filtering rides `filters.hideMine`, not a new key.
 
 **Stat deltas on fiction pages** — "since you last looked: +312 followers, +0.02 rating". Read
 the six stat tiles by label text, icon as fallback (that page renders FontAwesome under five

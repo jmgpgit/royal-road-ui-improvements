@@ -19,6 +19,11 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (deps) {
   const { CARD_GROUPS, VIEWS, normalizeIds, normalizeSettings } = deps;
 
+  /** How far a dropped fiction's card fades. Enough to read as set aside while
+   *  skimming, not so far the title cannot be read - the card is still there to
+   *  be reconsidered. */
+  const DROP_OPACITY = 0.55;
+
   /** Marks every element this extension injects: inject.css resets them away from
    *  Royal Road's styling, buildHideCss exempts them from a hidden card's dimming,
    *  and main.js's MutationObserver ignores them so it cannot sweep on its own output. */
@@ -151,6 +156,35 @@
     return rules.join('\n');
   }
 
+  /**
+   * The same per-group `:has()` shape as `buildHideCss`, for fictions marked as
+   * tried and dropped. Deliberately not `display:none` and not
+   * `pointer-events:none`: a dropped fiction stays in the list, stays legible
+   * and stays clickable, because the mark exists to be reconsidered. Somebody
+   * who wants them gone can filter them out, or hide them.
+   *
+   * @param {Array<number|string>} ids dropped fiction ids
+   * @returns {string} CSS text ('' when nothing is dropped)
+   */
+  function buildDropCss(ids) {
+    const clean = normalizeIds(ids);
+    if (!clean.length) return '';
+
+    const rules = [];
+    for (const group of CARD_GROUPS) {
+      const match = `:is(${group.cards.join(',')}):has(:is(${linkMatch(group, clean)}))`;
+      // On the children, skipping our own controls: opacity on the card cannot be
+      // undone by a descendant, so the badge and buttons would fade with it.
+      // `!important` for the same reason the hide sheet needs it - this lands in
+      // <html> at document_start, so any later Royal Road rule of equal
+      // specificity would win, and the card would simply not dim.
+      rules.push(
+        `${match}>*:not(.${UI_CLASS}){opacity:${DROP_OPACITY}!important;filter:grayscale(.5)!important}`
+      );
+    }
+    return rules.join('\n');
+  }
+
   return {
     UI_CLASS,
     ROOT_CLASS,
@@ -159,6 +193,7 @@
     rootClassesFor,
     rootVarsFor,
     buildHideCss,
+    buildDropCss,
     hrefTest,
   };
 });

@@ -17,6 +17,8 @@
     settings: RRX.normalizeSettings(null),
     hidden: {},
     hiddenSet: new Set(),
+    dropped: {},
+    droppedSet: new Set(),
     /** 'list' | 'chapter' | 'fiction' | 'home' | 'other' */
     page: 'other',
     isListPage: false,
@@ -25,6 +27,8 @@
     filterCounts: null,
     hide,
     unhide,
+    drop,
+    undrop,
     setSetting,
     setSettings,
   };
@@ -35,16 +39,18 @@
 
   // --- state ---------------------------------------------------------------
 
-  function adoptState(settings, hidden) {
+  function adoptState(settings, hidden, dropped) {
     ctx.settings = RRX.normalizeSettings(settings);
     ctx.hidden = RRX.normalizeHidden(hidden);
     ctx.hiddenSet = new Set(RRX.hiddenIds(ctx.hidden));
+    ctx.dropped = RRX.normalizeDropped(dropped);
+    ctx.droppedSet = new Set(RRX.droppedIds(ctx.dropped));
   }
 
   /** Push current state everywhere: stylesheet, mirror, toolbar, card controls. */
   function applyState() {
-    RRX.boot.apply(ctx.settings, [...ctx.hiddenSet]);
-    RRX.store.writeMirror(ctx.settings, ctx.hidden);
+    RRX.boot.apply(ctx.settings, [...ctx.hiddenSet], [...ctx.droppedSet]);
+    RRX.store.writeMirror(ctx.settings, ctx.hidden, ctx.dropped);
     // Cards first: filtering sets ctx.filterCounts, which the toolbar reports.
     syncCards(document);
     renderToolbar();
@@ -56,24 +62,44 @@
 
   /** Batched: the filter panel applies ~20 settings in one go. */
   async function setSettings(patch) {
-    adoptState({ ...ctx.settings, ...patch }, ctx.hidden);
+    adoptState({ ...ctx.settings, ...patch }, ctx.hidden, ctx.dropped);
     applyState(); // optimistic: the UI must not wait on storage
     await RRX.store.saveSettings(patch);
   }
 
+  const titleOf = (id, meta) => (meta && meta.title) || `Fiction ${id}`;
+
   async function hide(id, meta) {
-    adoptState(ctx.settings, { ...ctx.hidden, [id]: { ...meta, hiddenAt: Date.now() } });
+    adoptState(ctx.settings, { ...ctx.hidden, [id]: { ...meta, hiddenAt: Date.now() } }, ctx.dropped);
     applyState();
-    ui.toast(`Hidden “${(meta && meta.title) || `Fiction ${id}`}”`, 'Undo', () => unhide(id));
+    ui.toast(`Hidden “${titleOf(id, meta)}”`, 'Undo', () => unhide(id));
     await RRX.store.hide(id, meta);
   }
 
   async function unhide(id) {
     const next = { ...ctx.hidden };
     delete next[Number(id)];
-    adoptState(ctx.settings, next);
+    adoptState(ctx.settings, next, ctx.dropped);
     applyState();
     await RRX.store.unhide(id);
+  }
+
+  async function drop(id, meta) {
+    adoptState(ctx.settings, ctx.hidden, {
+      ...ctx.dropped,
+      [id]: { ...meta, droppedAt: Date.now() },
+    });
+    applyState();
+    ui.toast(`Marked “${titleOf(id, meta)}” as dropped`, 'Undo', () => undrop(id));
+    await RRX.store.drop(id, meta);
+  }
+
+  async function undrop(id) {
+    const next = { ...ctx.dropped };
+    delete next[Number(id)];
+    adoptState(ctx.settings, ctx.hidden, next);
+    applyState();
+    await RRX.store.undrop(id);
   }
 
   // --- page shape ----------------------------------------------------------
@@ -267,19 +293,19 @@
       RRX.boot.legacy = true;
       document.documentElement.classList.remove(RRX.ROOT_CLASS.filtersPending);
 
-      const { settings, hidden } = await RRX.boot.ready;
+      const { settings, hidden, dropped } = await RRX.boot.ready;
 
       // The mirror is the only way a legacy page leaves behind what the next one
       // needs to switch before it paints.
-      RRX.store.writeMirror(settings, hidden);
+      RRX.store.writeMirror(settings, hidden, dropped);
 
       // Follow a layout change from the popup straight away, or the popup appears
       // to do nothing on the page you changed it for.
       RRX.store.onChange(({ settings: next }) => RRX.boot.enforceDesign(next));
       return;
     }
-    const { settings, hidden } = await RRX.boot.ready;
-    adoptState(settings, hidden);
+    const { settings, hidden, dropped } = await RRX.boot.ready;
+    adoptState(settings, hidden, dropped);
     refreshPageShape();
     healthCheck();
     applyState();
@@ -287,11 +313,11 @@
     document.documentElement.classList.add(RRX.ROOT_CLASS.ready);
 
     // Options page, popup, or another tab changed something.
-    RRX.store.onChange(({ settings: s, hidden: h }) => {
+    RRX.store.onChange(({ settings: s, hidden: h, dropped: d }) => {
       // Switching to the old layout ends this page, so it comes before anything
       // that would restyle a page about to go.
       if (RRX.boot.enforceDesign(s)) return;
-      adoptState(s, h);
+      adoptState(s, h, d);
       applyState();
       runOnce();
     });

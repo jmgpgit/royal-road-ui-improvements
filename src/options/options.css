@@ -54,8 +54,8 @@ body {
  * gets a gap.
  *
  * `gap` on the flex parent reaches direct children only, which is exactly what
- * is wanted here: the hidden-fiction manager lives one level deeper, inside the
- * Fiction lists box, so it cannot pick this up and keeps its group spacing.
+ * is wanted here: the two fiction managers live one level deeper, inside the
+ * Fiction lists box, so they cannot pick this up and keep their group spacing.
  *
  * The between-box gap has to stay clearly larger than the between-group gap
  * inside a box (1.25rem), or the hierarchy reads flat.
@@ -238,9 +238,9 @@ select.input {
   color: var(--danger);
 }
 
-/* --- hidden fiction list ------------------------------------------------- */
+/* --- the hidden and dropped fiction lists ---------------------------------- */
 
-.hidden-list {
+.fic-list {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -251,7 +251,7 @@ select.input {
   list-style: none;
 }
 
-.hidden-item {
+.fic-item {
   display: flex;
   gap: 0.7rem;
   align-items: center;
@@ -260,7 +260,7 @@ select.input {
   border-radius: 0.4rem;
 }
 
-.hidden-item__cover {
+.fic-item__cover {
   flex: none;
   width: 2.6rem;
   height: 3.9rem;
@@ -269,12 +269,12 @@ select.input {
   border-radius: 0.2rem;
 }
 
-.hidden-item__body {
+.fic-item__body {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.hidden-item__title {
+.fic-item__title {
   display: block;
   overflow: hidden;
   color: inherit;
@@ -284,12 +284,12 @@ select.input {
   white-space: nowrap;
 }
 
-.hidden-item__title:hover {
+.fic-item__title:hover {
   color: var(--primary);
   text-decoration: underline;
 }
 
-.hidden-item__meta {
+.fic-item__meta {
   color: var(--muted);
   font-size: 0.78rem;
 }
@@ -323,9 +323,10 @@ select.input {
   padding-top: 0;
 }
 
-/* The hidden-fiction manager sits inside the Fiction lists box, so it drops the
-   card chrome it would otherwise carry and reads as one more group. */
-#hidden-section.card {
+/* Both managers sit inside the Fiction lists box, so they drop the card chrome
+   they would otherwise carry and read as two more groups. */
+#hidden-section.card,
+#dropped-section.card {
   padding: 0;
   margin-top: 1.25rem;
   background: none;

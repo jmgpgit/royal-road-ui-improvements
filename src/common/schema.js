@@ -19,7 +19,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   const STATUSES = ['ONGOING', 'HIATUS', 'COMPLETED', 'STUB', 'DROPPED'];
   const TYPES = ['Original', 'Fan Fiction'];
-  const MINE = ['follow', 'favorite', 'ril'];
+  const MINE = ['follow', 'favorite', 'ril', 'dropped'];
   const VIEWS = ['default', 'compact', 'grid', 'two-col'];
 
   /**
@@ -60,6 +60,12 @@
     // ── hiding individual fictions (v1 feature) ───────────────────────────
     'hide.enabled': { type: 'bool', default: true },
     'hide.showHidden': { type: 'bool', default: false },
+
+    /** Mark a fiction as one you tried and stopped reading. Its card dims and
+     *  says so wherever it turns up, but stays where it is and stays clickable -
+     *  changing your mind is the point, and hiding already covers "never show me
+     *  this again". Off by default: it puts a second button on every card. */
+    'drop.enabled': { type: 'bool', default: false },
 
     // ── filters ───────────────────────────────────────────────────────────
     'filters.enabled': { type: 'bool', default: true },

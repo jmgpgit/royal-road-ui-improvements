@@ -86,6 +86,10 @@
       label: 'Show hidden fictions in place',
       note: 'Hidden fictions stay in the lists, dimmed and labelled, each with a plus button to bring it back.',
     },
+    'drop.enabled': {
+      label: 'Mark fictions you tried and dropped',
+      note: 'Puts a bookmark button on every card. A fiction you mark dims and is labelled Dropped wherever it comes up, so you can see you have already given it a go — but it stays in the list and stays clickable, in case you change your mind. To stop them appearing at all, add Dropped to “Hide mine” in the Filters panel. Turning this off keeps your list for later.',
+    },
 
     // ── filters ───────────────────────────────────────────────────────────
     'filters.enabled': {
@@ -321,6 +325,7 @@
         },
         { title: 'Filters', keys: ['filters.enabled', 'list.infiniteScroll'] },
         { title: 'Hiding fictions', keys: ['hide.enabled', 'hide.showHidden'] },
+        { title: 'Tried and dropped', keys: ['drop.enabled'] },
       ],
     },
     {

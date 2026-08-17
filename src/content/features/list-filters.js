@@ -33,11 +33,19 @@
   }
 
   /** Cached per card; re-parsing 50 cards on every sweep is waste. */
-  function dataFor(card) {
+  function dataFor(card, ctx) {
     if (!card[DATA_KEY]) {
       const id = card.dataset.rrxFid ? Number(card.dataset.rrxFid) : null;
       card[DATA_KEY] = RRX.readCardData(card, id);
     }
+    // Read fresh rather than cached with the rest: everything else on the record
+    // comes off markup that only changes when the card is re-rendered, but this
+    // is our own mark, and dropping a fiction has to take effect on the pass that
+    // follows rather than whenever Royal Road next redraws the list. Gated on the
+    // feature's own switch, so turning it off makes the marks inert everywhere
+    // rather than leaving this one filter still acting on them.
+    card[DATA_KEY].mine.dropped =
+      !!ctx.settings['drop.enabled'] && !!ctx.droppedSet && ctx.droppedSet.has(card[DATA_KEY].id);
     return card[DATA_KEY];
   }
 
@@ -50,7 +58,7 @@
     let shown = 0;
 
     for (const card of cards) {
-      const keep = !active || RRX.matchesFilters(dataFor(card), ctx.settings);
+      const keep = !active || RRX.matchesFilters(dataFor(card, ctx), ctx.settings);
       card.classList.toggle(FILTERED_CLASS, !keep);
       if (keep) shown += 1;
     }

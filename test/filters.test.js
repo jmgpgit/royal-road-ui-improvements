@@ -130,6 +130,14 @@ test('hideMine drops what is already on my shelves', () => {
 
   // Logged out, `mine` is absent entirely - nothing to hide, nothing excluded.
   assert.equal(matchesFilters(card({ mine: undefined }), { 'filters.hideMine': ['follow'] }, NOW), true);
+
+  // "Tried and dropped" rides the same list rather than a filter of its own: it
+  // answers the same question as the other three, and the panel already has a
+  // row for it. The value is ours, filled in from the stored list rather than
+  // read off the card - see list-filters.js.
+  const dropped = card({ mine: { follow: false, favorite: false, ril: false, dropped: true } });
+  assert.equal(matchesFilters(dropped, { 'filters.hideMine': ['dropped'] }, NOW), false);
+  assert.equal(matchesFilters(dropped, { 'filters.hideMine': ['follow'] }, NOW), true);
 });
 
 test('the master switch turns everything off at once', () => {

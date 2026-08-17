@@ -1,6 +1,6 @@
 'use strict';
 
-/** Options page: schema-built settings sections, the hidden-fiction manager, and
+/** Options page: schema-built settings sections, the two fiction managers, and
  *  JSON backup. Writes go to the browser.storage.local every Royal Road tab
  *  reads, so open tabs pick changes up through storage.onChanged, no reload. */
 (function () {
@@ -8,12 +8,12 @@
   const { SCHEMA, COPY, SECTIONS } = RRX;
   const $ = (id) => document.getElementById(id);
 
-  let state = { settings: RRX.normalizeSettings(null), hidden: {}, chapters: {} };
-  let filter = '';
+  let state = { settings: RRX.normalizeSettings(null), hidden: {}, dropped: {}, chapters: {} };
 
-  /** Hand-written markup rather than a generated row, so render moves it into the
-   *  list settings box. It lives here until then, so the listeners below find it. */
-  const hiddenSection = $('hidden-section');
+  /** Hand-written markup rather than generated rows, so render moves them into
+   *  the list settings box. They live here until then, so the listeners below
+   *  find them. */
+  const managerSections = [$('hidden-section'), $('dropped-section')];
 
   // --- element helpers -------------------------------------------------------
 
@@ -149,6 +149,8 @@
     'list.hoverExpand': () => !state.settings['list.expandAll'],
     'list.hoverDelayMs': () => state.settings['list.hoverExpand'] && !state.settings['list.expandAll'],
     'hide.showHidden': () => state.settings['hide.enabled'],
+    // Deliberately absent: `drop.enabled` off keeps the list, the same way
+    // `hide.enabled` does, so its manager stays usable.
     'reader.lineHeight': () => state.settings['reader.enabled'],
     'reader.justify': () => state.settings['reader.enabled'],
     'reader.hyphens': () => state.settings['reader.enabled'] && state.settings['reader.justify'],
@@ -170,8 +172,8 @@
 
   function renderSections() {
     const host = $('sections');
-    // Lift it clear before the wipe, or the re-render destroys it.
-    hiddenSection.remove();
+    // Lift them clear before the wipe, or the re-render destroys them.
+    for (const section of managerSections) section.remove();
     host.textContent = '';
     for (const section of SECTIONS) {
       const groups = section.groups.map((group) =>
@@ -185,7 +187,7 @@
           el('h2', { id: `h-${section.id}`, text: section.title }),
           section.blurb ? el('p', { class: 'muted card__blurb', text: section.blurb }) : null,
           ...groups,
-          section.id === 'lists' ? hiddenSection : null,
+          ...(section.id === 'lists' ? managerSections : []),
         ])
       );
     }
@@ -200,7 +202,7 @@
     }
   }
 
-  // --- hidden fictions -------------------------------------------------------
+  // --- the hidden and dropped managers ---------------------------------------
 
   function formatDate(ms) {
     if (!ms) return 'date unknown';
@@ -211,51 +213,91 @@
     });
   }
 
-  function renderHidden() {
-    const list = $('hidden-list');
-    const empty = $('hidden-empty');
-    const ids = RRX.hiddenIds(state.hidden);
-    $('hidden-count').textContent = String(ids.length);
+  /** The two lists are the same list with different words, so they share a
+   *  renderer rather than drifting apart a line at a time. */
+  const MANAGERS = {
+    hidden: {
+      stamp: 'hiddenAt',
+      /** What the date line says, and the per-row button. */
+      past: 'Hidden',
+      undo: 'Unhide',
+      empty: 'Nothing hidden yet. Use the − button on any fiction card on Royal Road.',
+      noMatch: (needle) => `No hidden fiction matches “${needle}”.`,
+      ids: () => RRX.hiddenIds(state.hidden),
+      records: () => state.hidden,
+      remove: (id) => RRX.store.unhide(id),
+      adopt: (next) => {
+        state.hidden = next;
+      },
+    },
+    dropped: {
+      stamp: 'droppedAt',
+      past: 'Dropped',
+      undo: 'Restore',
+      empty:
+        'Nothing dropped yet. Turn on “Mark fictions you tried and dropped” above, then use the ' +
+        'bookmark button on any fiction card on Royal Road.',
+      noMatch: (needle) => `No dropped fiction matches “${needle}”.`,
+      ids: () => RRX.droppedIds(state.dropped),
+      records: () => state.dropped,
+      remove: (id) => RRX.store.undrop(id),
+      adopt: (next) => {
+        state.dropped = next;
+      },
+    },
+  };
 
-    const needle = filter.trim().toLowerCase();
+  /** One search box each, kept out of the manager definitions because it is
+   *  view state rather than what the list is. */
+  const search = { hidden: '', dropped: '' };
+
+  function renderManager(kind) {
+    const manager = MANAGERS[kind];
+    const list = $(`${kind}-list`);
+    const empty = $(`${kind}-empty`);
+    const records = manager.records();
+    const ids = manager.ids();
+    $(`${kind}-count`).textContent = String(ids.length);
+
+    const needle = search[kind].trim().toLowerCase();
     const visible = ids
-      .map((id) => ({ id, ...state.hidden[id] }))
-      // Most recently hidden first - that is what you are most likely undoing.
-      .sort((a, b) => b.hiddenAt - a.hiddenAt)
+      .map((id) => ({ id, ...records[id] }))
+      // Most recent first - that is what you are most likely undoing.
+      .sort((a, b) => b[manager.stamp] - a[manager.stamp])
       .filter((rec) => !needle || rec.title.toLowerCase().includes(needle));
 
     empty.hidden = ids.length > 0 && visible.length > 0;
-    if (!ids.length) {
-      empty.textContent = 'Nothing hidden yet. Use the − button on any fiction card on Royal Road.';
-    } else if (!visible.length) {
-      empty.textContent = `No hidden fiction matches “${filter}”.`;
-    }
+    if (!ids.length) empty.textContent = manager.empty;
+    else if (!visible.length) empty.textContent = manager.noMatch(search[kind]);
 
     list.textContent = '';
     for (const rec of visible) {
-      const cover = el('img', { class: 'hidden-item__cover', alt: '', loading: 'lazy' });
+      const cover = el('img', { class: 'fic-item__cover', alt: '', loading: 'lazy' });
       if (rec.cover) cover.src = rec.cover;
 
       list.appendChild(
-        el('li', { class: 'hidden-item' }, [
+        el('li', { class: 'fic-item' }, [
           cover,
-          el('div', { class: 'hidden-item__body' }, [
+          el('div', { class: 'fic-item__body' }, [
             el('a', {
-              class: 'hidden-item__title',
+              class: 'fic-item__title',
               href: new URL(rec.url, 'https://www.royalroad.com').href,
               target: '_blank',
               rel: 'noreferrer',
               text: rec.title,
             }),
-            el('div', { class: 'hidden-item__meta', text: `Hidden ${formatDate(rec.hiddenAt)}` }),
+            el('div', {
+              class: 'fic-item__meta',
+              text: `${manager.past} ${formatDate(rec[manager.stamp])}`,
+            }),
           ]),
           el('button', {
             type: 'button',
             class: 'btn btn--small',
-            text: 'Unhide',
+            text: manager.undo,
             onClick: async () => {
-              state.hidden = await RRX.store.unhide(rec.id);
-              renderHidden();
+              manager.adopt(await manager.remove(rec.id));
+              renderManager(kind);
             },
           }),
         ])
@@ -265,7 +307,8 @@
 
   function render() {
     renderSections();
-    renderHidden();
+    renderManager('hidden');
+    renderManager('dropped');
   }
 
   // --- backup ----------------------------------------------------------------
@@ -288,7 +331,9 @@
     });
     link.click();
     URL.revokeObjectURL(url);
-    setStatus(`Exported ${RRX.hiddenIds(state.hidden).length} hidden fictions.`, 'ok');
+    const hidden = RRX.hiddenIds(state.hidden).length;
+    const dropped = RRX.droppedIds(state.dropped).length;
+    setStatus(`Exported your settings, ${hidden} hidden and ${dropped} dropped fictions.`, 'ok');
   });
 
   $('import').addEventListener('click', () => $('import-file').click());
@@ -300,15 +345,21 @@
     try {
       const parsed = RRX.parseBackup(await file.text());
       const incoming = RRX.hiddenIds(parsed.hidden).length;
+      const incomingDropped = RRX.droppedIds(parsed.dropped).length;
       const current = RRX.hiddenIds(state.hidden).length;
-      // Reading progress is replaced too, so the prompt has to name it.
+      const dropped = RRX.droppedIds(state.dropped).length;
+      // Everything the import replaces has to be named, or the prompt is
+      // agreeing to less than it does.
       const read = Object.keys(state.chapters || {}).length;
-      const alsoRead = read ? ` and where you had got to in ${read} chapter${read === 1 ? '' : 's'}` : '';
+      const also = [
+        dropped ? `${dropped} dropped fiction${dropped === 1 ? '' : 's'}` : '',
+        read ? `where you had got to in ${read} chapter${read === 1 ? '' : 's'}` : '',
+      ].filter(Boolean);
       if (
-        (current || read) &&
+        (current || dropped || read) &&
         !confirm(
           `Replace your current settings, ${current} hidden fiction${current === 1 ? '' : 's'}` +
-            `${alsoRead} with what is in this file?`
+            `${also.length ? `, ${also.join(' and ')}` : ''} with what is in this file?`
         )
       ) {
         setStatus('Import cancelled.');
@@ -316,19 +367,19 @@
       }
       state = await RRX.store.replaceAll(parsed);
       render();
-      setStatus(`Imported ${incoming} hidden fictions.`, 'ok');
+      setStatus(`Imported ${incoming} hidden and ${incomingDropped} dropped fictions.`, 'ok');
     } catch (err) {
       setStatus(err.message || 'Could not read that file.', 'error');
     }
   });
 
+  const KEPT = 'Your hidden fictions, dropped fictions and reading progress are kept.';
+
   $('reset').addEventListener('click', async () => {
-    if (!confirm('Reset every setting to its default? Your hidden fictions and reading progress are kept.')) {
-      return;
-    }
+    if (!confirm(`Reset every setting to its default? ${KEPT}`)) return;
     state.settings = await RRX.store.resetSettings();
     render();
-    setStatus('Settings reset to defaults. Your hidden fictions and reading progress are kept.', 'ok');
+    setStatus(`Settings reset to defaults. ${KEPT}`, 'ok');
   });
 
   $('unhide-all').addEventListener('click', async () => {
@@ -338,19 +389,31 @@
       return;
     }
     state.hidden = await RRX.store.unhideAll();
-    renderHidden();
+    renderManager('hidden');
   });
 
-  $('hidden-search').addEventListener('input', (event) => {
-    filter = event.target.value;
-    renderHidden();
+  $('undrop-all').addEventListener('click', async () => {
+    const count = RRX.droppedIds(state.dropped).length;
+    if (!count) return;
+    if (!confirm(`Clear all ${count} dropped fiction${count === 1 ? '' : 's'}? This cannot be undone.`)) {
+      return;
+    }
+    state.dropped = await RRX.store.undropAll();
+    renderManager('dropped');
   });
+
+  for (const kind of Object.keys(MANAGERS)) {
+    $(`${kind}-search`).addEventListener('input', (event) => {
+      search[kind] = event.target.value;
+      renderManager(kind);
+    });
+  }
 
   // --- boot ------------------------------------------------------------------
 
-  // `onChange` carries settings and hidden only - reading progress is left out of
-  // its guard on purpose - so the spread keeps the chapters we already hold rather
-  // than overwriting them with undefined.
+  // `onChange` carries settings, hidden and dropped only - reading progress is
+  // left out of its guard on purpose - so the spread keeps the chapters we
+  // already hold rather than overwriting them with undefined.
   RRX.store.onChange((next) => {
     state = { ...state, ...next };
     render();

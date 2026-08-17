@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const model = require('../src/common/model.js');
+const { SCHEMA } = require('../src/common/schema.js');
 
 test('fictionIdFromHref accepts every shape of Royal Road fiction link', () => {
   const cases = {
@@ -69,15 +70,48 @@ test('the boot mirror round-trips, and a corrupt one degrades to null', () => {
     'list.hoverDelayMs': 300,
   });
   const hidden = { 5: { title: 'A' }, 3: { title: 'B' } };
+  const dropped = { 9: { title: 'C' } };
 
-  const parsed = model.parseMirror(JSON.stringify(model.buildMirror(settings, hidden)));
+  const parsed = model.parseMirror(JSON.stringify(model.buildMirror(settings, hidden, dropped)));
   assert.deepEqual(parsed.ids, [3, 5]);
+  assert.deepEqual(parsed.dropped, [9]);
   assert.equal(parsed.settings['list.expandAll'], true);
   assert.equal(parsed.settings['list.hoverDelayMs'], 300);
 
   assert.equal(model.parseMirror('{not json'), null);
   assert.equal(model.parseMirror(null), null);
   assert.equal(model.parseMirror(JSON.stringify({ v: 99, ids: [1] })), null, 'unknown version');
+
+  // A mirror written before dropped fictions existed still boots: it costs the
+  // dimming on that one load, not the settings and hidden ids alongside it.
+  const old = model.parseMirror(JSON.stringify({ v: 1, settings, ids: [3] }));
+  assert.deepEqual(old.ids, [3]);
+  assert.deepEqual(old.dropped, []);
+});
+
+test('dropped fictions are their own list, kept apart from the hidden one', () => {
+  const dropped = model.normalizeDropped({
+    181303: { title: 'Gifted', url: '/fiction/181303/gifted', cover: 'c.jpg', droppedAt: 1000 },
+    56828: {}, // a record that lost its metadata
+    bogus: { title: 'ignored' },
+  });
+  assert.deepEqual(model.droppedIds(dropped), [56828, 181303]);
+  assert.equal(dropped[181303].droppedAt, 1000);
+  assert.equal(dropped[56828].title, 'Fiction 56828');
+  assert.equal(dropped[56828].droppedAt, 0);
+  // The two stamps are what tell the records apart, so neither map may carry the
+  // other's: a dropped record that grew a `hiddenAt` would read as hidden.
+  assert.equal('hiddenAt' in dropped[181303], false);
+
+  // The same fiction can be on both lists, and hiding does not consume dropping.
+  const both = { 7: { title: 'X' } };
+  assert.deepEqual(model.hiddenIds(both), [7]);
+  assert.deepEqual(model.droppedIds(both), [7]);
+
+  const backup = model.buildBackup({ dropped }, 1700000000000);
+  assert.deepEqual(model.parseBackup(JSON.stringify(backup)).dropped, dropped);
+  // Absent in a backup written before the feature existed.
+  assert.deepEqual(model.parseBackup(JSON.stringify({ ...backup, dropped: undefined })).dropped, {});
 });
 
 test('backup round-trips settings and hidden fictions', () => {
@@ -96,6 +130,35 @@ test('backup round-trips settings and hidden fictions', () => {
   const restored = model.parseBackup(JSON.stringify(backup));
   assert.deepEqual(restored.settings, settings);
   assert.deepEqual(restored.hidden, hidden);
+});
+
+test('every setting survives a backup, not just the ones a test remembered', () => {
+  // The round trip above sets two settings and leaves 65 at their defaults,
+  // where a coercion bug is invisible: a colour losing its "#", an enum falling
+  // back, a list dropping entries all compare equal to the default they were
+  // never moved from. Every key is exercised at a non-default value here, so a
+  // new setting is covered the moment it is added to the schema.
+  const raw = {};
+  for (const [key, spec] of Object.entries(SCHEMA)) {
+    if (spec.type === 'bool') raw[key] = !spec.default;
+    else if (spec.type === 'enum') raw[key] = spec.values.find((v) => v !== spec.default);
+    else if (spec.type === 'int' || spec.type === 'number') {
+      const low = spec.min ?? 0;
+      const high = spec.max ?? 100;
+      const mid = Math.round((low + high) / 2);
+      raw[key] = mid === spec.default ? Math.min(high, mid + 1) : mid;
+    } else if (spec.type === 'color') raw[key] = '#7FFFD4';
+    else if (spec.type === 'string') raw[key] = 'probe value';
+    else if (spec.type === 'list') raw[key] = ['litrpg', 'magic'];
+  }
+
+  const settings = model.normalizeSettings(raw);
+  const backup = model.buildBackup({ settings, hidden: {}, chapters: {} }, 1700000000000);
+  const restored = model.parseBackup(JSON.stringify(backup)).settings;
+
+  for (const key of Object.keys(SCHEMA)) {
+    assert.deepEqual(restored[key], settings[key], `${key} did not survive the round trip`);
+  }
 });
 
 test('parseBackup rejects foreign files with a readable message', () => {

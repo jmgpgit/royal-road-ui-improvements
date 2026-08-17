@@ -207,6 +207,9 @@
       setRecommendations(ctx.settings['fiction.recommendations']);
 
       // Sort first, or extra pages load in the old order and the list ends up mixed.
+      // Same replacement problem as the comments: re-sorting swaps the list and
+      // takes our appended pages with it.
+      reviewPager.noticeReplacement();
       setReviewSort(ctx.settings['fiction.reviewSort']);
       if (ctx.settings['fiction.reviewsAutoLoad']) reviewPager.watch();
     },

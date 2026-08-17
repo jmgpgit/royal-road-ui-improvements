@@ -285,7 +285,7 @@
         dateRow('Updated within', 'filters.updatedWithinDays'),
         dateRow('Quiet for', 'filters.staleForDays'),
         chipRow('Hide mine', 'filters.hideMine', RRX.MINE, (v) =>
-          ({ follow: 'Following', favorite: 'Favourited', ril: 'Read Later' })[v]
+          ({ follow: 'Following', favorite: 'Favourited', ril: 'Read Later', dropped: 'Dropped' })[v]
         ),
       ]),
     ]);

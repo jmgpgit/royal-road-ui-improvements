@@ -14,6 +14,7 @@
   const ext = RRX.ext;
   const KEY_SETTINGS = 'settings';
   const KEY_HIDDEN = 'hidden';
+  const KEY_DROPPED = 'dropped';
   const KEY_CHAPTERS = 'chapters';
 
   /** Scroll scratchpad, in royalroad.com's own localStorage. See `writePosition`. */
@@ -21,10 +22,11 @@
   const POS_MAX = 300;
 
   async function load() {
-    const raw = await ext.storage.local.get([KEY_SETTINGS, KEY_HIDDEN]);
+    const raw = await ext.storage.local.get([KEY_SETTINGS, KEY_HIDDEN, KEY_DROPPED]);
     return {
       settings: RRX.normalizeSettings(raw[KEY_SETTINGS]),
       hidden: RRX.normalizeHidden(raw[KEY_HIDDEN]),
+      dropped: RRX.normalizeDropped(raw[KEY_DROPPED]),
     };
   }
 
@@ -121,17 +123,40 @@
     return {};
   }
 
+  /** @param {{title?:string,url?:string,cover?:string}} meta as for `hide` */
+  async function drop(id, meta) {
+    const { dropped } = await load();
+    const next = RRX.normalizeDropped({ ...dropped, [id]: { ...(meta || {}), droppedAt: Date.now() } });
+    await ext.storage.local.set({ [KEY_DROPPED]: next });
+    return next;
+  }
+
+  async function undrop(id) {
+    const { dropped } = await load();
+    const next = { ...dropped };
+    delete next[Number(id)];
+    await ext.storage.local.set({ [KEY_DROPPED]: next });
+    return next;
+  }
+
+  async function undropAll() {
+    await ext.storage.local.set({ [KEY_DROPPED]: {} });
+    return {};
+  }
+
   /** Used by import. Replaces every key wholesale. */
-  async function replaceAll({ settings, hidden, chapters }) {
+  async function replaceAll({ settings, hidden, dropped, chapters }) {
     const next = {
       [KEY_SETTINGS]: RRX.normalizeSettings(settings),
       [KEY_HIDDEN]: RRX.normalizeHidden(hidden),
+      [KEY_DROPPED]: RRX.normalizeDropped(dropped),
       [KEY_CHAPTERS]: RRX.normalizeChapters(chapters),
     };
     await ext.storage.local.set(next);
     return {
       settings: next[KEY_SETTINGS],
       hidden: next[KEY_HIDDEN],
+      dropped: next[KEY_DROPPED],
       chapters: next[KEY_CHAPTERS],
     };
   }
@@ -153,7 +178,7 @@
       // rebuilds the toolbar, re-syncs every card and re-enters every feature's
       // onPage in every open Royal Road tab - absurd for somebody scrolling a
       // chapter, which is what writes this key. The next page load reads the truth.
-      if (!(KEY_SETTINGS in changes) && !(KEY_HIDDEN in changes)) return;
+      if (!(KEY_SETTINGS in changes) && !(KEY_HIDDEN in changes) && !(KEY_DROPPED in changes)) return;
       load().then(callback);
     };
     ext.storage.onChanged.addListener(listener);
@@ -162,9 +187,9 @@
 
   /** The boot mirror. Only meaningful from a content script, where localStorage
    *  belongs to royalroad.com; failure costs the no-flicker path, not correctness. */
-  function writeMirror(settings, hidden) {
+  function writeMirror(settings, hidden, dropped) {
     try {
-      const payload = JSON.stringify(RRX.buildMirror(settings, hidden));
+      const payload = JSON.stringify(RRX.buildMirror(settings, hidden, dropped));
       if (root.localStorage.getItem(RRX.MIRROR_KEY) !== payload) {
         root.localStorage.setItem(RRX.MIRROR_KEY, payload);
       }
@@ -235,6 +260,9 @@
     hide,
     unhide,
     unhideAll,
+    drop,
+    undrop,
+    undropAll,
     replaceAll,
     onChange,
     writeMirror,

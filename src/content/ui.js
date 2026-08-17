@@ -25,6 +25,9 @@
     view: ['M4 5h7v6H4z', 'M13 5h7v6h-7z', 'M4 13h7v6H4z', 'M13 13h7v6h-7z'],
     minus: ['M6 12h12'],
     plus: ['M12 6v12', 'M6 12h12'],
+    /** A bookmark with a line through it: put down, not thrown away. */
+    drop: ['M7 4h10v16l-5-4-5 4z', 'M4.5 4.5l15 15'],
+    undrop: ['M7 4h10v16l-5-4-5 4z'],
   };
 
   /**
@@ -88,12 +91,15 @@
   }
 
   /** Small circular control overlaid on a fiction card. */
-  function cardButton({ label, iconName, modifier, onClick }) {
+  /** @param {string} [name] identifies which control this is, so a card can carry
+   *  more than one without each feature's selector matching the other's. */
+  function cardButton({ label, iconName, modifier, name, onClick }) {
     return el(
       'button',
       {
         type: 'button',
         class: `rrx-ui rrx-card-btn${modifier ? ` ${modifier}` : ''}`,
+        'data-rrx-btn': name || null,
         'aria-label': label,
         title: label,
         onClick,

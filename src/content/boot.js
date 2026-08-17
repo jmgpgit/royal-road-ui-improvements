@@ -37,8 +37,9 @@
   /**
    * @param {object} settings
    * @param {number[]} ids hidden fiction ids
+   * @param {number[]} [dropped] ids marked tried and dropped
    */
-  function apply(settings, ids) {
+  function apply(settings, ids, dropped) {
     const s = RRX.normalizeSettings(settings);
 
     const wanted = new Set(RRX.rootClassesFor(s));
@@ -63,7 +64,14 @@
     }
     for (const [name, value] of Object.entries(vars)) html.style.setProperty(name, value);
 
-    const css = s['hide.enabled'] ? RRX.buildHideCss(ids) : '';
+    // One <style> for both: they are the same kind of thing, generated from the
+    // same ids, and two elements would only be two places to keep in step.
+    const css = [
+      s['hide.enabled'] ? RRX.buildHideCss(ids) : '',
+      s['drop.enabled'] ? RRX.buildDropCss(dropped) : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
     const el = styleEl();
     if (el.textContent !== css) el.textContent = css;
   }
@@ -154,7 +162,7 @@
     /* localStorage can throw when site data is blocked; fall through to async */
   }
   const booted = mirrored ? mirrored.settings : RRX.DEFAULT_SETTINGS;
-  apply(booted, mirrored ? mirrored.ids : []);
+  apply(booted, mirrored ? mirrored.ids : [], mirrored ? mirrored.dropped : []);
 
   // Everything below is wasted work on a page about to be replaced, so a swap
   // returns rather than falling through.
@@ -163,11 +171,12 @@
   // 2. Authoritative. Also repairs the mirror when the options page or another
   //    tab changed something while no Royal Road tab was open.
   RRX.boot.ready = RRX.ext.storage.local
-    .get(['settings', 'hidden'])
+    .get(['settings', 'hidden', 'dropped'])
     .then((raw) => {
       const settings = RRX.normalizeSettings(raw.settings);
       const hidden = RRX.normalizeHidden(raw.hidden);
-      apply(settings, RRX.hiddenIds(hidden));
+      const dropped = RRX.normalizeDropped(raw.dropped);
+      apply(settings, RRX.hiddenIds(hidden), RRX.droppedIds(dropped));
 
       // Again, now the authoritative answer is in. The mirror is only written by
       // a content script that ran, which never happens on the legacy layout - so
@@ -178,14 +187,17 @@
       // becoming two reloads.
       RRX.boot.enforceDesign(settings);
       try {
-        root.localStorage.setItem(RRX.MIRROR_KEY, JSON.stringify(RRX.buildMirror(settings, hidden)));
+        root.localStorage.setItem(
+          RRX.MIRROR_KEY,
+          JSON.stringify(RRX.buildMirror(settings, hidden, dropped))
+        );
       } catch {
         /* no-op */
       }
-      return { settings, hidden };
+      return { settings, hidden, dropped };
     })
     .catch((err) => {
       RRX.warn('could not read settings', err);
-      return { settings: RRX.normalizeSettings(null), hidden: {} };
+      return { settings: RRX.normalizeSettings(null), hidden: {}, dropped: {} };
     });
 })(globalThis);

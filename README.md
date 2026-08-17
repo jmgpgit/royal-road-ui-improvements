@@ -1,8 +1,9 @@
 # UI Improvements for Royal Road
 
 A Firefox and Chrome extension for the **redesigned** [royalroad.com](https://www.royalroad.com):
-list filters and layouts, permanent per-fiction hiding, chapter typography the site does not
-offer, and clearer comment threads. Every feature is separate and every one can be switched off.
+list filters and layouts, per-fiction hiding and drop marks, chapter typography the site does
+not offer, and clearer comment threads. Every feature is separate and every one can be switched
+off.
 
 Unless noted, settings ship off or are set to "leave alone". Nothing leaves your device: no
 analytics, no server of its own, and no write to your Royal Road account.
@@ -24,7 +25,7 @@ analytics, no server of its own, and no write to your Royal Road account.
 - **Hammer Royal Road.** Every request is one you could have made by opening a page. One at a
   time, cached, never on a timer or in the background.
 - **Send your reading anywhere.** No server, no analytics, no telemetry, no third-party code.
-  Settings and hidden list stay on your device; royalroad.com is the only site it contacts.
+  Settings and your own lists stay on your device; royalroad.com is the only site it contacts.
   [`PRIVACY.md`](PRIVACY.md) names the file behind every claim.
 
 It never writes to your Royal Road account — no follow, favourite, rating, comment or
@@ -40,9 +41,11 @@ bookmark — and never hides an author's own comments.
   to pin one open.
 - **Hide fictions**: a `−` on every card drops that fiction from every list for good, with an
   undo toast, a browsable manager, and a "show hidden" mode.
+- **Tried and dropped**: mark a fiction you gave a go and stopped. Its card dims and says so
+  wherever it turns up, but stays in the list and stays clickable, in case you change your mind.
 - **Filters**: rating, followers, views, pages, chapters, tags in and out, status, type, last
-  updated or gone quiet, and hiding what you already follow, favourited or saved for later.
-  None of these exist on Royal Road outside `/fictions/search`.
+  updated or gone quiet, and hiding what you already follow, favourited, saved for later or
+  dropped. None of these exist on Royal Road outside `/fictions/search`.
 - **Infinite scroll**: the next page appends as you reach the bottom. Filters and hidden
   fictions apply to whatever arrives.
 - **Alternative layouts**: Royal Road's cards, compact rows, two columns, or a cover grid,
@@ -105,8 +108,8 @@ toggle away in options:
 Anything that alters an author's words is opt-in, and so is every rule that folds or hides a
 comment.
 
-The options page is four boxes: which layout to use, then fiction lists (with the hidden-fiction
-manager), fiction pages, and chapter pages.
+The options page is four boxes: which layout to use, then fiction lists (with the hidden and
+dropped fiction managers), fiction pages, and chapter pages.
 
 ## Install
 
@@ -174,10 +177,14 @@ The rule matches `a[data-vt-trigger="fiction-card"]`, the card's own title link,
 `/fiction/` link inside it. Blurbs routinely link to *other* fictions, so matching those would
 make hiding fiction A delete every card whose blurb recommends A.
 
+`buildDropCss()` is the same shape for fictions you tried and dropped, dimming rather than
+removing: no `display: none`, no `pointer-events: none`, because the mark exists to be
+reconsidered.
+
 **Hidden cards never flash.** `browser.storage.local` is async and would race first paint.
-Content scripts share the page's origin, so a compact copy of the hidden list is mirrored into
-`localStorage` and read synchronously at `document_start`, before Royal Road's deferred modules
-run. Embla never measures the carousel slides we are about to hide, so `/home` lays out
+Content scripts share the page's origin, so a compact copy of the hidden and dropped lists is
+mirrored into `localStorage` and read synchronously at `document_start`, before Royal Road's
+deferred modules run. Embla never measures the carousel slides we are about to hide, so `/home` lays out
 correctly around them.
 
 **Infinite scroll appends; Royal Road's paginator replaces.** Comments and reviews use its
@@ -217,7 +224,7 @@ src/common/    browser · selectors · schema · model · cards · filters · cs
 src/content/   boot.js (document_start) · main.js · ui.js · panel.js · inject*.css
 src/content/features/       one file per feature, registered on RRX.features.list
 src/background/             15 lines, only so the toolbar can open the options page
-src/options/ src/popup/     settings, hidden-fiction manager, JSON backup
+src/options/ src/popup/     settings, the two fiction managers, JSON backup
 tools/build.mjs             dist/firefox + dist/chrome
 test/                       node:test suites + captured Royal Road HTML in fixtures/
 ```
@@ -260,10 +267,11 @@ be changed without starting from nothing.
 - **pure logic**: `schema`, `model`, `filters`: ~50 cases over settings coercion, the boot
   mirror, backups, and every filter including that a `null` field never excludes.
 - **selectors**: string assertions that each hook still exists in the real captured HTML.
-- **DOM**: `cards`, `dom`, `author-notes`: the real modules under jsdom against real pages.
-  Hiding one fiction matches exactly one card; a near-miss id (`18130` vs `181303`) matches
-  none; a blurb's outbound links cannot hide the card they sit in; the `/home` blog carousel
-  is never hideable; the shoutout-only note collapses while the genuine note is untouched.
+- **DOM**: `cards`, `dom`, `dropped`, `author-notes`: the real modules under jsdom against real
+  pages. Hiding one fiction matches exactly one card; a near-miss id (`18130` vs `181303`)
+  matches none; a blurb's outbound links cannot hide the card they sit in; the `/home` blog
+  carousel is never hideable; hide and drop controls share a card without deleting each other;
+  the shoutout-only note collapses while the genuine note is untouched.
 - **integration**: boots *every* content script, in the order `manifest.json` declares,
   against real list, chapter, fiction and legacy pages, and drives the UI: open the filter
   panel, apply, hide a fiction, check the counts.

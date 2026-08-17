@@ -83,10 +83,11 @@
     return [...out].sort((a, b) => a - b);
   }
 
-  /** `{ [fictionId]: { title, url, cover, hiddenAt } }`. Metadata is captured off
-   *  the card at hide time so the manager renders covers and titles without
-   *  hitting the network. */
-  function normalizeHidden(raw) {
+  /** `{ [fictionId]: { title, url, cover, <stamp> } }`. Metadata is captured off
+   *  the card when the mark is made, so the manager renders covers and titles
+   *  without hitting the network.
+   *  @param {string} stamp the field holding when it happened, in ms */
+  function normalizeMarks(raw, stamp) {
     const src = raw && typeof raw === 'object' ? raw : {};
     const out = {};
     for (const key of Object.keys(src)) {
@@ -97,13 +98,21 @@
         title: typeof rec.title === 'string' && rec.title ? rec.title : `Fiction ${id}`,
         url: typeof rec.url === 'string' && rec.url ? rec.url : `/fiction/${id}`,
         cover: typeof rec.cover === 'string' ? rec.cover : '',
-        hiddenAt: Number.isFinite(Number(rec.hiddenAt)) ? Number(rec.hiddenAt) : 0,
+        [stamp]: Number.isFinite(Number(rec[stamp])) ? Number(rec[stamp]) : 0,
       };
     }
     return out;
   }
 
+  /** Hidden and dropped are two maps rather than one with a flag: they are
+   *  different answers ("never show me this" against "I read some and stopped"),
+   *  a fiction can be both, and one map would make every read decide which kind
+   *  of record it was looking at. */
+  const normalizeHidden = (raw) => normalizeMarks(raw, 'hiddenAt');
+  const normalizeDropped = (raw) => normalizeMarks(raw, 'droppedAt');
+
   const hiddenIds = (hidden) => normalizeIds(Object.keys(normalizeHidden(hidden)));
+  const droppedIds = (dropped) => normalizeIds(Object.keys(normalizeDropped(dropped)));
 
   // --- reading progress -----------------------------------------------------
   //
@@ -221,16 +230,28 @@
   // before Royal Road's deferred module scripts: no flash of soon-to-be-hidden
   // cards, and Embla never measures the carousel slides we are about to hide.
 
-  function buildMirror(settings, hidden) {
-    return { v: 1, settings: normalizeSettings(settings), ids: hiddenIds(hidden) };
+  function buildMirror(settings, hidden, dropped) {
+    return {
+      v: 1,
+      settings: normalizeSettings(settings),
+      ids: hiddenIds(hidden),
+      dropped: droppedIds(dropped),
+    };
   }
 
-  /** Never throws - a corrupt mirror just means we boot with defaults. */
+  /** Never throws - a corrupt mirror just means we boot with defaults. `v` does
+   *  not move when a field is added: absent reads as empty, and an install that
+   *  has not run since the field existed still gets its settings and hidden ids
+   *  before paint rather than none of it. */
   function parseMirror(rawJson) {
     try {
       const data = JSON.parse(rawJson);
       if (!data || data.v !== 1) return null;
-      return { settings: normalizeSettings(data.settings), ids: normalizeIds(data.ids) };
+      return {
+        settings: normalizeSettings(data.settings),
+        ids: normalizeIds(data.ids),
+        dropped: normalizeIds(data.dropped),
+      };
     } catch {
       return null;
     }
@@ -255,6 +276,7 @@
       exportedAt: new Date(Number(now) || 0).toISOString(),
       settings: normalizeSettings(src.settings),
       hidden: normalizeHidden(src.hidden),
+      dropped: normalizeDropped(src.dropped),
       chapters: normalizeChapters(src.chapters),
     };
   }
@@ -277,8 +299,9 @@
     return {
       settings: normalizeSettings(data.settings),
       hidden: normalizeHidden(data.hidden),
-      // Absent in a backup written before reading progress existed; normalises
+      // Both absent in a backup written before their feature existed; normalise
       // to {} rather than failing the import.
+      dropped: normalizeDropped(data.dropped),
       chapters: normalizeChapters(data.chapters),
     };
   }
@@ -294,7 +317,9 @@
     pageFromPath,
     normalizeIds,
     normalizeHidden,
+    normalizeDropped,
     hiddenIds,
+    droppedIds,
     normalizeChapters,
     pruneChapters,
     CHAPTERS_MAX,

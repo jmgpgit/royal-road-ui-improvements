@@ -107,6 +107,8 @@
         for (const item of doc.querySelectorAll('[data-rr-paginate-item]')) {
           const marker = item.querySelector('[id]');
           if (marker && seen.has(marker.id)) continue; // already appended
+          // Marked so a replacement can be noticed: see `noticeReplacement`.
+          item.setAttribute('data-rrx-appended', '1');
           host.appendChild(document.adoptNode(item));
           added += 1;
         }
@@ -172,7 +174,32 @@
       Object.assign(state, { next: 2, max: null, busy: false, done: false, added: 0 });
     }
 
-    return { state, watch, check, loadNext, reset, maxPage, urlFor, hideFooter };
+    /**
+     * Notice when Royal Road has replaced the list under us, and start over.
+     *
+     * Changing the comment sort makes it refetch page one and swap the
+     * container's contents, taking every page we appended with it. Our counters
+     * know nothing about that: `next` is still deep into the run and `done` is
+     * set once the last page has been seen, so nothing ever loads again and the
+     * rest of the comments are simply gone. Reported as "resort and the rest
+     * disappear, and infinite scroll stops working".
+     *
+     * Detected by absence rather than by watching the sort, so it holds for any
+     * reason Royal Road swaps the list - a sort, a mode toggle, whatever it adds
+     * next - and whether the reader did it or we did.
+     *
+     * @returns {boolean} whether the run was restarted
+     */
+    function noticeReplacement() {
+      if (!state.added) return false;
+      const host = container();
+      if (!host || host.querySelector('[data-rrx-appended]')) return false;
+      reset();
+      hideFooter(false); // its page numbers are true again
+      return true;
+    }
+
+    return { state, watch, check, loadNext, reset, noticeReplacement, maxPage, urlFor, hideFooter };
   }
 
   RRX.pager = { create, MAX_PAGES };

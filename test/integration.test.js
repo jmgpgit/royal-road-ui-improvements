@@ -59,12 +59,12 @@ nodeTest.after(() => {
  * Boot the extension over a fixture.
  * @param {object} [settings] seeded into the fake storage
  */
-async function boot(fixtureName, url, settings = {}, hidden = {}) {
+async function boot(fixtureName, url, settings = {}, hidden = {}, dropped = {}) {
   const dom = new JSDOM(fixture(fixtureName), { url, runScripts: 'outside-only' });
   const w = dom.window;
   windows.push(w);
 
-  const store = { settings, hidden };
+  const store = { settings, hidden, dropped };
   w.eval(`globalThis.__store = ${JSON.stringify(store)};`);
   w.eval(`globalThis.browser = {
     storage: {
@@ -360,6 +360,60 @@ test('hiding a fiction through the button removes it and records it', async () =
   const css = w.document.getElementById('rrx-hide-style').textContent;
   assert.ok(css.includes(`/fiction/${id}/`), 'the generated rule targets it');
   assert.ok(w.document.getElementById('rrx-toast'), 'an undo toast is offered');
+});
+
+test('dropping a fiction dims its card and leaves it in the list', async () => {
+  const { w } = await boot(
+    'fictions-rising-stars.new.html',
+    'https://www.royalroad.com/fictions/rising-stars',
+    { 'drop.enabled': true }
+  );
+  const card = w.document.querySelector('[data-rrx-fid]');
+  const id = Number(card.dataset.rrxFid);
+  const before = w.document.querySelectorAll('.fiction-card-expanded').length;
+
+  card
+    .querySelector('[data-rrx-btn="drop"]')
+    .dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.ok(w.RRX.main.ctx.droppedSet.has(id), 'recorded as dropped');
+  const css = w.document.getElementById('rrx-hide-style').textContent;
+  assert.ok(css.includes(`/fiction/${id}/`), 'the generated rule targets it');
+  assert.equal(css.includes('display:none'), false, 'and does not remove it');
+  assert.equal(
+    w.document.querySelectorAll('.fiction-card-expanded').length,
+    before,
+    'the card is still on the page'
+  );
+  assert.ok(card.querySelector('.rrx-dropped-badge'), 'and says why it is dimmed');
+  assert.ok(w.document.getElementById('rrx-toast'), 'an undo toast is offered');
+});
+
+test('the drop mark is inert while the feature is off, filter included', async () => {
+  // One switch, not two: with the feature off the marks do nothing anywhere, so
+  // turning it back on is the only thing needed to get them back.
+  const stored = { title: 'X', url: '/fiction/1', cover: '', droppedAt: 1 };
+  const url = 'https://www.royalroad.com/fictions/rising-stars';
+  const settings = { 'drop.enabled': true, 'filters.hideMine': ['dropped'] };
+
+  const on = await boot('fictions-rising-stars.new.html', url, settings, {}, {});
+  const id = Number(on.w.document.querySelector('[data-rrx-fid]').dataset.rrxFid);
+  const total = on.w.document.querySelectorAll('.fiction-card-expanded').length;
+
+  const filtered = await boot('fictions-rising-stars.new.html', url, settings, {}, { [id]: stored });
+  assert.equal(visibleCards(filtered.w).length, total - 1, 'the dropped card is filtered out');
+
+  const off = await boot(
+    'fictions-rising-stars.new.html',
+    url,
+    { ...settings, 'drop.enabled': false },
+    {},
+    { [id]: stored }
+  );
+  assert.equal(visibleCards(off.w).length, total, 'and comes back when the feature is off');
+  assert.equal(off.w.document.getElementById('rrx-hide-style').textContent, '', 'nothing dims');
+  assert.equal(off.w.document.querySelector('[data-rrx-btn="drop"]'), null, 'and no control');
 });
 
 test('the load-more bar appears only when filters could be hiding further pages', async () => {
@@ -956,4 +1010,81 @@ test('"About Fiction: always open" survives Royal Road re-applying its own state
   box().checked = false;
   await new Promise((r) => setTimeout(r, 700));
   assert.equal(box().checked, true, 'and is put back');
+});
+
+test('re-sorting after loading pages does not strand the rest of the comments', async () => {
+  // Reported: load several pages of comments, change the sort, and only the
+  // first page comes back - the rest vanish and infinite scroll never resumes.
+  // Royal Road refetches page one and swaps the container's contents, taking
+  // every page we appended with it, while our counters still believe the run is
+  // deep in progress or finished.
+  const w = await fictionPage({ 'fiction.reviewsAutoLoad': true });
+  const pager = w.RRX.fictionPage.reviewPager;
+  const host = w.document.querySelector(w.RRX.SEL.reviewsContainer);
+  assert.ok(host, 'the fiction page has a reviews container');
+
+  // Stand in for a run that reached the end: pages appended, nothing left.
+  const appended = w.document.createElement('div');
+  appended.setAttribute('data-rr-paginate-item', '');
+  appended.setAttribute('data-rrx-appended', '1');
+  host.appendChild(appended);
+  pager.state.added = 3;
+  pager.state.next = 4;
+  pager.state.done = true;
+
+  assert.equal(pager.noticeReplacement(), false, 'our pages are still there, so nothing to do');
+
+  // Royal Road re-sorts: it replaces the container with page one of the new
+  // order, and everything we appended goes with it.
+  host.innerHTML = '<div data-rr-paginate-item></div>';
+
+  assert.equal(pager.noticeReplacement(), true, 'the replacement is noticed');
+  assert.equal(pager.state.done, false, 'so the run can resume');
+  assert.equal(pager.state.next, 2, 'from page two of the NEW order');
+  assert.equal(pager.state.added, 0);
+});
+
+test('a list we never appended to is left alone', async () => {
+  // Royal Road replaces its own list for its own reasons. Before we have added
+  // anything there is nothing to restart, and resetting would be noise.
+  const w = await fictionPage({ 'fiction.reviewsAutoLoad': true });
+  const pager = w.RRX.fictionPage.reviewPager;
+  const host = w.document.querySelector(w.RRX.SEL.reviewsContainer);
+
+  pager.state.added = 0;
+  host.innerHTML = '<div data-rr-paginate-item></div>';
+  assert.equal(pager.noticeReplacement(), false);
+});
+
+test('after a re-sort the run really does start again, not just reset its counters', async () => {
+  // Resetting the state is only half of it. What was reported is "infinite
+  // scroll stops working", so the test that matters is whether a further page
+  // is actually fetched afterwards - in the new order, from page two, because
+  // Royal Road has already put page one on screen itself.
+  const w = await fictionPage({ 'fiction.reviewsAutoLoad': true });
+  const pager = w.RRX.fictionPage.reviewPager;
+  const host = w.document.querySelector(w.RRX.SEL.reviewsContainer);
+
+  const appended = w.document.createElement('div');
+  appended.setAttribute('data-rr-paginate-item', '');
+  appended.setAttribute('data-rrx-appended', '1');
+  host.appendChild(appended);
+  Object.assign(pager.state, { added: 3, next: 4, done: true });
+
+  // Royal Road re-sorts and replaces the list.
+  host.innerHTML = '<div data-rr-paginate-item></div>';
+  pager.noticeReplacement();
+
+  // At the end of the list, so a check should want the next page.
+  host.getBoundingClientRect = () => boxOf({ width: 900, height: 900, bottom: 10 });
+  const before = w.__fetched.length;
+  pager.check();
+  // Waited for rather than slept through: a fixed delay is a race, and this one
+  // failed once under load before passing three runs in a row.
+  for (let i = 0; i < 50 && w.__fetched.length === before; i += 1) {
+    await new Promise((r) => setTimeout(r, 20));
+  }
+
+  assert.ok(w.__fetched.length > before, 'nothing was fetched: the run is still stuck');
+  assert.match(w.__fetched[w.__fetched.length - 1], /page=2/, 'and it resumed from page two');
 });

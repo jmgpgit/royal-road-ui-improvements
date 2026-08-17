@@ -7,11 +7,14 @@ below names the file that implements it.
 
 ## What is stored, and where
 
-Four things, all in `browser.storage.local`, which is local to your browser profile:
+Five things, all in `browser.storage.local`, which is local to your browser profile:
 
 - **Your settings.** The list in [`src/common/schema.js`](src/common/schema.js) is exhaustive.
 - **Your hidden fictions.** For each one: its Royal Road id, title, cover URL and the time you
   hid it, so the manager can list them. See [`src/common/store.js`](src/common/store.js).
+- **The fictions you marked as tried and dropped**, in the same shape and the same file: id,
+  title, cover URL and the time you marked it. A separate list from the hidden one, and one a
+  fiction only joins when you press the button.
 - **Where you stopped reading, and which comments you have seen**, once you switch those on.
   For each chapter you have opened: its Royal Road id, its fiction's id, when you last had it
   open, how far down you were — as a paragraph number, not a scrolled distance — and the time
@@ -24,10 +27,10 @@ Four things, all in `browser.storage.local`, which is local to your browser prof
   This is Royal Road's own public vocabulary — "LitRPG", "Progression", and the rest — and says
   nothing about you. See [`src/content/tags.js`](src/content/tags.js).
 
-A compact copy of your settings and the ids of your hidden fictions is mirrored into
+A compact copy of your settings and the ids of your hidden and dropped fictions is mirrored into
 `localStorage` on royalroad.com. This exists only so the extension can read your settings before
 the page paints, which stops hidden fictions flashing up before they are hidden. It is the same
-data, on the same machine.
+data, on the same machine — ids only, no titles.
 
 With the previous-chapter recap switched on, the closing text of each chapter it reads is kept
 in `sessionStorage` on royalroad.com, so that moving back and forth does not fetch the same
@@ -97,8 +100,8 @@ browser would already send to royalroad.com.
 ## What it never does
 
 - It never writes to your Royal Road account: no follow, no favourite, no rating, no comment,
-  no bookmark, no setting. Hiding a fiction is local to this extension and is not Royal Road's
-  own server-side "hide". The layout cookie described above is the one thing it writes that
+  no bookmark, no setting. Hiding a fiction, or marking one as tried and dropped, is local to
+  this extension; neither is Royal Road's own server-side "hide". The layout cookie described above is the one thing it writes that
   Royal Road can see, and it lives in your browser rather than against an account: it works, and
   is written the same way, whether or not you are signed in.
 - It never requests your account pages (`/my/follows`, `/my/favorites`, `/my/readlater`).
@@ -111,7 +114,7 @@ browser would already send to royalroad.com.
 
 | Permission | Why |
 |---|---|
-| `storage` | To save your settings, hidden list and reading progress on this device. |
+| `storage` | To save your settings, your hidden and dropped lists and your reading progress on this device. |
 | `*://www.royalroad.com/*` | To read and restyle Royal Road pages. This is the whole extension. |
 
 There are no optional permissions, and the host permission cannot be narrowed: the extension
@@ -120,9 +123,9 @@ unhidden content.
 
 ## Your data is yours
 
-Options -> Backup exports everything the extension holds — settings, hidden fictions and
-reading progress — as a JSON file, and imports it back. Resetting the settings leaves the other
-two alone.
+Options -> Backup exports everything the extension holds — settings, hidden fictions, dropped
+fictions and reading progress — as a JSON file, and imports it back. Resetting the settings
+leaves the other three alone.
 Removing the extension removes everything it has stored with it. The `localStorage` copy
 described above lives under royalroad.com rather than under the extension; clearing site data
 for royalroad.com removes it, along with the recap and chapter-list caches, which also go when
