@@ -297,7 +297,9 @@ test('an edited chapter says so rather than claiming the same place', async () =
 
 test('the scratchpad and storage agree on what a position is', async () => {
   const { w } = load({ settings: { 'chapter.resume': 'jump' } });
-  const position = { p: 12, o: 0.25, n: 88, len: 11870, a: 1700000000, f: 149588 };
+  // Stamped now rather than at a fixed date: a record is dropped once nothing
+  // has touched it for a year, so a hard-coded 2023 one ages out of the suite.
+  const position = { p: 12, o: 0.25, n: 88, len: 11870, a: Math.floor(Date.now() / 1000), f: 149588 };
 
   w.RRX.store.writePosition(CHAPTER, position);
   // Field by field: an object parsed inside jsdom carries jsdom's prototypes,

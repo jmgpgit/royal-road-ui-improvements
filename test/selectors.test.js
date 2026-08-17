@@ -13,7 +13,7 @@
 const nodeTest = require('node:test');
 const assert = require('node:assert/strict');
 
-const { SEL, CARD_VARIANTS, CARD_GROUPS } = require('../src/common/selectors.js');
+const { SEL, CARD_VARIANTS, CARD_GROUPS, FICTION_STATS } = require('../src/common/selectors.js');
 const { read, need } = require('./helpers/fixtures.js');
 
 const FIXTURES = [
@@ -180,6 +180,39 @@ test('every fiction card links to /fiction/{id}/, which is what hiding matches o
   // Tag and bookmark URLs live under /fictions/ and so cannot collide.
   assert.ok(listPage.includes('/fictions/search?tagsAdd='));
   assert.ok(listPage.includes('/fictions/setbookmark/'));
+});
+
+test('every statistic we read is still labelled the way we look it up', () => {
+  // The tiles carry no id and no data-rr- hook, so the label text is the whole
+  // contract. A rename here is the one change that breaks the readout, and it
+  // has to fail loudly rather than quietly reading fewer numbers.
+  for (const label of Object.keys(FICTION_STATS)) {
+    // "Ratings" is the exception: the Overall Score panel repeats it as its own
+    // heading, which is why the read climbs a bounded distance and why the tile
+    // has to come first in document order.
+    const expected = label === 'Ratings' ? 2 : 1;
+    assert.equal(count(fictionPage, `>${label}<`), expected, `stat label: ${label}`);
+  }
+
+  // The panel around them, and the two numbers that are not tiles. Both ids are
+  // written twice - Royal Road repeats each as a `data-rr-*-id` on the same
+  // element - so two occurrences is one element, not two.
+  assert.equal(count(fictionPage, 'id="stats-accordion"'), 2);
+  assert.equal(count(fictionPage, 'id="fiction-rating-tooltip"'), 2);
+  assert.match(fictionPage, /id="chapters" data-chapters="\d+"/);
+  // The score, to two decimals. Royal Road renders the rounded one as star
+  // geometry and never writes it as text.
+  assert.match(fictionPage, /"aggregateRating":\{[^}]*"ratingValue":\d+\.\d\d/);
+  assert.equal(count(fictionPage, 'data-rr-initial-rating="4.83"'), 0, 'the attribute is rounded');
+});
+
+test('Royal Road still ships Statistics closed, which decides where the readout goes', () => {
+  // If this ever flips to open, the readout could move inside the panel. Until
+  // then, anything in there is invisible on a default install.
+  const at = fictionPage.indexOf('id="stats-accordion"');
+  const panel = fictionPage.slice(at, at + 4000);
+  assert.match(panel, /aria-expanded="false"/);
+  assert.match(panel, /data-rr-accordion-content-state="closed"/);
 });
 
 test('the new-UI probe matches every redesign page we support', () => {

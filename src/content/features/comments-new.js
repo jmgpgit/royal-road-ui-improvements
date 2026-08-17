@@ -127,6 +127,9 @@
    *  loaded, and write off page two when only page one was ever fetched. */
   function commit({ force = false } = {}) {
     if (!dwelt && !force) return;
+    // The dwell observer and the pagehide handler outlive a mid-page switch-off,
+    // so the setting is re-read here rather than trusted from onPage.
+    if (lastCtx && lastCtx.settings['comments.seen'] === 'off') return;
     const id = chapterId();
     const newest = newestRendered(document);
     if (!id || !newest || newest <= Math.max(seenAt || 0, committedTo)) return;

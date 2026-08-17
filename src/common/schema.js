@@ -220,6 +220,11 @@
       values: ['leave', 'top', 'newest', 'oldest', 'upvotes'],
     },
     'fiction.reviewsAutoLoad': { type: 'bool', default: false },
+    /** "Since you last looked: +312 followers". Records the numbers on the page
+     *  as you open it, so the second visit has something to compare against.
+     *  Off by default, and nothing is recorded while it is off - it is the only
+     *  setting here that starts keeping a record of what you looked at. */
+    'fiction.statDeltas': { type: 'bool', default: false },
   };
 
   /** v1 shipped these six as bare keys. Reading them keeps existing installs'

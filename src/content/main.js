@@ -284,6 +284,21 @@
   }
 
   async function init() {
+    // Housekeeping, before anything about this page matters: it ages out the
+    // stored maps whether or not the features that fill them are still on, and
+    // it is one read of a single number on all but one page load a day. Runs on
+    // the legacy layout too - the data is the same data.
+    RRX.store.tidy().catch((err) => RRX.warn('housekeeping failed', err));
+
+    // "Forget reading history" runs on the options page, which cannot reach the
+    // scroll scratchpad: that lives in royalroad.com's localStorage and only a
+    // content script can touch it. Without this the positions came straight back
+    // on the next visit, since a scratchpad entry outranks a missing record.
+    RRX.ext.storage.onChanged.addListener((changes, area) => {
+      const emptied = area === 'local' && changes.chapters && changes.chapters.newValue;
+      if (emptied && !Object.keys(emptied).length) RRX.store.clearPositions();
+    });
+
     if (!document.querySelector(SEL.newUiProbe)) {
       // Not the redesign. Release the pre-paint guard: boot.js sets it from the
       // URL alone, which cannot tell the two layouts apart, and legacy has a

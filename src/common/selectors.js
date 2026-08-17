@@ -242,6 +242,29 @@
     reviewsContainer: '#reviews-pagination [data-rr-paginate-items-container]',
     reviewSortDropdown: '#review-sort-dropdown',
     dropdownItem: '[data-rr-dropdown-item]',
+
+    // --- fiction page: the numbers ------------------------------------------
+    /** The Statistics panel. Royal Road ships it *closed*, but its contents are
+     *  server-rendered and in the DOM either way, so they read fine. */
+    statsAccordion: '#stats-accordion',
+    /** Where a readout goes: between the trigger and the collapsing content, so
+     *  it shows whether or not the panel is open and a click on it does not
+     *  toggle the panel. */
+    statsAccordionItem: '#stats-accordion [data-rr-accordion-item]',
+    statsAccordionContent: '#stats-accordion [data-rr-accordion-content]',
+    /** The chapter count, which is not a stat tile: it lives on the table of
+     *  contents, as an attribute. */
+    chaptersCount: '#chapters[data-chapters]',
+    /** Five sit in the panel - the overall score and four sub-scores - each
+     *  beside its own heading, which is how they are told apart. */
+    ratingWidget: '[data-rr-rating-selector]',
+    /** Inside a widget: "4.83 out of 5". The stars and `data-rr-initial-rating`
+     *  are both rounded to 4.8; this is the only place the real figure is. */
+    ratingValue: '[data-rr-tooltip-content]',
+    /** The score as a number, rather than text to parse out of a tooltip. */
+    ratingLd: 'script[type="application/ld+json"]',
+    /** The tooltip beside the title - the one score source outside the panel. */
+    ratingTooltip: '#fiction-rating-tooltip [data-rr-tooltip-content] span.font-semibold',
   };
 
   /**
@@ -269,6 +292,30 @@
     Views: 'views',
   };
 
+  /** The Statistics tiles, by label text, in the order Royal Road lays them out.
+   *  By label because a tile carries no id and no `data-rr-` hook, only Tailwind
+   *  classes: anything positional mispairs silently when one moves. */
+  const FICTION_STATS = {
+    'Total Views': 'v',
+    /** Total views over chapters, so it moves whenever a chapter is posted.
+     *  Tracked anyway: every tile is annotated, and one left blank reads as a
+     *  fault. */
+    'Avg. Views': 'w',
+    Followers: 'f',
+    Favorites: 'm',
+    Ratings: 'r',
+    Pages: 'p',
+  };
+
+  /** The star ratings, by the heading each sits under. */
+  const FICTION_SCORES = {
+    'Overall Score': 's',
+    Style: 'sty',
+    Story: 'sto',
+    Grammar: 'gra',
+    Character: 'cha',
+  };
+
   /** Tooltip text Royal Road uses for the passive status icons. */
   const MINE_TOOLTIPS = {
     Following: 'follow',
@@ -276,5 +323,14 @@
     Favorite: 'favorite', // mobile says "Favorite", desktop "Favorited"
   };
 
-  return { SEL, CARD_GROUPS, CARD_VARIANTS, CARD_STATS, MINE_TOOLTIPS, FICTION_ACCORDIONS };
+  return {
+    SEL,
+    CARD_GROUPS,
+    CARD_VARIANTS,
+    CARD_STATS,
+    FICTION_STATS,
+    FICTION_SCORES,
+    MINE_TOOLTIPS,
+    FICTION_ACCORDIONS,
+  };
 });

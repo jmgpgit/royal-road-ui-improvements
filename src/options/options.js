@@ -8,7 +8,13 @@
   const { SCHEMA, COPY, SECTIONS } = RRX;
   const $ = (id) => document.getElementById(id);
 
-  let state = { settings: RRX.normalizeSettings(null), hidden: {}, dropped: {}, chapters: {} };
+  let state = {
+    settings: RRX.normalizeSettings(null),
+    hidden: {},
+    dropped: {},
+    chapters: {},
+    stats: {},
+  };
 
   /** Hand-written markup rather than generated rows, so render moves them into
    *  the list settings box. They live here until then, so the listeners below
@@ -32,6 +38,10 @@
 
   const commit = async (key, value) => {
     state.settings = await RRX.store.saveSettings({ [key]: value });
+    // Re-read rather than assumed: a settings write can delete a whole map -
+    // switching the fiction readings off does - and a stale copy here would let
+    // Export write out what was just deleted.
+    state.stats = await RRX.store.loadStats();
     render();
   };
 
@@ -309,6 +319,7 @@
     renderSections();
     renderManager('hidden');
     renderManager('dropped');
+    renderHistorySize();
   }
 
   // --- backup ----------------------------------------------------------------
@@ -351,12 +362,14 @@
       // Everything the import replaces has to be named, or the prompt is
       // agreeing to less than it does.
       const read = Object.keys(state.chapters || {}).length;
+      const watched = Object.keys(state.stats || {}).length;
       const also = [
         dropped ? `${dropped} dropped fiction${dropped === 1 ? '' : 's'}` : '',
         read ? `where you had got to in ${read} chapter${read === 1 ? '' : 's'}` : '',
+        watched ? `the statistics you have seen for ${watched} fiction${watched === 1 ? '' : 's'}` : '',
       ].filter(Boolean);
       if (
-        (current || dropped || read) &&
+        (current || dropped || read || watched) &&
         !confirm(
           `Replace your current settings, ${current} hidden fiction${current === 1 ? '' : 's'}` +
             `${also.length ? `, ${also.join(' and ')}` : ''} with what is in this file?`
@@ -373,13 +386,49 @@
     }
   });
 
+  // Not the fiction statistics: reset returns that setting to its default, which
+  // is off, and off deletes them. Promising otherwise would be a lie in a
+  // confirm dialog.
   const KEPT = 'Your hidden fictions, dropped fictions and reading progress are kept.';
 
   $('reset').addEventListener('click', async () => {
     if (!confirm(`Reset every setting to its default? ${KEPT}`)) return;
     state.settings = await RRX.store.resetSettings();
+    state.stats = {}; // reset turns the readings off, which clears them
     render();
     setStatus(`Settings reset to defaults. ${KEPT}`, 'ok');
+  });
+
+  /** What the reader has accumulated by reading, as opposed to by choosing. The
+   *  hidden and dropped lists have their own managers; this is the half nobody
+   *  could see, let alone clear, without uninstalling. */
+  function renderHistorySize() {
+    const chapters = Object.keys(state.chapters || {}).length;
+    const fictions = Object.keys(state.stats || {}).length;
+    const parts = [];
+    if (chapters) parts.push(`${chapters} chapter${chapters === 1 ? '' : 's'}`);
+    if (fictions) parts.push(`${fictions} fiction${fictions === 1 ? '' : 's'}`);
+
+    $('history-size').textContent = parts.length
+      ? `Reading history: ${parts.join(' and ')}. Kept on this device, and aged out on its own.`
+      : 'No reading history stored.';
+    $('forget-history').disabled = !parts.length;
+  }
+
+  $('forget-history').addEventListener('click', async () => {
+    if (
+      !confirm(
+        'Forget where you got to in every chapter, which comments you had seen, and the ' +
+          'fiction statistics? Your settings, hidden fictions and dropped fictions are kept. ' +
+          'This cannot be undone.'
+      )
+    ) {
+      return;
+    }
+    state.chapters = await RRX.store.forgetChapters();
+    state.stats = await RRX.store.forgetStats();
+    renderHistorySize();
+    setStatus('Reading history forgotten.', 'ok');
   });
 
   $('unhide-all').addEventListener('click', async () => {
@@ -411,16 +460,18 @@
 
   // --- boot ------------------------------------------------------------------
 
-  // `onChange` carries settings, hidden and dropped only - reading progress is
-  // left out of its guard on purpose - so the spread keeps the chapters we
-  // already hold rather than overwriting them with undefined.
+  // `onChange` carries settings, hidden and dropped only - reading progress and
+  // fiction statistics are left out of its guard on purpose - so the spread
+  // keeps the two we already hold rather than overwriting them with undefined.
   RRX.store.onChange((next) => {
     state = { ...state, ...next };
     render();
   });
 
-  Promise.all([RRX.store.load(), RRX.store.loadChapters()]).then(([next, chapters]) => {
-    state = { ...next, chapters };
-    render();
-  });
+  Promise.all([RRX.store.load(), RRX.store.loadChapters(), RRX.store.loadStats()]).then(
+    ([next, chapters, stats]) => {
+      state = { ...next, chapters, stats };
+      render();
+    }
+  );
 })();

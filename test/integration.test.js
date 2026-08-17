@@ -59,12 +59,12 @@ nodeTest.after(() => {
  * Boot the extension over a fixture.
  * @param {object} [settings] seeded into the fake storage
  */
-async function boot(fixtureName, url, settings = {}, hidden = {}, dropped = {}) {
+async function boot(fixtureName, url, settings = {}, hidden = {}, dropped = {}, stats = {}) {
   const dom = new JSDOM(fixture(fixtureName), { url, runScripts: 'outside-only' });
   const w = dom.window;
   windows.push(w);
 
-  const store = { settings, hidden, dropped };
+  const store = { settings, hidden, dropped, stats };
   w.eval(`globalThis.__store = ${JSON.stringify(store)};`);
   w.eval(`globalThis.browser = {
     storage: {
@@ -390,9 +390,12 @@ test('dropping a fiction dims its card and leaves it in the list', async () => {
   assert.ok(w.document.getElementById('rrx-toast'), 'an undo toast is offered');
 });
 
-test('the drop mark is inert while the feature is off, filter included', async () => {
-  // One switch, not two: with the feature off the marks do nothing anywhere, so
-  // turning it back on is the only thing needed to get them back.
+test('switching the feature off stops the marking, but not a filter asked for', async () => {
+  // `drop.enabled` decides whether the button and the dimming appear. It used to
+  // gate the filter too, so that one switch turned everything off - but the
+  // panel offers the Dropped chip whatever the switch says and the toolbar
+  // counts it as narrowing the list, so an explicitly chosen filter silently did
+  // nothing.
   const stored = { title: 'X', url: '/fiction/1', cover: '', droppedAt: 1 };
   const url = 'https://www.royalroad.com/fictions/rising-stars';
   const settings = { 'drop.enabled': true, 'filters.hideMine': ['dropped'] };
@@ -411,8 +414,12 @@ test('the drop mark is inert while the feature is off, filter included', async (
     {},
     { [id]: stored }
   );
-  assert.equal(visibleCards(off.w).length, total, 'and comes back when the feature is off');
-  assert.equal(off.w.document.getElementById('rrx-hide-style').textContent, '', 'nothing dims');
+  assert.equal(
+    visibleCards(off.w).length,
+    total - 1,
+    'still filtered: that is what the reader asked the panel for'
+  );
+  assert.equal(off.w.document.getElementById('rrx-hide-style').textContent, '', 'but not dimmed');
   assert.equal(off.w.document.querySelector('[data-rrx-btn="drop"]'), null, 'and no control');
 });
 
@@ -555,6 +562,227 @@ test('an accordion already in the wanted state is marked done, not clicked forev
     'open'
   );
   assert.equal(clicks, 0, 'and still never clicked');
+});
+
+test('a first visit records the numbers and says nothing', async () => {
+  const { w, errors } = await boot(
+    'fiction-detail.new.html',
+    'https://www.royalroad.com/fiction/21220/mother-of-learning',
+    { 'fiction.statDeltas': true }
+  );
+  await new Promise((resolve) => setTimeout(resolve, 20));
+
+  assert.deepEqual(errors, []);
+  assert.equal(w.document.getElementById('rrx-stat-delta'), null, 'nothing to compare against yet');
+
+  const stored = w.__store.stats[21220];
+  assert.ok(stored && stored.now, 'but the visit was recorded');
+  assert.equal(stored.now.f, 32866, 'with the followers off the page');
+  assert.equal(stored.now.s, 4.83, 'and the two-decimal score');
+  assert.equal(stored.prev, undefined, 'and no baseline, since this was the first look');
+});
+
+test('opening the same fiction twice in one sitting is enough to get an answer', async () => {
+  // The journey that was broken: switch the feature on, open a fiction, open it
+  // again. Every visit overwrote the last reading and none of them established a
+  // baseline, so the readout could not appear until the next day.
+  const url = 'https://www.royalroad.com/fiction/21220/mother-of-learning';
+  const settings = { 'fiction.statDeltas': true };
+
+  const first = await boot('fiction-detail.new.html', url, settings);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const carried = JSON.parse(JSON.stringify(first.w.__store.stats));
+  assert.ok(carried[21220].now, 'the first visit was recorded');
+
+  // Second visit, minutes later. The capture cannot change between the two, so
+  // the first reading is doctored instead: the same page now reads as a fiction
+  // that has gained a chapter and a follower since.
+  carried[21220].now.c -= 1;
+  carried[21220].now.f -= 1;
+
+  const second = await boot('fiction-detail.new.html', url, settings, {}, {}, carried);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+
+  assert.ok(second.w.__store.stats[21220].prev, 'the earlier reading became the baseline');
+  const line = second.w.document.getElementById('rrx-stat-delta');
+  assert.ok(line, 'and the readout appears on the second visit');
+  assert.match(line.textContent, /\+1 chapter\b/);
+  assert.match(line.textContent, /\+1 follower\b/);
+  // Minutes old, so it says a time rather than today's date, which would read
+  // as a bug on the day it was written.
+  assert.match(line.textContent, /^Since \d/);
+});
+
+test('coming back says what moved, and nothing while the feature is off', async () => {
+  const url = 'https://www.royalroad.com/fiction/21220/mother-of-learning';
+  // A look from two days ago, when it had 500 fewer followers and a lower score.
+  const then = Math.floor(Date.now() / 1000) - 2 * 24 * 3600;
+  const seed = () => ({
+    21220: { now: { a: then, f: 32366, m: 31777, s: 4.81, c: 106, p: 2932, r: 17316, v: 27778323 } },
+  });
+
+  const { w } = await boot('fiction-detail.new.html', url, { 'fiction.statDeltas': true }, {}, {}, seed());
+  await new Promise((resolve) => setTimeout(resolve, 20));
+
+  const line = w.document.getElementById('rrx-stat-delta');
+  assert.ok(line, 'the readout is on the page');
+  assert.match(line.textContent, /\+500 followers/);
+  assert.match(line.textContent, /\+3 chapters/);
+  assert.match(line.textContent, /\+0\.02 score/, 'the rounded 4.8 could never show this');
+  assert.equal(/favourites/.test(line.textContent), false, 'and stays quiet about what did not move');
+
+  // It sits where it can be read: outside the trigger, above the panel Royal
+  // Road ships closed.
+  const content = w.document.querySelector('#stats-accordion [data-rr-accordion-content]');
+  assert.equal(line.nextElementSibling, content);
+  assert.equal(line.closest('[data-rr-accordion-trigger]'), null);
+
+  // The baseline rolled forward, so the record now compares against today.
+  assert.equal(w.__store.stats[21220].prev.f, 32366);
+  assert.equal(w.__store.stats[21220].now.f, 32866);
+
+  const off = await boot('fiction-detail.new.html', url, { 'fiction.statDeltas': false }, {}, {}, seed());
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(off.w.document.getElementById('rrx-stat-delta'), null, 'nothing shown');
+  assert.deepEqual(
+    off.w.__store.stats[21220].now.a,
+    then,
+    'and nothing recorded: the stored look is untouched'
+  );
+});
+
+test('the tag cache ages from when it was fetched, not from when it was last used', async () => {
+  // `save` rewrites the key on every read of the cache and on any page carrying
+  // tag chips. Stamping those with "now" made the week count from the last time
+  // the filter panel was opened, so a reader who opened it weekly never
+  // refreshed - the cache aged only while it went unused.
+  const eightDays = Date.now() - 8 * 24 * 3600 * 1000;
+  const { w } = await boot(
+    'fictions-rising-stars.new.html',
+    'https://www.royalroad.com/fictions/rising-stars'
+  );
+  w.__store.tagCatalogue = { at: eightDays, tags: [{ slug: 'litrpg', label: 'LitRPG' }] };
+
+  await w.RRX.tags.load();
+  assert.equal(
+    w.__store.tagCatalogue.at,
+    eightDays,
+    'using the cache does not make it look freshly fetched'
+  );
+  // Whether it refetches is not asserted here: this capture carries 73 distinct
+  // tag slugs on its cards, one over the threshold at which `load` returns
+  // without consulting the cache at all.
+});
+
+test('the stored maps age out even with every feature that fills them off', async () => {
+  // The prunes live inside the write paths, and every write path is behind a
+  // setting. With those off nothing wrote and so nothing expired either: what
+  // was there stayed for good. Housekeeping is what makes the expiry real.
+  const year = 400 * 24 * 3600;
+  const old = Math.floor(Date.now() / 1000) - year;
+  const { w } = await boot(
+    'fictions-rising-stars.new.html',
+    'https://www.royalroad.com/fictions/rising-stars',
+    {}, // every reading feature at its default, which is off
+    {},
+    {},
+    { 21220: { now: { a: old, f: 100 } } }
+  );
+  // Booting a page is enough to have run it once, which is the point.
+  assert.ok(w.__store.tidiedAt, 'every page load offers to tidy');
+
+  w.__store.chapters = { 3766643: { f: 9, a: old, p: 42, o: 0.5 } };
+  delete w.__store.tidiedAt; // as if a day had passed
+  assert.equal(await w.RRX.store.tidy(), true, 'it ran');
+  assert.equal(Object.keys(w.__store.chapters).length, 0, 'the stale chapter went');
+  assert.equal(Object.keys(w.__store.stats).length, 0, 'and the stale fiction');
+
+  // Once a day, not once a page: this reads two maps that reach megabytes.
+  assert.equal(await w.RRX.store.tidy(), false, 'not again today');
+});
+
+test('housekeeping does not clobber a record written while it was deciding', async () => {
+  // It runs at document_end alongside the features that write these maps, and
+  // the write is the whole map: a reading recorded between the read and the
+  // write was read back stale and dropped by the prune that had already run.
+  const { w } = await boot(
+    'fictions-rising-stars.new.html',
+    'https://www.royalroad.com/fictions/rising-stars'
+  );
+  const stale = Math.floor(Date.now() / 1000) - 400 * 24 * 3600;
+  w.__store.stats = { 1: { now: { a: stale, f: 1 } } };
+  delete w.__store.tidiedAt;
+
+  // A page records while housekeeping is mid-flight.
+  const housekeeping = w.RRX.store.tidy();
+  await w.RRX.store.markFictionStats(21220, { f: 32866 });
+  await housekeeping;
+
+  assert.ok(w.__store.stats[21220], 'the fresh reading survived');
+  assert.equal(w.__store.stats[1], undefined, 'and the stale one still went');
+});
+
+test('housekeeping prunes against the reader’s own expiry, not the built-in one', async () => {
+  // The 1.4.1 bug from the other direction: a writer that omits the setting
+  // prunes the whole map against the default, silently overriding the choice.
+  const days = (n) => Math.floor(Date.now() / 1000) - n * 24 * 3600;
+  const { w } = await boot(
+    'fictions-rising-stars.new.html',
+    'https://www.royalroad.com/fictions/rising-stars',
+    { 'comments.seenDays': 300 }
+  );
+  // 200 days old: past the built-in 60, well inside the 300 the reader chose.
+  w.__store.chapters = { 3766643: { f: 9, a: days(200), s: days(200) } };
+  delete w.__store.tidiedAt;
+
+  await w.RRX.store.tidy();
+  assert.ok(w.__store.chapters[3766643], 'kept, because the reader asked for 300 days');
+  assert.equal(w.__store.chapters[3766643].s, days(200), 'watermark and all');
+});
+
+test('resetting and importing delete the readings too, not just the toggle', async () => {
+  // saveSettings noticed the on->off transition; resetSettings writes the
+  // settings key directly and import replaces it wholesale, so both reached
+  // "off" without ever cleaning up after it.
+  const url = 'https://www.royalroad.com/fiction/21220/mother-of-learning';
+  const seeded = { 21220: { now: { a: Math.floor(Date.now() / 1000), f: 32366 } } };
+
+  const reset = await boot('fiction-detail.new.html', url, { 'fiction.statDeltas': true }, {}, {}, seeded);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  await reset.w.RRX.store.resetSettings();
+  assert.equal(Object.keys(reset.w.__store.stats).length, 0, 'reset turns it off, so it clears');
+
+  // ...and a backup carrying readings alongside a setting that says they are
+  // not kept: the setting wins, or import would be a way back in.
+  const imported = await boot('fiction-detail.new.html', url, { 'fiction.statDeltas': true }, {}, {}, seeded);
+  const state = await imported.w.RRX.store.replaceAll({
+    settings: { 'fiction.statDeltas': false },
+    stats: seeded,
+  });
+  assert.equal(Object.keys(imported.w.__store.stats).length, 0, 'not restored behind the setting');
+  assert.equal(Object.keys(state.stats).length, 0, 'and the caller is told so');
+});
+
+test('switching the readings off deletes them', async () => {
+  // The map is pruned only when a reading is written, so with the feature off
+  // nothing would ever touch it again: what was there would sit in storage for
+  // good, whatever "forgotten after a year" claimed.
+  const url = 'https://www.royalroad.com/fiction/21220/mother-of-learning';
+  const seeded = { 21220: { now: { a: 1_700_000_000, f: 32366 } } };
+  const { w } = await boot('fiction-detail.new.html', url, { 'fiction.statDeltas': true }, {}, {}, seeded);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.ok(w.__store.stats[21220], 'seeded');
+
+  await w.RRX.store.saveSettings({ 'fiction.statDeltas': false });
+  // Counted rather than deepEqual'd: a jsdom `{}` is not strictly equal to one
+  // built out here.
+  assert.equal(Object.keys(w.__store.stats).length, 0, 'off means gone, not merely paused');
+
+  // Turning something else off leaves it alone.
+  await w.RRX.store.saveSettings({ 'fiction.statDeltas': true });
+  await w.RRX.store.markFictionStats(21220, { f: 1 });
+  await w.RRX.store.saveSettings({ 'list.expandAll': false });
+  assert.ok(w.__store.stats[21220], 'an unrelated setting change keeps them');
 });
 
 test('a section forced open survives Royal Road re-closing it after init', async () => {
@@ -1042,6 +1270,52 @@ test('re-sorting after loading pages does not strand the rest of the comments', 
   assert.equal(pager.state.done, false, 'so the run can resume');
   assert.equal(pager.state.next, 2, 'from page two of the NEW order');
   assert.equal(pager.state.added, 0);
+});
+
+test('a re-sort while a page is in flight drops that page rather than mixing it in', async () => {
+  // `noticeReplacement` restarts the run through `reset`, which clears `busy`.
+  // A fetch already in the air then landed anyway: it appended into the
+  // container that had just been swapped out, and bumped the counters, so the
+  // restarted run believed it was holding a page nobody could see.
+  const w = await fictionPage({ 'fiction.reviewsAutoLoad': true });
+  const pager = w.RRX.fictionPage.reviewPager;
+  const host = w.document.querySelector(w.RRX.SEL.reviewsContainer);
+
+  const appended = w.document.createElement('div');
+  appended.setAttribute('data-rr-paginate-item', '');
+  appended.setAttribute('data-rrx-appended', '1');
+  host.appendChild(appended);
+  Object.assign(pager.state, { added: 3, next: 4, done: false });
+
+  // A fetch that will not resolve until we say so.
+  let release;
+  const inFlight = new Promise((resolve) => {
+    release = resolve;
+  });
+  w.eval(`globalThis.__held = null; globalThis.fetch = (url) => {
+    globalThis.__fetched.push(String(url));
+    return new Promise((resolve) => { globalThis.__held = resolve; });
+  };`);
+
+  pager.loadNext();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(pager.state.busy, true, 'a page is in the air');
+
+  // Royal Road re-sorts underneath it.
+  host.innerHTML = '<div data-rr-paginate-item></div>';
+  assert.equal(pager.noticeReplacement(), true);
+  const restarted = { next: pager.state.next, added: pager.state.added };
+
+  // ...and only now does the old response arrive.
+  w.eval(`globalThis.__held({ ok: true, status: 200, text: async () =>
+    '<div data-rr-paginate-item><div id="stale-1"></div></div>' });`);
+  release();
+  await inFlight;
+  await new Promise((r) => setTimeout(r, 20));
+
+  assert.equal(w.document.getElementById('stale-1'), null, 'the stale page was not appended');
+  assert.equal(pager.state.next, restarted.next, 'and the restarted run is untouched');
+  assert.equal(pager.state.added, restarted.added);
 });
 
 test('a list we never appended to is left alone', async () => {

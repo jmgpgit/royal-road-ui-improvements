@@ -96,6 +96,10 @@
       for (const card of cards) {
         const adopted = document.adoptNode(card);
         const data = RRX.readCardData(adopted);
+        // Ours rather than Royal Road's, so nothing on the card can carry it:
+        // without this, "Hide mine -> Dropped" let every dropped fiction in and
+        // counted it, and list-filters hid it again a moment later.
+        data.mine.dropped = ctx.droppedSet ? ctx.droppedSet.has(data.id) : false;
         if (!RRX.matchesFilters(data, ctx.settings)) continue;
         if (ctx.hiddenSet.has(data.id)) continue;
         container.appendChild(adopted);

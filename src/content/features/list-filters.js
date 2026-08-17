@@ -41,11 +41,15 @@
     // Read fresh rather than cached with the rest: everything else on the record
     // comes off markup that only changes when the card is re-rendered, but this
     // is our own mark, and dropping a fiction has to take effect on the pass that
-    // follows rather than whenever Royal Road next redraws the list. Gated on the
-    // feature's own switch, so turning it off makes the marks inert everywhere
-    // rather than leaving this one filter still acting on them.
-    card[DATA_KEY].mine.dropped =
-      !!ctx.settings['drop.enabled'] && !!ctx.droppedSet && ctx.droppedSet.has(card[DATA_KEY].id);
+    // follows rather than whenever Royal Road next redraws the list.
+    //
+    // Not gated on `drop.enabled`. It was, so that one switch turned everything
+    // off - but the filter panel offers the Dropped chip whatever that switch
+    // says, and the toolbar counts it as narrowing the list, so gating it made
+    // an explicitly chosen filter silently do nothing. `drop.enabled` decides
+    // whether the button and the dimming appear; asking for them to be filtered
+    // out is a separate thing to ask for.
+    card[DATA_KEY].mine.dropped = !!ctx.droppedSet && ctx.droppedSet.has(card[DATA_KEY].id);
     return card[DATA_KEY];
   }
 

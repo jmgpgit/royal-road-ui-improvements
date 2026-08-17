@@ -195,6 +195,15 @@
   features.list.push({
     id: 'fictionPage',
     pages: ['fiction'],
+    /** The re-sort watch has to be here rather than in `onPage`: a reader
+     *  changing Royal Road's own sort order never re-enters `onPage`, which runs
+     *  at init and on a settings change only. In `onPage` it could only ever
+     *  see a run that had not started yet, so it did nothing at all. */
+    syncCards: (scope, ctx) => {
+      if (reviewPager.noticeReplacement() && ctx.settings['fiction.reviewsAutoLoad']) {
+        reviewPager.check();
+      }
+    },
     onPage: (ctx) => {
       for (const [id, key] of Object.entries(FICTION_ACCORDIONS)) {
         const want = ctx.settings[key];
@@ -207,9 +216,6 @@
       setRecommendations(ctx.settings['fiction.recommendations']);
 
       // Sort first, or extra pages load in the old order and the list ends up mixed.
-      // Same replacement problem as the comments: re-sorting swaps the list and
-      // takes our appended pages with it.
-      reviewPager.noticeReplacement();
       setReviewSort(ctx.settings['fiction.reviewSort']);
       if (ctx.settings['fiction.reviewsAutoLoad']) reviewPager.watch();
     },

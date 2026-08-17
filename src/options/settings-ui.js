@@ -126,6 +126,10 @@
       label: 'Keep loading reviews as you scroll',
       note: 'Adds the next page to the bottom instead of replacing the reviews you have already read.',
     },
+    'fiction.statDeltas': {
+      label: 'Show what has changed since you last looked',
+      note: 'Royal Road only ever shows today’s total. This writes the change since your last visit under each figure on a fiction page, and sums it up on the Statistics header while that section is shut. The numbers are saved as you open the page, on this device and nowhere else, and forgotten after a year. Nothing is shown until you come back to a fiction you have already opened, and switching this off deletes everything it has saved.',
+    },
 
     // ── chapter text ──────────────────────────────────────────────────────
     'reader.enabled': {
@@ -345,6 +349,7 @@
           ],
         },
         { title: 'Reviews', keys: ['fiction.reviewSort', 'fiction.reviewsAutoLoad'] },
+        { title: 'Statistics', keys: ['fiction.statDeltas'] },
       ],
     },
     {

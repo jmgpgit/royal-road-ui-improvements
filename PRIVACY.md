@@ -7,7 +7,7 @@ below names the file that implements it.
 
 ## What is stored, and where
 
-Five things, all in `browser.storage.local`, which is local to your browser profile:
+Seven things, all in `browser.storage.local`, which is local to your browser profile:
 
 - **Your settings.** The list in [`src/common/schema.js`](src/common/schema.js) is exhaustive.
 - **Your hidden fictions.** For each one: its Royal Road id, title, cover URL and the time you
@@ -19,10 +19,23 @@ Five things, all in `browser.storage.local`, which is local to your browser prof
   For each chapter you have opened: its Royal Road id, its fiction's id, when you last had it
   open, how far down you were — as a paragraph number, not a scrolled distance — and the time
   of the newest comment you had seen on it. No chapter text, no comment text, no titles. The
-  comment date is forgotten after 60 days by default, and a reading position is deleted as soon
-  as you finish the chapter, so neither accumulates indefinitely. See
+  comment date is forgotten after 60 days by default, a reading position is deleted as soon as
+  you finish the chapter, and the whole record goes once you have not opened that chapter for a
+  year — whether or not either setting is still switched on. See
   [`src/common/model.js`](src/common/model.js) for the exact
   shape.
+- **The public numbers on the fiction pages you open**, once you switch on "show what has
+  changed since you last looked". For each fiction: its views, followers, favourites, ratings,
+  pages, chapters and star scores, and when they were read — twice, so there is something to
+  compare today's against. These are Royal Road's own public totals, not anything about you, and the only thing
+  the record says about you is that the page was opened. Two readings per fiction, and a fiction
+  you have not opened for a year is dropped. Nothing is stored while the setting is off, and
+  switching it off deletes what is already there. Nothing is fetched for it either: the numbers
+  are read off the page you just opened.
+  See [`src/common/model.js`](src/common/model.js).
+- **When the housekeeping last ran** — one number. The two lists above that grow with use are
+  aged out once a day rather than only while the feature that fills them is switched on. See
+  [`src/common/store.js`](src/common/store.js).
 - **Royal Road's list of tags**, cached for a week so the filter panel does not refetch it.
   This is Royal Road's own public vocabulary — "LitRPG", "Progression", and the rest — and says
   nothing about you. See [`src/content/tags.js`](src/content/tags.js).
@@ -101,9 +114,10 @@ browser would already send to royalroad.com.
 
 - It never writes to your Royal Road account: no follow, no favourite, no rating, no comment,
   no bookmark, no setting. Hiding a fiction, or marking one as tried and dropped, is local to
-  this extension; neither is Royal Road's own server-side "hide". The layout cookie described above is the one thing it writes that
-  Royal Road can see, and it lives in your browser rather than against an account: it works, and
-  is written the same way, whether or not you are signed in.
+  this extension; neither is Royal Road's own server-side "hide". The layout cookie described
+  above is the one thing it writes that Royal Road can see, and it lives in your browser rather
+  than against an account: it works, and is written the same way, whether or not you are signed
+  in.
 - It never requests your account pages (`/my/follows`, `/my/favorites`, `/my/readlater`).
   Everything it knows about what you follow is read from the page you are already looking at.
 - It contains no analytics, no telemetry, no crash reporting and no third-party code.
@@ -114,7 +128,7 @@ browser would already send to royalroad.com.
 
 | Permission | Why |
 |---|---|
-| `storage` | To save your settings, your hidden and dropped lists and your reading progress on this device. |
+| `storage` | To save your settings, your hidden and dropped lists, your reading progress and the fiction statistics you have seen, on this device. |
 | `*://www.royalroad.com/*` | To read and restyle Royal Road pages. This is the whole extension. |
 
 There are no optional permissions, and the host permission cannot be narrowed: the extension
@@ -124,12 +138,24 @@ unhidden content.
 ## Your data is yours
 
 Options -> Backup exports everything the extension holds — settings, hidden fictions, dropped
-fictions and reading progress — as a JSON file, and imports it back. Resetting the settings
-leaves the other three alone.
-Removing the extension removes everything it has stored with it. The `localStorage` copy
-described above lives under royalroad.com rather than under the extension; clearing site data
-for royalroad.com removes it, along with the recap and chapter-list caches, which also go when
-you close the tab.
+fictions, reading progress and the fiction statistics you have seen — as a JSON file, and
+imports it back. Resetting the settings leaves your hidden fictions, dropped fictions and
+reading progress alone. Options -> Backup also says how much reading history is stored and has
+a button that forgets all of it: where you got to in every chapter, which comments you had
+seen, and every fiction statistic.
+
+Removing the extension removes everything under the extension. Three things are not under the
+extension, because they have to be readable by royalroad.com's own pages, and they outlive it:
+
+- **The two `localStorage` copies** described above — the settings-and-ids mirror, and your
+  place in the chapter you are reading. The mirror is a full copy of your settings and of which
+  fictions you have hidden and dropped.
+- **The `beta-ui-v2` cookie**, if you chose a layout. It lasts a year, so Royal Road may go on
+  serving you the design you picked after the extension that asked for it is gone. Royal Road's
+  own "Revert To Legacy UI" link undoes it.
+
+Clearing site data for royalroad.com removes all three, and takes the recap and chapter-list
+caches with them — though those go when you close the tab in any case.
 
 ## Changes
 

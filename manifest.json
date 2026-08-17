@@ -101,6 +101,7 @@
         "src/content/features/comments.js",
         "src/content/features/comments-new.js",
         "src/content/features/fiction-page.js",
+      "src/content/features/fiction-stats.js",
         "src/content/main.js"
       ]
     }

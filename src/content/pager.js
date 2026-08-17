@@ -27,6 +27,8 @@
    */
   function create({ rootSelector, container, ready, prime, params }) {
     const state = { next: 2, max: null, busy: false, done: false, started: false, added: 0 };
+    /** Bumped by `reset`, so a fetch started before it can tell it is stale. */
+    let run = 0;
 
     const rootEl = () => document.querySelector(rootSelector);
 
@@ -80,17 +82,28 @@
       const host = container();
       if (!url || !host) return;
 
+      // Which run this fetch belongs to. `reset` bumps it, so a response that
+      // was already in the air when the list was swapped underneath us is
+      // dropped rather than appended into a container that is no longer on the
+      // page - which also left the restarted run believing it held a page it
+      // never showed.
+      const generation = run;
+      const mine = () => generation === run;
+
       state.busy = true;
       try {
         const response = await fetch(url, {
           credentials: 'same-origin',
           headers: { 'X-Requested-With': 'XMLHttpRequest' },
         });
+        if (!mine()) return;
         if (!response.ok) {
           state.done = true;
           return;
         }
-        const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
+        const text = await response.text();
+        if (!mine()) return;
+        const doc = new DOMParser().parseFromString(text, 'text/html');
 
         // The comments endpoint reports the real page count on its response; the
         // reviews one does not, and takes it from the root instead.
@@ -122,10 +135,13 @@
 
         if (RRX.main) RRX.main.syncCards(document);
       } catch {
-        state.done = true;
+        if (mine()) state.done = true;
       } finally {
-        state.busy = false;
-        hideFooter(state.added > 0);
+        // Never the new run's flags: `reset` has already cleared them.
+        if (mine()) {
+          state.busy = false;
+          hideFooter(state.added > 0);
+        }
       }
     }
 
@@ -171,6 +187,7 @@
 
     /** Sorting changed underneath us: everything loaded so far is stale. */
     function reset() {
+      run += 1;
       Object.assign(state, { next: 2, max: null, busy: false, done: false, added: 0 });
     }
 

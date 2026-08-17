@@ -33,13 +33,29 @@
 
   const byLabel = (a, b) => a.label.localeCompare(b.label);
 
+  /** When the catalogue was last *fetched*, which is not when the key was last
+   *  written: page chips are merged in on any page carrying them, and a cached
+   *  copy is written straight back on every read. Stamping those with "now" made
+   *  the week count from the last time the filter panel was opened, so anybody
+   *  who opened it more often than weekly never refreshed at all. */
+  let fetchedAt = 0;
+
   /** Merge into the catalogue by slug; earlier labels win. */
   async function save(tags) {
     const bySlug = new Map(catalogue.map((t) => [t.slug, t]));
     for (const tag of tags) if (!bySlug.has(tag.slug)) bySlug.set(tag.slug, tag);
     catalogue = [...bySlug.values()].sort(byLabel);
     try {
-      await RRX.ext.storage.local.set({ [CACHE_KEY]: { at: Date.now(), tags: catalogue } });
+      // Harvesting page chips writes too, and can run before anything has read
+      // the key, so the stored stamp is the fallback rather than "now" - merging
+      // three more genres in is not a fetch and must not look like one.
+      if (!fetchedAt) {
+        const stored = (await RRX.ext.storage.local.get(CACHE_KEY))[CACHE_KEY];
+        fetchedAt = Number(stored && stored.at) || 0;
+      }
+      await RRX.ext.storage.local.set({
+        [CACHE_KEY]: { at: fetchedAt || Date.now(), tags: catalogue },
+      });
     } catch {
       /* a failed write just means we fetch again next week */
     }
@@ -74,6 +90,7 @@
     const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
     const tags = [...parseSelect(doc.querySelector('#tagsAdd')), ...harvestChips(doc)];
     if (!tags.length) throw new Error('tag list: #tagsAdd had no options');
+    fetchedAt = Date.now();
     return save(tags);
   }
 
@@ -92,6 +109,7 @@
     }
 
     if (cached && Array.isArray(cached.tags) && cached.tags.length) {
+      fetchedAt = Number(cached.at) || 0;
       await save(cached.tags);
       // Stale but usable: serve it now, refresh quietly for next time.
       if (Date.now() - (cached.at || 0) > MAX_AGE_MS) fetchCatalogue().catch(() => {});

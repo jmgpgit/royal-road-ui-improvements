@@ -93,6 +93,13 @@ Statistics, Table of Contents, Leave A Review and Reviews are each left alone, a
 always closed. Others Also Liked is left alone, shown or hidden. Reviews also get a default
 sort order and their own infinite scroll.
 
+- **What has changed since you last looked**. Royal Road only ever shows today's total, which
+  cannot tell you whether a fiction is climbing or has gone quiet. Every figure gets its own
+  change written under it — `(+312)`, `(−2)`, `(+0.02)` — the six stat tiles and all five star
+  ratings; with Statistics shut, the header sums it up. The numbers are read off the page you
+  opened — no request — and kept on your device, so nothing is shown on a first visit and
+  nothing when nothing moved. Off by default; switching it off again deletes what it recorded.
+
 ### Defaults that change the page
 
 Most settings ship off or as "leave alone". These do something on first run, and each is one
