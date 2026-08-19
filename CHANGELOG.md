@@ -4,6 +4,24 @@ Notable changes, newest first. Versions follow [semantic versioning](https://sem
 the patch number for fixes, the minor for new settings, the major for anything that changes
 what an existing setting does.
 
+## 1.5.2
+
+**Fixes**
+
+- **The options page stays where you left it in Chrome.** It rebuilt its whole form after every
+  write, so the control you were using was destroyed and replaced mid-change — and Chrome uses
+  the focused element to decide where to hold the page, so it nudged upwards each time you
+  changed a setting. The form is built once now and the controls are updated in place.
+- **The popup waits for Chrome before closing itself.** Opening the settings page returns a
+  promise there, so the window could shut before the request had been accepted, and a refusal
+  went nowhere. It now stays open long enough to be sure, and says so if it fails.
+
+**Elsewhere**
+
+- Both the options page and the popup show which version you are running, read from the
+  extension itself. Worth having when it is the one thing you cannot tell by looking — after a
+  store update, or with a copy you installed yourself sitting alongside a listed one.
+
 ## 1.5.1
 
 **Fixes**
