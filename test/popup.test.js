@@ -49,7 +49,11 @@ async function open(url) {
           get: async () => ({ settings: {}, hidden: {} }),
           set: async (patch) => Object.assign(globalThis.__saved, patch) },
         onChanged: { addListener() {}, removeListener() {} } },
-      runtime: { openOptionsPage() {}, getURL: (p) => p },
+      runtime: {
+        getManifest: () => ({ version: '9.8.7' }),
+        openOptionsPage() {},
+        getURL: (p) => p
+      },
       tabs: { query: async () => ${JSON.stringify(url ? [{ url }] : [{}])} },
     };`);
 
@@ -72,6 +76,12 @@ const visible = (w) =>
   [...w.document.querySelectorAll('section[data-page]')]
     .filter((s) => !s.hidden)
     .map((s) => s.dataset.page);
+
+test('the popup shows the loaded extension version', async () => {
+  const w = await open('https://www.royalroad.com/fictions/rising-stars');
+  assert.equal(w.document.getElementById('p-version').textContent, 'Version 9.8.7');
+  w.close();
+});
 
 test('every section only offers settings that act on that page', () => {
   const dom = new JSDOM(html).window.document;
@@ -147,6 +157,48 @@ test('changing a control writes that setting and nothing else', async () => {
   const saved = JSON.parse(JSON.stringify(w.eval('globalThis.__saved'))).settings;
   assert.equal(saved['filters.enabled'], false);
   w.close();
+});
+
+test('the popup stays alive until Chrome accepts the options-page request', async () => {
+  const w = await open('https://www.royalroad.com/fictions/rising-stars');
+  let finish;
+  let closed = false;
+  w.RRX.ext.runtime.openOptionsPage = () =>
+    new Promise((resolve) => {
+      finish = resolve;
+    });
+  w.close = () => {
+    closed = true;
+  };
+
+  w.document.getElementById('p-manage').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(closed, false, 'the popup closed while its request was still pending');
+
+  finish();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(closed, true);
+});
+
+test('a rejected options-page request leaves the popup open', async () => {
+  const w = await open('https://www.royalroad.com/fictions/rising-stars');
+  let closed = false;
+  let warned = false;
+  w.RRX.ext.runtime.openOptionsPage = async () => {
+    throw new Error('not opened');
+  };
+  w.RRX.warn = () => {
+    warned = true;
+  };
+  w.close = () => {
+    closed = true;
+  };
+
+  w.document.getElementById('p-manage').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(closed, false);
+  assert.equal(warned, true);
 });
 
 test('the design row is there whichever page you open the popup over', async () => {

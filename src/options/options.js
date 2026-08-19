@@ -8,6 +8,8 @@
   const { SCHEMA, COPY, SECTIONS } = RRX;
   const $ = (id) => document.getElementById(id);
 
+  $('app-version').textContent = `Version ${RRX.ext.runtime.getManifest().version}`;
+
   let state = {
     settings: RRX.normalizeSettings(null),
     hidden: {},
@@ -183,6 +185,20 @@
     return null; // lists are edited in context, not here
   }
 
+  /** Storage changes can come from this page, the popup or another tab. Keep
+   *  the existing control: Chrome uses the focused element as a scroll anchor,
+   *  so replacing the whole form after a write nudges the page. */
+  function syncControl(control) {
+    const key = control.dataset.setting;
+    const spec = SCHEMA[key];
+    if (!spec) return;
+    if (spec.type === 'bool') control.checked = !!state.settings[key];
+    else {
+      const value = state.settings[key];
+      control.value = value === null || value === undefined ? '' : String(value);
+    }
+  }
+
   /** Controls greyed out while their master switch is off. */
   const DEPENDENCIES = {
     'list.hoverExpand': () => !state.settings['list.expandAll'],
@@ -211,28 +227,37 @@
 
   function renderSections() {
     const host = $('sections');
-    // Lift them clear before the wipe, or the re-render destroys them.
-    for (const section of managerSections) section.remove();
-    host.textContent = '';
-    for (const section of SECTIONS) {
-      const groups = section.groups.map((group) =>
-        el('div', { class: `group${group.layout ? ` group--${group.layout}` : ''}` }, [
-          group.title ? el('h3', { class: 'group__title', text: group.title }) : null,
-          ...group.keys.map(rowFor).filter(Boolean),
-          // Beside the switches that fill it, not appended after every group in
-          // the box - which put the hidden manager between the drop switch and
-          // the dropped list it belongs to.
-          group.manager ? managers[group.manager] : null,
-        ])
-      );
-      host.appendChild(
-        el('section', { class: 'card', id: `card-${section.id}`, 'aria-labelledby': `h-${section.id}` }, [
-          el('h2', { id: `h-${section.id}`, text: section.title }),
-          section.blurb ? el('p', { class: 'muted card__blurb', text: section.blurb }) : null,
-          ...groups,
-        ])
-      );
+    if (!host.children.length) {
+      // Lift them clear before the build, or clearing an incomplete render
+      // would destroy the hand-written managers.
+      for (const section of managerSections) section.remove();
+      host.textContent = '';
+      for (const section of SECTIONS) {
+        const groups = section.groups.map((group) =>
+          el('div', { class: `group${group.layout ? ` group--${group.layout}` : ''}` }, [
+            group.title ? el('h3', { class: 'group__title', text: group.title }) : null,
+            ...group.keys.map(rowFor).filter(Boolean),
+            // Beside the switches that fill it, not appended after every group in
+            // the box - which put the hidden manager between the drop switch and
+            // the dropped list it belongs to.
+            group.manager ? managers[group.manager] : null,
+          ])
+        );
+        host.appendChild(
+          el(
+            'section',
+            { class: 'card', id: `card-${section.id}`, 'aria-labelledby': `h-${section.id}` },
+            [
+              el('h2', { id: `h-${section.id}`, text: section.title }),
+              section.blurb ? el('p', { class: 'muted card__blurb', text: section.blurb }) : null,
+              ...groups,
+            ]
+          )
+        );
+      }
     }
+
+    for (const control of host.querySelectorAll('[data-setting]')) syncControl(control);
 
     for (const [key, isEnabled] of Object.entries(DEPENDENCIES)) {
       const control = document.querySelector(`[data-setting="${key}"]`);
@@ -393,8 +418,12 @@
   function renderTagColors() {
     const list = $('tagc-list');
     const home = $('tagc-home-row');
-    home.textContent = '';
-    home.appendChild(rowFor('tags.colorHome'));
+    let homeControl = home.querySelector('[data-setting="tags.colorHome"]');
+    if (!homeControl) {
+      home.appendChild(rowFor('tags.colorHome'));
+      homeControl = home.querySelector('[data-setting="tags.colorHome"]');
+    }
+    syncControl(homeControl);
     backfillTagNames();
     const entries = RRX.parseTagColors(state.settings['tags.colors']);
     $('tagc-empty').hidden = entries.length > 0;

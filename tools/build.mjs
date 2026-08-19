@@ -36,8 +36,13 @@ const PAYLOAD = ['src', 'icons', 'LICENSE'];
 function toChrome(manifest) {
   const next = structuredClone(manifest);
   delete next.browser_specific_settings;
-  const [worker] = manifest.background?.scripts ?? [];
-  if (!worker) throw new Error('manifest.background.scripts is missing: cannot derive the Chrome service worker');
+  const workers = manifest.background?.scripts ?? [];
+  if (workers.length !== 1) {
+    throw new Error(
+      `manifest.background.scripts must contain exactly one Chrome service worker; found ${workers.length}`
+    );
+  }
+  const [worker] = workers;
   next.background = { service_worker: worker };
   return next;
 }

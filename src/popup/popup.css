@@ -136,6 +136,13 @@ h1:not(:first-of-type) {
   outline-offset: 2px;
 }
 
+.version {
+  margin: 0.3rem 0 0;
+  color: var(--muted);
+  font-size: 0.7rem;
+  text-align: right;
+}
+
 /* Shown instead of a section when the tab is not a page this extension acts on.
    Quieter than a control, because it is telling you there is nothing to do. */
 /* The design row sits above the page sections and is always present, so it gets

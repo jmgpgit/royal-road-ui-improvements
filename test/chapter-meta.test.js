@@ -150,7 +150,8 @@ test('each switch adds only its own fact', () => {
 
   const two = load({ 'chapter.wordCount': 'both', 'chapter.wpm': 250 });
   two.w.RRX.chapterMeta.apply(two.ctx);
-  assert.deepEqual([...texts(two.w)], ['2,120 words', '~8 min']);
+  const wordLabel = `${(2120).toLocaleString()} words`;
+  assert.deepEqual([...texts(two.w)], [wordLabel, '~8 min']);
 
   const three = load({ 'chapter.topTimestamp': true, 'chapter.wordCount': 'words' });
   three.w.RRX.chapterMeta.apply(three.ctx);
