@@ -169,7 +169,8 @@ async function render(store) {
       ' get: async () => JSON.parse(JSON.stringify(globalThis.__s)),' +
       ' set: async (p) => Object.assign(globalThis.__s, p) },' +
       ' onChanged: { addListener() {}, removeListener() {} } },' +
-      ' runtime: { getURL: (p) => p, sendMessage: async () => {}, onMessage: { addListener() {} } } };'
+      ' runtime: { getManifest: () => ({ version: "9.8.7" }), getURL: (p) => p,' +
+      ' sendMessage: async () => {}, onMessage: { addListener() {} } } };'
   );
   for (const file of [
     'src/common/browser.js',
@@ -185,6 +186,11 @@ async function render(store) {
   await new Promise((resolve) => setTimeout(resolve, 60));
   return w;
 }
+
+test('the settings page shows the loaded extension version', async () => {
+  const w = await render();
+  assert.equal(w.document.getElementById('app-version').textContent, 'Version 9.8.7');
+});
 
 test('a note is never part of the control it explains', async () => {
   // A checkbox row wrapped label and note in one <label for=...>, so the whole
@@ -351,4 +357,59 @@ test('the switch inside the tag card is a settings row like every other', async 
     'the control comes before its label'
   );
   assert.equal(control.querySelector('input[type="checkbox"]').dataset.setting, 'tags.colorHome');
+});
+
+test('a setting write leaves the changed control mounted and focused', async () => {
+  // Chrome prioritises the focused element for scroll anchoring. Rebuilding the
+  // form removed that anchor after every write and nudged the page upwards.
+  const w = await render();
+  const d = w.document;
+
+  const checkbox = d.querySelector('[data-setting="list.expandAll"]');
+  checkbox.focus();
+  checkbox.checked = !checkbox.checked;
+  checkbox.dispatchEvent(new w.Event('change', { bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 40));
+
+  assert.equal(d.querySelector('[data-setting="list.expandAll"]'), checkbox);
+  assert.equal(d.activeElement, checkbox);
+
+  const select = d.querySelector('[data-setting="design.mode"]');
+  select.focus();
+  select.value = [...select.options].find((option) => option.value !== select.value).value;
+  select.dispatchEvent(new w.Event('change', { bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 40));
+
+  assert.equal(d.querySelector('[data-setting="design.mode"]'), select);
+  assert.equal(d.activeElement, select);
+
+  const tagSwitch = d.querySelector('[data-setting="tags.colorHome"]');
+  tagSwitch.focus();
+  tagSwitch.checked = !tagSwitch.checked;
+  tagSwitch.dispatchEvent(new w.Event('change', { bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 40));
+
+  assert.equal(d.querySelector('[data-setting="tags.colorHome"]'), tagSwitch);
+  assert.equal(d.activeElement, tagSwitch);
+});
+
+test('reset updates mounted controls to their defaults', async () => {
+  const w = await render({
+    settings: { 'design.mode': 'new', 'list.expandAll': true, 'tags.colorHome': true },
+  });
+  const d = w.document;
+  const select = d.querySelector('[data-setting="design.mode"]');
+  const checkbox = d.querySelector('[data-setting="list.expandAll"]');
+  const tagSwitch = d.querySelector('[data-setting="tags.colorHome"]');
+  w.confirm = () => true;
+
+  d.getElementById('reset').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 40));
+
+  assert.equal(d.querySelector('[data-setting="design.mode"]'), select);
+  assert.equal(d.querySelector('[data-setting="list.expandAll"]'), checkbox);
+  assert.equal(d.querySelector('[data-setting="tags.colorHome"]'), tagSwitch);
+  assert.equal(select.value, 'leave');
+  assert.equal(checkbox.checked, false);
+  assert.equal(tagSwitch.checked, false);
 });

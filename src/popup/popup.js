@@ -21,6 +21,8 @@
   const RRX = globalThis.RRX;
   const $ = (id) => document.getElementById(id);
 
+  $('p-version').textContent = `Version ${RRX.ext.runtime.getManifest().version}`;
+
   const boxes = [...document.querySelectorAll('input[type="checkbox"][data-setting]')];
   const sliders = [...document.querySelectorAll('input[type="range"][data-setting]')];
   const selects = [...document.querySelectorAll('select[data-setting]')];
@@ -124,9 +126,13 @@
     });
   }
 
-  $('p-manage').addEventListener('click', () => {
-    RRX.ext.runtime.openOptionsPage();
-    window.close();
+  $('p-manage').addEventListener('click', async () => {
+    try {
+      await RRX.ext.runtime.openOptionsPage();
+      window.close();
+    } catch (err) {
+      RRX.warn('could not open settings', err);
+    }
   });
 
   pageOfActiveTab().then(show);
