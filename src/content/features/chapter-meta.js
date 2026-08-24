@@ -70,8 +70,11 @@
    * sweep and every settings change. `.chapter-content` is the right boundary
    * - author notes are siblings of it, and the ad placeholders inside are
    * empty divs whose iframes hold no text. Two impurities left alone: the
-   * chapter's own title heading, and a hidden anti-scraping sentence Royal
-   * Road sometimes injects. A heuristic for either could eat real prose.
+   * chapter's own title heading, and the anti-scraping sentence Royal Road
+   * sometimes injects. A heuristic for either could eat real prose.
+   *
+   * The raw text stays the cache key. It identifies the chapter, and building
+   * it is the cheap half of the work below.
    */
   function wordCount() {
     const content = RRX.chapterTop && RRX.chapterTop.content();
@@ -80,7 +83,15 @@
     const text = content.textContent || '';
     if (text.length === wordCache.length) return wordCache.words;
 
-    const trimmed = text.trim();
+    // A `<br>` contributes no whitespace of its own, so the words either side
+    // of one arrived as a single token: 3-6% low on the fictions that write a
+    // paragraph break as `<br><br>` rather than as a second `<p>`.
+    const clone = RRX.chapterTop.visible(content);
+    for (const br of clone.querySelectorAll('br')) {
+      br.replaceWith(clone.ownerDocument.createTextNode(' '));
+    }
+
+    const trimmed = (clone.textContent || '').trim();
     const words = trimmed ? trimmed.split(/\s+/).length : 0;
     wordCache = { length: text.length, words };
     return words;

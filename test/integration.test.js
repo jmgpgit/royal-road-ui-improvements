@@ -1248,6 +1248,62 @@ async function fictionPage(settings) {
   return w;
 }
 
+// --- the reader's place on the page -----------------------------------------
+
+/** jsdom has no scrolling at all, so the position is faked: what is being
+ *  pinned here is the decision to put it back, not the scrolling itself. */
+function withFakeScroll(w) {
+  const puts = [];
+  let y = 0;
+  Object.defineProperty(w, 'scrollY', { get: () => y, configurable: true });
+  Object.defineProperty(w, 'scrollX', { get: () => 0, configurable: true });
+  w.scrollTo = (opts) => {
+    puts.push(opts.top);
+    y = opts.top;
+  };
+  return { puts, moveTo: (to) => { y = to; w.dispatchEvent(new w.Event('scroll')); }, at: () => y };
+}
+
+test('changing the review sort leaves the reader where they were', async () => {
+  const w = await fictionPage({});
+  const scroll = withFakeScroll(w);
+
+  w.RRX.fictionPage.keepScroll();
+  // Royal Road answers a sort change by scrolling its review list into view,
+  // about 120ms after the click. From the top of the page that is a ~2,700px
+  // drop into the reviews, which is not what the reader asked for.
+  scroll.moveTo(2765);
+
+  assert.deepEqual([...scroll.puts], [0], 'put back');
+  assert.equal(scroll.at(), 0);
+});
+
+test('a reader who scrolls during that moment is not fought for it', async () => {
+  const w = await fictionPage({});
+  const scroll = withFakeScroll(w);
+
+  w.RRX.fictionPage.keepScroll();
+  w.dispatchEvent(new w.Event('wheel'));
+  scroll.moveTo(900);
+
+  assert.equal(scroll.puts.length, 0, 'their own scroll stands');
+  assert.equal(scroll.at(), 900);
+});
+
+test('a deep link scrolls itself, and is left alone', async () => {
+  const { w } = await boot(
+    'fiction-detail.new.html',
+    'https://www.royalroad.com/fiction/21220/mother-of-learning#reviews',
+    {}
+  );
+  const scroll = withFakeScroll(w);
+
+  w.RRX.fictionPage.keepScroll();
+  scroll.moveTo(2765);
+
+  assert.equal(scroll.puts.length, 0, 'the anchor is the reader’s position too');
+});
+
 test('a collapsed reviews panel is never paged into', async () => {
   // Anything display:none reports a zero-size box, and a bottom of 0 satisfies
   // any "are we near the end of the list?" test. Unguarded, the pager downloads

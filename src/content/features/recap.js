@@ -74,6 +74,41 @@
   }
 
   /**
+   * The paragraphs inside one block, as text.
+   *
+   * Some authors paste a whole chapter into a single `<p>` and break the
+   * paragraphs with `<br><br>` - fiction 86874 does, 23 KB of chapter in one
+   * element. Read as elements that is a single paragraph, so `wanted` bought the
+   * whole chapter. A lone `<br>` is a line break within a paragraph rather than
+   * a break between two, so only a run of two or more splits.
+   *
+   * Walked rather than split on the text, because a `<br>` and the source's own
+   * pretty-printing are the same newline once it is a string.
+   */
+  function paragraphsIn(block) {
+    const lines = [];
+    let current = '';
+    let breaks = 0;
+    for (const node of RRX.chapterTop.visible(block).childNodes) {
+      if (node.nodeName === 'BR') {
+        breaks += 1;
+        if (breaks === 1) current += ' '; // a line break, so the words do not run together
+        else if (breaks === 2) {
+          lines.push(current);
+          current = '';
+        }
+        continue;
+      }
+      const text = node.textContent;
+      // Whitespace between two `<br>`s must not read as prose separating them.
+      if (text.trim()) breaks = 0;
+      current += text;
+    }
+    lines.push(current);
+    return lines.map((line) => line.replace(/\s+/g, ' ').trim());
+  }
+
+  /**
    * The closing paragraphs of a chapter document.
    *
    * @param {Document} doc a parsed chapter page
@@ -84,20 +119,20 @@
     const content = doc.querySelector(SEL.chapterContent);
     if (!content) return '';
 
-    const paragraphs = [...content.querySelectorAll('p')];
+    // Text, not markup: a recap wants the author's words, not their images,
+    // scripts, or end-of-chapter shoutout blocks.
+    const paragraphs = [...content.querySelectorAll('p')].flatMap(paragraphsIn);
     // Trailing separators first, then anything empty, so `wanted` buys prose.
     let end = paragraphs.length;
     while (end > 0) {
-      const text = paragraphs[end - 1].textContent.trim();
+      const text = paragraphs[end - 1];
       if (text && !SEPARATOR_ONLY.test(text)) break;
       end -= 1;
     }
     const kept = paragraphs.slice(Math.max(0, end - wanted), end);
     if (!kept.length) return '';
 
-    // Rebuilt as text, not adopted as markup: a recap wants the author's words,
-    // not their images, scripts, or end-of-chapter shoutout blocks.
-    return kept.map((p) => p.textContent.trim()).filter(Boolean).join('\n\n');
+    return kept.filter(Boolean).join('\n\n');
   }
 
   /** @returns {string|null} the previous chapter's URL, if there is one */

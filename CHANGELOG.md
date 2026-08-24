@@ -4,6 +4,24 @@ Notable changes, newest first. Versions follow [semantic versioning](https://sem
 the patch number for fixes, the minor for new settings, the major for anything that changes
 what an existing setting does.
 
+## 1.5.3
+
+**Fixes**
+
+- **The recap no longer shows the whole chapter.** It kept "the last three paragraphs" by counting
+  `<p>` elements, and some authors write an entire chapter as one paragraph with line breaks
+  between the others — 23 KB in a single element, all of which counted as one. Paragraphs are now
+  read the way they look: a run of two or more line breaks starts a new one, a single one does not.
+- **Word counts were short on those same chapters**, because a line break contributes no space and
+  the words either side of it merged. One chapter went from 4,034 to 4,159.
+- **Text an author has hidden is no longer counted or recapped.** Some watermark their prose with
+  invisible copyright lines between the words — eight per chapter in one fiction, 175 words of
+  them — which the count read as prose and the recap could have shown you.
+- **A fiction page stays at the top when you have a default review sort.** Royal Road answers a
+  sort change by scrolling its reviews into view, which meant opening any fiction page threw you
+  two thousand pixels down it. The page now holds its place for a moment and lets go the instant
+  you scroll yourself — and stays out of the way entirely when you followed a link to a section.
+
 ## 1.5.2
 
 **Fixes**
