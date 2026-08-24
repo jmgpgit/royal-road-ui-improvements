@@ -117,13 +117,25 @@ test('an unlabelled stamp is named by position, never invented', () => {
 
 test('the word count is the chapter text, and matches the real chapter', () => {
   const { w } = load();
-  assert.equal(w.RRX.chapterMeta.wordCount(), 2120);
+  // 2121, not 2120: the fixture's two `<br>`s separate a pair of words that
+  // used to be counted as one, because `<br>` yields no whitespace of its own.
+  assert.equal(w.RRX.chapterMeta.wordCount(), 2121);
+});
+
+test('a <br> is a word boundary, and hidden text is not words at all', () => {
+  const { w } = load();
+  const content = w.RRX.chapterTop.content();
+  // Both real: fiction 86874 writes every paragraph break as `<br><br>`, and
+  // fiction 187641 watermarks its prose with hidden copyright spans.
+  content.innerHTML =
+    '<p>One two<br><br>three four<br>five<span style="display: none"> not a word</span></p>';
+  assert.equal(w.RRX.chapterMeta.wordCount(), 5);
 });
 
 test('reading time rounds to minutes, and to hours once minutes stop helping', () => {
   const { w } = load();
   const { readingTime } = w.RRX.chapterMeta;
-  assert.equal(readingTime(2120, 250), '~8 min');
+  assert.equal(readingTime(2121, 250), '~8 min');
   assert.equal(readingTime(100, 250), '~1 min', 'never zero minutes');
   assert.equal(readingTime(30000, 250), '~2 h');
   assert.equal(readingTime(33000, 250), '~2 h 12 min');
@@ -150,7 +162,7 @@ test('each switch adds only its own fact', () => {
 
   const two = load({ 'chapter.wordCount': 'both', 'chapter.wpm': 250 });
   two.w.RRX.chapterMeta.apply(two.ctx);
-  const wordLabel = `${(2120).toLocaleString()} words`;
+  const wordLabel = `${(2121).toLocaleString()} words`;
   assert.deepEqual([...texts(two.w)], [wordLabel, '~8 min']);
 
   const three = load({ 'chapter.topTimestamp': true, 'chapter.wordCount': 'words' });

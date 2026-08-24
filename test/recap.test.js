@@ -87,6 +87,31 @@ test('the ending is taken from prose, not from the scene break it closes on', ()
   assert.equal(tail, 'Real paragraph one.\n\nReal paragraph two.');
 });
 
+test('a chapter written as one <p> with <br><br> breaks still has paragraphs', () => {
+  const w = load();
+  // Fiction 86874 is written this way: the whole chapter in a single element,
+  // 23 KB of it. Counting elements gave one paragraph, so the recap showed the
+  // lot. A lone <br> is a line break inside a paragraph and must not split.
+  const doc = new w.DOMParser().parseFromString(
+    `<div class="chapter-content">
+       <p>One.<br><br>Two,<br>still two.<br><br>Three.<br><br>***</p>
+     </div>`,
+    'text/html'
+  );
+  assert.equal(w.RRX.recap.tailOf(doc, 2), 'Two, still two.\n\nThree.');
+  assert.equal(w.RRX.recap.tailOf(doc, 999).split('\n\n').length, 3);
+});
+
+test('whitespace between the two <br>s does not stop them being a break', () => {
+  const w = load();
+  const doc = new w.DOMParser().parseFromString(
+    `<div class="chapter-content"><p>One.<br>
+       <br>Two.</p></div>`,
+    'text/html'
+  );
+  assert.equal(w.RRX.recap.tailOf(doc, 2), 'One.\n\nTwo.');
+});
+
 test('separator-only paragraphs are recognised in the forms chapters use', () => {
   const w = load();
   const { SEPARATOR_ONLY } = w.RRX.recap;

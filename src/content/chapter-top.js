@@ -70,6 +70,26 @@
     return true;
   }
 
+  /**
+   * A copy of `el` with the parts a reader cannot see taken out.
+   *
+   * Authors watermark their prose with `<span style="display: none">…</span>`
+   * between the words - fiction 187641 puts eight per chapter, each a copyright
+   * line - and `textContent` reads them as prose. It reached both the recap and
+   * the word count.
+   *
+   * Inline styles only. Royal Road's own anti-theft sentence is hidden by a
+   * hashed class instead, which would need its stylesheet, and the recap reads
+   * documents that were never rendered, so there is no `getComputedStyle` to ask.
+   */
+  function visible(el) {
+    const clone = el.cloneNode(true);
+    for (const node of clone.querySelectorAll('[style*="display"]')) {
+      if (/display:\s*none/i.test(node.getAttribute('style') || '')) node.remove();
+    }
+    return clone;
+  }
+
   /** Take a slot's block away, if it is there. */
   function clear(slot) {
     const where = content();
@@ -80,5 +100,5 @@
     if (taken) taken.remove();
   }
 
-  RRX.chapterTop = { SLOTS, SLOT_ATTR, place, clear, content };
+  RRX.chapterTop = { SLOTS, SLOT_ATTR, place, clear, content, visible };
 })(globalThis);
