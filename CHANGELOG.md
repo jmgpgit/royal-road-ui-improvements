@@ -4,6 +4,19 @@ Notable changes, newest first. Versions follow [semantic versioning](https://sem
 the patch number for fixes, the minor for new settings, the major for anything that changes
 what an existing setting does.
 
+## 1.5.4
+
+**Fixes**
+
+- **Every reply on a chapter is shown now, however deep the chain.** Past depth 2 Royal Road
+  moves the rest of a conversation behind an "N more replies" button, and that button does
+  nothing on any page infinite scroll had added: it looks the comment up in a list Royal Road
+  builds once, as the page loads, and a reply that arrived later is not in it. Those replies
+  could not be reached at all. They are shown where they were written instead, at any depth,
+  and Royal Road's "N more replies" and Flat/Focus controls go with them — neither has
+  anything left to do. Nothing extra is fetched: the whole chain was already on the page, only
+  hidden.
+
 ## 1.5.3
 
 **Fixes**

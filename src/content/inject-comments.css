@@ -85,6 +85,30 @@ html.rrx-comments.rrx-comment-rules
    follow and the line is most wanted.
    ========================================================================== */
 
+/* Every reply on the page, however deep.
+   Royal Road has two comment modes, kept in its own localStorage under
+   `rr-comments-display-mode`: "flat" strips the `hidden` off every deep holder,
+   "focus" leaves each chain behind its "N more replies" button. The whole chain
+   is in the response either way - the button only removes a class - so showing
+   it costs no request.
+   Done here rather than by clicking, because in focus mode that button is dead
+   on anything the pager appended: Royal Road builds its comment tree once, in
+   its constructor, and the click looks the comment up in that tree. A reply
+   from page two is not in it, so nothing happens and the chain cannot be opened
+   at all - not on the page, not in the focused view the button otherwise
+   switches to. */
+html.rrx-comments [data-rr-deep-replies] {
+  display: block;
+}
+
+/* Both controls that mode owns: the "N more replies" button, and the Flat/Focus
+   toggle in the comment header. Neither has anything left to do, and a control
+   that visibly does nothing is worse than one that is not there. */
+html.rrx-comments [data-rr-comment-expand-deep],
+html.rrx-comments [data-rr-comments-mode-toggle] {
+  display: none;
+}
+
 html.rrx-comments .comment-replies,
 html.rrx-comments [data-rr-deep-replies] {
   margin-top: 0.5rem;

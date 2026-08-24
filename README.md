@@ -88,11 +88,12 @@ bookmark — and never hides an author's own comments.
   nothing is ever hidden. A bar above the comments counts them, filters to just the new ones,
   or clears the marks.
 - **Comments**: a rule between threads, a thread line down each chain in a colour you pick, a
-  collapse control on any thread with replies, and folding or hiding for low-content comments
-  ("thanks", "tyfc"), lone emoticons, and your own phrases or regular expressions. Plus real
-  infinite scroll. Two things are never hidden: a comment with replies, so the replies still
-  make sense, and the author's own comments, which are left alone unless you say otherwise and
-  are only ever folded even then.
+  collapse control on any thread with replies, every reply shown where it was written however
+  deep the chain, and folding or hiding for low-content comments ("thanks", "tyfc"), lone
+  emoticons, and your own phrases or regular expressions. Plus real infinite scroll. Two things
+  are never hidden: a comment with replies, so the replies still make sense, and the author's
+  own comments, which are left alone unless you say otherwise and are only ever folded even
+  then.
 
 **Everywhere on the site**: none of the above works on Royal Road's legacy layout, so the
 extension's popup carries a choice of layout — leave it to Royal Road, always the new design,
@@ -122,8 +123,8 @@ toggle away in options:
 - **A `−` button on every card.** Nothing is hidden until you press one.
 - **A drop-mark button beside it**, for a fiction you tried and stopped. Nothing is marked until
   you press one, and the two are separate switches.
-- **Comment threading**: a divider between conversations, a line down each reply chain, and a
-  collapse control on any comment with replies.
+- **Comment threading**: a divider between conversations, a line down each reply chain, every
+  reply shown however deep it sits, and a collapse control on any comment with replies.
 - **Hyphenation**, which does nothing unless you also turn on justified text.
 
 Anything that alters an author's words is opt-in, and so is every rule that folds or hides a
@@ -338,10 +339,10 @@ naming what is missing; `test/fixtures/README.md` covers how to re-capture each 
 - **Shoutout detection is a heuristic**: "a direct child block of the note that links to a
   different fiction". It cannot catch a shoutout with no link, and it will collapse a block
   that merely mentions another fiction in passing. Both cost one click on the chip.
-- **Deep replies start collapsed.** Past depth 2, Royal Road moves the rest of a chain into a
-  container it hides behind a "N more replies" button. The thread line and the collapse
-  control follow the chain into it, but the button is Royal Road's and the extension does not
-  click it for you.
+- **Royal Road's own Flat/Focus comment control is hidden.** Past depth 2 it moves the rest of
+  a chain behind a "N more replies" button, and that button does nothing on a page infinite
+  scroll added. Every reply is shown inline instead, so neither control has anything left to
+  do. Turning comment threading off gives both back.
 - **The low-effort comment rules are a guess.** They fire on short comments that are nothing
   but an acknowledgement once the filler is stripped ("thanks", "tyfc", "cheers"), a position
   claim ("first"), or a single Royal Road emoticon. Anything with more left in it survives:
