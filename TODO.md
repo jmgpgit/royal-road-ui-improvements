@@ -62,6 +62,16 @@ feature, and usually a smaller one.
 - **Chapter length in the contents.** Royal Road publishes no per-chapter word count, but every
   chapter you read gives one for free. A partial column still says something ("the ones you have
   read average 2,800 words").
+- **Open a fiction page at the section you care about.** The page currently always opens at the
+  top, and now holds the reader there while the review sort is applied, because Royal Road
+  answers a sort change by scrolling its review list into view. Someone who reads reviews
+  first, or who only wants the chapter list, would rather land there. A setting
+  naming one section — hero, stats, chapters, reviews — and a scroll to it once the accordions
+  have settled. Two things it has to get right: the section must be finished opening first, or
+  it scrolls to a box that then grows underneath it; and a deep link (`#reviews`, `?comment=`)
+  is the reader's own choice and outranks the setting. `keepScroll` in `fiction-page.js` is the
+  piece to reuse and invert - it already knows how to win an argument with Royal Road's own
+  scrolling, and how to stand down when the reader moves themselves.
 - **Review reading** — filter reviews by score, collapse the single-line-of-praise ones, reusing
   the low-value-comment machinery. Reviews already have their own pager.
 

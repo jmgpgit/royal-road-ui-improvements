@@ -154,6 +154,45 @@
     if (section) section.classList.toggle('rrx-note-hidden', want === 'hide');
   }
 
+  /**
+   * Hold the page where it is for a moment.
+   *
+   * Royal Road answers a sort change by focusing the dropdown and smooth-scrolling
+   * `#reviews-pagination` into view - right for a reader who just clicked it,
+   * wrong for the same click made on their behalf at load, which dropped them
+   * ~2,700px down the page. Measured on fiction 86874: the focus is immediate,
+   * the scroll about 120ms later.
+   *
+   * Its handlers run in the page's own world, so a content script has nothing to
+   * intercept; putting the scroll back is what is left. Bounded, and it stands
+   * down as soon as the reader moves themselves.
+   */
+  const HOLD_MS = 1500;
+  const READER_MOVED = ['wheel', 'touchstart', 'keydown'];
+
+  function keepScroll(ms = HOLD_MS) {
+    // A deep link scrolls itself and may not have landed yet. That position is
+    // the reader's too.
+    if (root.location.hash) return;
+
+    const top = root.scrollY;
+    const snap = () => {
+      // `instant` on purpose, and not the two-argument form: that one follows
+      // `scroll-behavior`, so where a page sets `smooth` the snap animates too
+      // and loses the race against the smooth scroll it is trying to undo. An
+      // instant scroll aborts one instead.
+      if (root.scrollY !== top) root.scrollTo({ top, left: root.scrollX, behavior: 'instant' });
+    };
+    const stop = () => {
+      root.removeEventListener('scroll', snap);
+      for (const name of READER_MOVED) root.removeEventListener(name, stop);
+    };
+
+    root.addEventListener('scroll', snap, { passive: true });
+    for (const name of READER_MOVED) root.addEventListener(name, stop, { passive: true });
+    setTimeout(stop, ms);
+  }
+
   /** Royal Road always opens reviews sorted by "Top". Picking its own dropdown
    *  item routes the re-sort through Royal Road's handler, not around it - and
    *  through our own click listener, which restarts the pager in the new order.
@@ -168,6 +207,7 @@
     );
     if (!item) return;
     dropdown.dataset.rrxSorted = want;
+    keepScroll();
     item.click();
   }
 
@@ -226,6 +266,7 @@
     setAbout,
     setRecommendations,
     setReviewSort,
+    keepScroll,
     reviewPager,
     userTouched,
     watching,
