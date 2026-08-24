@@ -275,6 +275,58 @@ test('past depth 2 the replies move to a different container, behind a button', 
   }
 });
 
+test('a deep chain arrives with the page, so showing it costs no request', () => {
+  // The claim the stylesheet rests on. Royal Road hides the chain, it does not
+  // withhold it: every comment that says it has replies has them, at every
+  // depth, on all three captures. If that ever stops holding, un-hiding the
+  // holder is no longer enough and the button has to be replaced with a fetch.
+  for (const name of [
+    'chapter-comments.new.html',
+    'chapter-comments-deep.new.html',
+    'chapter-comments-nested.new.html',
+  ]) {
+    const w = load(name);
+    for (const c of w.document.querySelectorAll('[data-comment-id][data-has-replies="true"]')) {
+      assert.ok(
+        c.querySelector('[data-comment-id]'),
+        `${name}: comment ${c.dataset.commentId} at depth ${c.dataset.depth} claims replies it did not send`
+      );
+    }
+    w.close();
+  }
+});
+
+test('the stylesheet shows deep chains and drops the controls that hid them', () => {
+  // Royal Road's "focus" comment mode leaves each chain behind a "N more
+  // replies" button, and that button is dead on anything the pager appended: it
+  // looks the comment up in a tree built once, in the constructor. So the chain
+  // is un-hidden here rather than clicked open.
+  const css = fs.readFileSync(path.join(ROOT, 'src/content/inject-comments.css'), 'utf8');
+  const rule = (...parts) => css.split('}').find((block) => parts.every((p) => block.includes(p)));
+
+  assert.ok(
+    rule('html.rrx-comments [data-rr-deep-replies]', 'display: block'),
+    'the deep-reply holder is shown'
+  );
+  // Its own button and the Flat/Focus toggle both go: with the chain always
+  // shown, neither has anything left to do.
+  assert.ok(
+    rule(
+      'html.rrx-comments [data-rr-comment-expand-deep]',
+      'html.rrx-comments [data-rr-comments-mode-toggle]',
+      'display: none'
+    ),
+    'and both controls that hid it are dropped'
+  );
+  // Collapsing a thread still wins, or the reader's own collapse would be
+  // silently overruled by the rule above - which outweighs it on specificity.
+  const collapse = css
+    .split('}')
+    .find((rule) => rule.includes('.rrx-thread-collapsed [data-rr-deep-replies]'));
+  assert.ok(collapse, 'the collapse rule is still there');
+  assert.match(collapse, /display: none !important/);
+});
+
 test('the shallower fixtures still parse, so neither shape is assumed', () => {
   // Two real pages that never go past depth 2, and one that has no deep-reply
   // holder at all. Whatever handles deep chains has to cope with their absence.
