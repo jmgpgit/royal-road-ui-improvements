@@ -109,23 +109,44 @@ test('latest-updates cards parse despite having no blurb', () => {
 // -- personal state, present and absent -------------------------------------
 
 test('a followed + favourited card reports both, and its real numbers', () => {
-  const w = loadPage('card-loggedin-marked.html', 'https://www.royalroad.com/fictions/best-rated');
+  // A search result: the rebuilt card draws the marks as bare icons with a
+  // `title`, and a search result carries no status chip.
+  const w = loadPage('card-loggedin-marked.html', 'https://www.royalroad.com/fictions/search');
   const d = w.RRX.readCardData(cardsOf(w)[0]);
 
-  assert.equal(d.id, 54508);
+  assert.equal(d.id, 166359);
   assert.equal(d.rating, 4.8);
-  assert.equal(d.followers, 2116);
-  assert.equal(d.pages, 362);
-  assert.equal(d.chapters, 50);
-  assert.equal(d.views, 714646);
-  assert.equal(d.status, 'COMPLETED');
+  assert.equal(d.followers, 2725);
+  assert.equal(d.pages, 1844);
+  assert.equal(d.chapters, 184);
+  assert.equal(d.views, 787178);
+  assert.equal(d.status, null);
   assert.equal(d.type, 'Original');
-  assert.deepEqual(own(d.tags).sort(), ['adventure', 'historical', 'mystery', 'romance']);
-  assert.equal(d.updatedAt, 1780672771);
+  assert.deepEqual(own(d.tags).sort(), [
+    'attractive_lead',
+    'comedy',
+    'contemporary',
+    'cozy',
+    'drama',
+    'female_lead',
+    'litrpg',
+    'modern_knowledge',
+    'progression',
+    'psychological',
+    'slice_of_life',
+  ]);
+  assert.equal(d.updatedAt, 1790170977);
 
   assert.equal(d.mine.follow, true, 'the Following icon must be seen');
   assert.equal(d.mine.favorite, true, 'the Favorited icon must be seen');
   assert.equal(d.mine.ril, false, 'mark="True" means Read Later is NOT set');
+});
+
+test('Read Later is read from its form, and one mark does not imply another', () => {
+  const w = loadPage('card-loggedin-marked.html', 'https://www.royalroad.com/fictions/search');
+  const d = w.RRX.readCardData(cardsOf(w)[1]);
+  assert.equal(d.id, 15935);
+  assert.deepEqual(own(d.mine), { follow: true, favorite: false, ril: true, dropped: false });
 });
 
 test('an unmarked card reports nothing on my shelves', () => {

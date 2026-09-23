@@ -487,13 +487,16 @@ html.rrx-view-grid
  * generates a box to lay them out in; a card with only one of the two puts that
  * one first, so it takes the left-hand slot either way.
  *
- * Royal Road gives each wrapper Tailwind's `.relative`, which is layered, so
- * this wins without `!important`.
+ * Each mark is a bare `<i title="Following">` in the title row, so the icon is
+ * its own chip. It used to sit in a `[data-rr-tooltip]` wrapper; the rebuilt
+ * card dropped it. Royal Road's `mt-1` is a layered utility and Font Awesome's
+ * display rule is one class, so this outranks both without `!important`.
+ *
+ * Font Awesome glyphs do not share an advance width - the heart is wider than
+ * the bookmark - so the chip has a fixed width and centres its glyph, which
+ * keeps the two chips matched and the icons on one axis.
  */
-html.rrx-view-grid
-  .fiction-card-expanded
-  div:has(> a[data-vt-trigger] > h2)
-  > div[data-rr-tooltip] {
+html.rrx-view-grid .fiction-card-expanded div:has(> a[data-vt-trigger] > h2) > i {
   position: absolute;
   top: var(--rrx-grid-mark-top);
   left: calc(var(--rrx-grid-inset) * -1);
@@ -503,7 +506,7 @@ html.rrx-view-grid
   justify-content: center;
   width: var(--rrx-grid-mark-w);
   height: var(--rrx-grid-mark-h);
-  margin: 0 !important;
+  margin: 0;
   padding: 0;
   border-radius: 0 0.3rem 0.3rem 0;
   /* Its own colour, not a variable: the chip straddles the tile edge and the
@@ -514,32 +517,10 @@ html.rrx-view-grid
   line-height: 1;
 }
 
-/* Font Awesome glyphs do not share an advance width - the heart is wider than
-   the bookmark - so hugging the icon gave the two chips different widths and
-   put the glyphs on different centres. This is what `fa-fw` does: one em of
-   space each, glyph centred in it, so the chips match and the icons stack on a
-   single axis.
-
-   The margin is Royal Road's: the icon carries `mt-1` to sit level with the
-   title it used to stand beside. Inside a chip that centres its contents, that
-   quarter-rem is simply pushed down from the middle - the centring was right
-   and the thing being centred was not. */
-html.rrx-view-grid
-  .fiction-card-expanded
-  div:has(> a[data-vt-trigger] > h2)
-  > div[data-rr-tooltip] i {
-  width: 1em;
-  margin: 0;
-  text-align: center;
-}
-
 /* Stacked under the first rather than beside it: side by side, the second chip
    reaches into the middle of the cover, which is the width this view has least
    of. Directly below costs nothing - the left edge is already clear. */
-html.rrx-view-grid
-  .fiction-card-expanded
-  div:has(> a[data-vt-trigger] > h2)
-  > div[data-rr-tooltip]:nth-of-type(2) {
+html.rrx-view-grid .fiction-card-expanded div:has(> a[data-vt-trigger] > h2) > i:nth-of-type(2) {
   top: calc(var(--rrx-grid-mark-top) + var(--rrx-grid-mark-h) + 0.2rem);
 }
 

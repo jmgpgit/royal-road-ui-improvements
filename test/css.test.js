@@ -853,14 +853,16 @@ test('the covers overlay reaches the Following and Favourite icons, and only tho
   const selector = selectorFor(viewsCss, 'position: absolute', OVERLAY_AT());
   const d = docFor('card-loggedin-marked.html', 'rrx-view-grid').window.document;
 
-  // The capture's phone copy sits inside `.md:hidden`, which the view hides.
-  const hit = [...d.querySelectorAll(selector)].filter((n) => !n.closest('.md\\:hidden'));
+  // The first card is followed and favourited, the second only followed.
+  // Queried from the document: jsdom's element-scoped querySelectorAll finds
+  // nothing for a descendant chain ending in `:has(…) > i`.
+  const [both, one] = [...d.querySelectorAll('.fiction-card-expanded')];
+  const all = [...d.querySelectorAll(selector)];
+  const hit = all.filter((n) => both.contains(n));
   assert.equal(hit.length, 2, `expected the two icons, matched ${hit.length}: ${selector}`);
+  assert.equal(all.filter((n) => one.contains(n)).length, 1, 'a lone mark is matched too');
   for (const node of hit) {
-    assert.ok(
-      node.querySelector('i.fa-bookmark, i.fa-heart'),
-      'matched something that is not one of the two icons'
-    );
+    assert.ok(node.matches('i.fa-bookmark, i.fa-heart'), 'matched something that is not one of the two icons');
   }
 
   // The other two children of that row must stay in flow: the title is the
@@ -972,7 +974,8 @@ test('both marks are the same size, with their glyphs on one axis', () => {
 
   assert.match(overlay, /width: var\(--rrx-grid-mark-w\)/, 'the chip width is not pinned');
   assert.match(overlay, /justify-content: center/, 'the glyph is not centred in the chip');
-  assert.match(overlay, /width: 1em/, 'the glyphs keep their own advance widths');
+  // The icon is the chip, so its own width is the pinned one.
+  assert.match(overlay, /> i \{[^}]*width: var\(--rrx-grid-mark-w\)/, 'the icon keeps its own advance width');
 
   // Both chips take the width from the same variable, so neither can drift.
   const declared = viewsCss.match(/--rrx-grid-mark-w: [\d.]+rem/g) || [];
@@ -988,7 +991,7 @@ test('the marks drop the margin Royal Road gives them for the title row', () => 
   // beside. Inside a chip that centres its contents that margin is dead weight
   // pushing the glyph off centre, and no amount of centring fixes it.
   const marked = docFor('card-loggedin-marked.html', 'rrx-view-grid').window.document;
-  const icons = [...marked.querySelectorAll('div.hidden i.fa-bookmark, div.hidden i.fa-heart')];
+  const icons = [...marked.querySelectorAll('i.fa-bookmark, i.fa-heart')];
   assert.ok(icons.length > 0, 'the capture no longer carries the icons this is about');
   assert.ok(
     icons.every((i) => i.className.includes('mt-')),
@@ -996,7 +999,7 @@ test('the marks drop the margin Royal Road gives them for the title row', () => 
   );
 
   const overlay = viewsCss.slice(OVERLAY_AT());
-  const rule = overlay.slice(overlay.indexOf('> div[data-rr-tooltip] i'));
+  const rule = overlay.slice(overlay.indexOf('position: absolute'));
   assert.match(rule.slice(0, rule.indexOf('}')), /margin: 0/, 'the margin is not cleared');
 });
 

@@ -10,9 +10,8 @@ a raw capture contains a live `__RequestVerificationToken`. `test/fixtures/` is 
 wholesale. Suites that need a missing fixture skip themselves with a message naming it, so a
 fresh clone still runs green on everything that does not need one.
 
-Captured from build `4.1.20260923.58`, except five older signed-in captures from August 2026,
-kept on purpose: `chapter-comments-lazy.new.html`, the two `card-loggedin` cards and the two
-saved `.htm` chapter pages.
+Captured from build `4.1.20260923.58`, except three older signed-in captures from August 2026,
+kept on purpose: `chapter-comments-lazy.new.html` and the two saved `.htm` chapter pages.
 
 ## What each one is for
 
@@ -32,7 +31,7 @@ saved `.htm` chapter pages.
 | `chapter-comments-deep.new.html` | 45 comments reaching depth 2, and no deeper | no |
 | `chapter-comments-nested.new.html` | A thread nested to depth 6, with deep-reply holders | no |
 | `card-loggedin.html` | A card with nothing marked: proof the status icons are absent, not missed | **yes** |
-| `card-loggedin-marked.html` | A followed + favourited + completed card | **yes** |
+| `card-loggedin-marked.html` | Two search results: followed + favourited, and followed + Read Later | **yes** |
 
 ### On the three comment captures
 
@@ -78,9 +77,21 @@ Invoke-WebRequest -Uri 'https://www.royalroad.com/fiction/chapter/<id>/comments?
   Out-File 'test/fixtures/chapter-comments.new.html' -Encoding utf8
 ```
 
-**The two logged-in cards** cannot be produced by the recipe above. Open a list page in a
-browser where you are signed in, find a fiction you have marked and one you have not, and
-copy the outer HTML of each `.fiction-card-expanded` out of the devtools inspector.
+**The two logged-in cards** cannot be produced by the recipe above, and a whole list is too
+long to paste. Signed in, on a list showing a fiction you have marked, save it from the
+console:
+
+```js
+const a = Object.assign(document.createElement('a'), {
+  href: URL.createObjectURL(new Blob([document.querySelector('.fiction-list').outerHTML])),
+  download: 'cards.html',
+});
+a.click();
+```
+
+Keep one marked card and one that is not, and strip what the extension added if it was
+running: `.rrx-ui` elements, `data-rrx-*` attributes and `rrx-` classes, with each cleaned
+title put back from its `data-rrx-full-title`.
 
 ## Redacting, every time
 
