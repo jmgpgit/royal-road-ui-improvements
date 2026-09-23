@@ -36,6 +36,17 @@
     return Number.isFinite(n) ? n : null;
   }
 
+  /** A rating tile with no star widget: Royal Road withholding the average
+   *  because there are too few ratings. Evidence, unlike a rating that could
+   *  not be read, so it gets its own field and filter. */
+  function readUnrated(card) {
+    for (const label of card.querySelectorAll(SEL.cardStatLabel)) {
+      if (label.textContent.trim() !== SEL.cardRatingLabel) continue;
+      return !label.parentElement.querySelector(SEL.cardRating);
+    }
+    return false;
+  }
+
   /** Followers / Pages / Chapters / Views, read label-first. */
   function readStats(card) {
     const out = { followers: null, pages: null, chapters: null, views: null };
@@ -123,6 +134,7 @@
     return {
       id: fictionId,
       rating: readRating(card),
+      unrated: readUnrated(card),
       ...readStats(card),
       ...readChips(card),
       tags: readTags(card),
@@ -131,5 +143,15 @@
     };
   }
 
-  return { readCardData, parseCount, readRating, readStats, readChips, readTags, readUpdatedAt, readMine };
+  return {
+    readCardData,
+    parseCount,
+    readRating,
+    readUnrated,
+    readStats,
+    readChips,
+    readTags,
+    readUpdatedAt,
+    readMine,
+  };
 });

@@ -88,6 +88,25 @@
     ]);
   }
 
+  /** One chip backed by a bool setting. */
+  function toggleRow(label, key, text) {
+    return el('div', { class: 'rrx-field rrx-field--wrap' }, [
+      el('span', { class: 'rrx-field__label', text: label }),
+      el('div', { class: 'rrx-chips' }, [
+        el('button', {
+          type: 'button',
+          class: 'rrx-chip',
+          'aria-pressed': draft[key] ? 'true' : 'false',
+          text,
+          onClick: (e) => {
+            draft[key] = !draft[key];
+            e.currentTarget.setAttribute('aria-pressed', draft[key] ? 'true' : 'false');
+          },
+        }),
+      ]),
+    ]);
+  }
+
   /**
    * Tag picker: a combobox that turns each pick into a chip. Not a native
    * `<datalist>` - its dropdown will not reopen after a pick without retyping,
@@ -270,7 +289,8 @@
       const cleared = {};
       for (const key of RRX.group('filters')) {
         if (key === 'filters.enabled') continue;
-        cleared[key] = Array.isArray(ctx.settings[key]) ? [] : null;
+        const value = ctx.settings[key];
+        cleared[key] = Array.isArray(value) ? [] : typeof value === 'boolean' ? false : null;
       }
       await ctx.setSettings(cleared);
     };
@@ -295,6 +315,7 @@
     const body = el('div', { class: 'rrx-panel__body' }, [
       group('Score and size', [
         rangeRow(['Rating', 'filters.minRating', 'filters.maxRating', '0.1']),
+        toggleRow('Too few ratings', 'filters.hideUnrated', 'Hide'),
         rangeRow(['Followers', 'filters.minFollowers', 'filters.maxFollowers', '100']),
         rangeRow(['Views', 'filters.minViews', 'filters.maxViews', '1000']),
         rangeRow(['Pages', 'filters.minPages', 'filters.maxPages', '10']),

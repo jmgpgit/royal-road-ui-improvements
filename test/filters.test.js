@@ -147,6 +147,20 @@ test('the master switch turns everything off at once', () => {
   assert.equal(hasActiveFilters({ ...strict, 'filters.enabled': false }), false);
 });
 
+test('"too few ratings" is its own switch, not part of the rating range', () => {
+  const unrated = card({ rating: null, unrated: true });
+  // The range still never excludes a card with no average...
+  assert.equal(matchesFilters(unrated, { 'filters.minRating': 4 }, NOW), true);
+  // ...the switch does, and only the cards Royal Road marked.
+  assert.equal(matchesFilters(unrated, { 'filters.hideUnrated': true }, NOW), false);
+  assert.equal(matchesFilters(card(), { 'filters.hideUnrated': true }, NOW), true);
+  assert.equal(matchesFilters(card({ rating: null }), { 'filters.hideUnrated': true }, NOW), true);
+
+  assert.equal(hasActiveFilters({ 'filters.hideUnrated': false }), false);
+  assert.equal(hasActiveFilters({ 'filters.hideUnrated': true }), true);
+  assert.deepEqual(describeFilters({ 'filters.hideUnrated': true }), ['enough ratings']);
+});
+
 test('hasActiveFilters ignores empty lists and nulls', () => {
   assert.equal(hasActiveFilters({ 'filters.tagsAll': [] }), false);
   assert.equal(hasActiveFilters({ 'filters.minRating': null }), false);

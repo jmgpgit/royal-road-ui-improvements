@@ -164,6 +164,23 @@ test('a rating filter narrows the real page by the right amount', () => {
   assert.ok(kept.length > 0 && kept.length < records.length, 'filter must actually narrow');
 });
 
+test('"Too few ratings" cards are told apart from rated ones', () => {
+  const w = loadPage('fictions-latest-updates.new.html', 'https://www.royalroad.com/fictions/latest-updates');
+  const cards = cardsOf(w);
+  const records = cards.map((el) => w.RRX.readCardData(el));
+  const unrated = records.filter((d) => d.unrated);
+
+  assert.ok(unrated.length > 0 && unrated.length < records.length, 'the capture holds both kinds');
+  for (const [i, d] of records.entries()) {
+    const withheld = /Too few ratings/.test(cards[i].textContent);
+    assert.equal(d.unrated, withheld, `card ${d.id}`);
+    assert.equal(d.rating === null, withheld, `card ${d.id}: a rating exactly when not withheld`);
+  }
+
+  const kept = records.filter((d) => matchesFilters(d, { 'filters.hideUnrated': true }));
+  assert.equal(kept.length, records.length - unrated.length);
+});
+
 test('a tag filter narrows the real page by the right amount', () => {
   const w = loadPage('fictions-rising-stars.new.html', 'https://www.royalroad.com/fictions/rising-stars');
   const records = cardsOf(w).map((el) => w.RRX.readCardData(el));

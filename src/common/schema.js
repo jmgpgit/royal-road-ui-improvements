@@ -82,6 +82,9 @@
     'filters.enabled': { type: 'bool', default: true },
     'filters.minRating': bound(0, 5),
     'filters.maxRating': bound(0, 5),
+    /** Hide fictions whose rating Royal Road withholds ("Too few ratings"). Its
+     *  own switch: the rating range never excludes a card with no average. */
+    'filters.hideUnrated': { type: 'bool', default: false },
     'filters.minFollowers': bound(0, 1e9),
     'filters.maxFollowers': bound(0, 1e9),
     'filters.minViews': bound(0, 1e12),

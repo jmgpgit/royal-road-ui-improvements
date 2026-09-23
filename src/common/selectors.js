@@ -128,6 +128,9 @@
      * Filtered against CARD_STATS, so stray `.uppercase` matches are harmless.
      */
     cardStatLabel: '.uppercase',
+    /** The rating tile's label. Below some number of ratings Royal Road puts
+     *  "Too few ratings" in that tile instead of the star widget. */
+    cardRatingLabel: 'Rating',
     /** Tag chips - the slug is in the href. */
     cardTag: 'a[href*="tagsAdd="]',
 
