@@ -176,6 +176,12 @@
     }
   })();
 
+  /** A link to a specific comment is a request to go somewhere else and wins
+   *  outright. Royal Road's permalinks are `?comment=N#comment-N`. Read now,
+   *  not in `restore`: once the comments load Royal Road strips the fragment
+   *  with `replaceState`, then scrolls to the comment 500 ms later. */
+  const deepLink = !!location.hash || location.search.includes('comment=');
+
   /** The handlers are latched on and never taken off - the reader can switch
    *  this off in a tab that is already listening, so "off" has to be honoured
    *  where the write happens, not only where the listeners are attached. */
@@ -321,11 +327,7 @@
    *  and a second restore would drag the reader back to where they were ten
    *  minutes ago. */
   function restore(mode) {
-    if (restored || userScrolled) return;
-
-    // A link to a specific comment is a request to go somewhere else and wins
-    // outright. Royal Road's own permalinks are `?comment=N#comment-N`.
-    if (location.hash || location.search.includes('comment=')) return;
+    if (restored || userScrolled || deepLink) return;
     if (root.scrollY >= TOP_PX) return;
     if (!saved || saved.p === undefined) return;
 
