@@ -96,20 +96,39 @@
   }
 
   /**
-   * Count a finished chapter in today's bucket. Read and written in one call,
-   * but storage.local has no compare-and-set: two tabs finishing in the same
-   * moment can still lose one.
+   * Count a finished chapter in today's bucket. Queued behind this page's other
+   * log writes, but storage.local has no compare-and-set: two tabs writing in
+   * the same moment can still lose one.
    *
    * @param {{chapterId:number, fictionId?:number, title?:string, words?:number}} entry
    * @returns {boolean} false when the chapter was already among the recent finishes
    */
-  async function markRead(entry) {
-    const log = await loadLog();
-    const now = Math.floor(Date.now() / 1000);
-    const next = RRX.logFinish(log, { ...entry, day: RRX.dayKey(new Date()), now });
-    if (next === log) return false;
-    await ext.storage.local.set({ [KEY_LOG]: RRX.pruneLog(next, { now }) });
-    return true;
+  function markRead(entry) {
+    return writeLog((log, now) =>
+      RRX.logFinish(log, { ...entry, day: RRX.dayKey(new Date()), now })
+    );
+  }
+
+  /** Seconds spent reading, added to today. */
+  function addReadingTime(seconds) {
+    return writeLog((log) => RRX.logTime(log, RRX.dayKey(new Date()), seconds));
+  }
+
+  /** One read-modify-write at a time from this page: a finish and a time flush
+   *  land in the same moment often enough, and the second would write back a
+   *  log without the first. */
+  let logQueue = Promise.resolve();
+  function writeLog(change) {
+    const run = async () => {
+      const log = await loadLog();
+      const now = Math.floor(Date.now() / 1000);
+      const next = change(log, now);
+      if (next === log) return false;
+      await ext.storage.local.set({ [KEY_LOG]: RRX.pruneLog(next, { now }) });
+      return true;
+    };
+    logQueue = logQueue.then(run, run);
+    return logQueue;
   }
 
   async function forgetLog() {
@@ -493,6 +512,7 @@
     forgetStats,
     loadLog,
     markRead,
+    addReadingTime,
     forgetLog,
     tidy,
     markChapter,

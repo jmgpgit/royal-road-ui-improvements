@@ -36,16 +36,26 @@
 
   const firstDay = (log) => Object.keys(log.d).sort()[0] || '';
 
-  /** Chapters, words and days with a chapter in them, over `from`..`to`. */
+  /** Chapters, words, seconds reading and days with a chapter in them, over
+   *  `from`..`to`. */
   function tally(log, from, to) {
-    const out = { c: 0, w: 0, days: 0 };
-    for (const [day, [c, w]] of Object.entries(log.d)) {
+    const out = { c: 0, w: 0, t: 0, days: 0 };
+    for (const [day, [c, w, t]] of Object.entries(log.d)) {
       if (day < from || day > to) continue;
       out.c += c;
       out.w += w;
+      out.t += t;
       if (c) out.days += 1;
     }
     return out;
+  }
+
+  /** "45 min", "3 h 5 min". Measured time, so no "~". */
+  function duration(seconds) {
+    const minutes = Math.round(seconds / 60);
+    if (minutes < 60) return `${minutes} min`;
+    const rest = minutes % 60;
+    return `${Math.floor(minutes / 60)} h${rest ? ` ${rest} min` : ''}`;
   }
 
   /** The last `count` weeks, oldest first, this one included. */
@@ -176,6 +186,7 @@
     weekStart,
     spanDays,
     tally,
+    duration,
     weeks,
     months,
     streaks,
@@ -212,7 +223,7 @@
   const date = (key, opts) => D.parse(key).toLocaleDateString(undefined, opts);
   const SHORT = { day: 'numeric', month: 'short' };
   const LONG = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
-  const MONTH = { month: 'long', year: 'numeric' };
+  const MONTH = { month: 'short', year: 'numeric' };
   const DATED = { ...SHORT, year: 'numeric' };
   const fromUnix = (s) => new Date(s * 1000).toLocaleDateString(undefined, DATED);
 
@@ -252,24 +263,25 @@
 
   // --- drawing -----------------------------------------------------------------
 
-  function tile(label, value, sub) {
+  /** One line per sub, so "1 h 9 min" never breaks across two. */
+  function tile(label, value, ...subs) {
     return el('div', { class: 'tile' }, [
       el('div', { class: 'tile__label', text: label }),
       el('div', { class: 'tile__value', text: value }),
-      sub ? el('div', { class: 'tile__sub', text: sub }) : null,
+      ...subs.filter(Boolean).map((sub) => el('div', { class: 'tile__sub', text: sub })),
     ]);
   }
 
   function renderTiles(s) {
     const host = $('dash-tiles');
-    const words = (t) => plural(t.w, 'word');
+    const words = (t) => [plural(t.w, 'word'), t.t ? D.duration(t.t) : ''];
     const avg = s.averages;
     const streak = s.streaks;
     const one = (n) => n.toLocaleString(undefined, { maximumFractionDigits: 1 });
     host.replaceChildren(
-      tile('Today', num(s.today.c), words(s.today)),
-      tile('This week', num(s.week.c), words(s.week)),
-      tile('This month', num(s.month.c), words(s.month)),
+      tile('Today', num(s.today.c), ...words(s.today)),
+      tile('This week', num(s.week.c), ...words(s.week)),
+      tile('This month', num(s.month.c), ...words(s.month)),
       // null when the clock is behind every recorded day
       ...(avg
         ? [
@@ -279,7 +291,8 @@
           ]
         : []),
       tile('Streak', plural(streak.current, 'day'), `longest ${plural(streak.longest, 'day')}`),
-      tile('Words read', num(s.all.w), `in ${plural(s.all.c, 'chapter')}`)
+      tile('Words read', num(s.all.w), `in ${plural(s.all.c, 'chapter')}`),
+      tile('Time reading', D.duration(s.all.t), 'on chapter pages, while active')
     );
   }
 
@@ -335,6 +348,7 @@
           el('td', { text: num(row.c) }),
           el('td', { text: num(row.w) }),
           el('td', { text: num(row.days) }),
+          el('td', { text: D.duration(row.t) }),
         ])
       )
     );

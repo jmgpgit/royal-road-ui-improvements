@@ -94,6 +94,16 @@ test('the year is 53 Monday-first weeks ending with this one', () => {
   );
 });
 
+test('measured time reads as minutes, then hours and minutes', () => {
+  assert.equal(D.duration(0), '0 min');
+  assert.equal(D.duration(2700), '45 min');
+  assert.equal(D.duration(3600), '1 h');
+  assert.equal(D.duration(3 * 3600 + 5 * 60), '3 h 5 min');
+  const days = log({ '2026-09-01': [1, 2000, 600], '2026-09-02': [0, 0, 300] });
+  const { t } = D.tally(days, '2026-09-01', '2026-09-02');
+  assert.equal(t, 900, 'a day with no finish still counts');
+});
+
 test('fictions join the log with chapters part-read, newest first', () => {
   const list = D.fictions(
     log({}, { f: { 1: { t: 'Logged', a: 100, c: 4 } } }),
@@ -151,7 +161,7 @@ test('a seeded log draws every part of the page', async () => {
   const w = await render({
     settings: { 'history.log': true },
     log: {
-      d: { [today]: [2, 4000], [D.addDays(today, -40)]: [1, 1500] },
+      d: { [today]: [2, 4000, 1500], [D.addDays(today, -40)]: [1, 1500, 600] },
       f: { 21220: { t: 'Mother of Learning', a: Math.floor(Date.now() / 1000), c: 3 } },
       r: [1, 2, 3],
     },
@@ -165,6 +175,8 @@ test('a seeded log draws every part of the page', async () => {
   const tiles = [...d.querySelectorAll('.tile')].map((t) => t.textContent);
   assert.ok(tiles.some((t) => t.startsWith('Today2')), tiles.join(' | '));
   assert.ok(tiles.some((t) => t.startsWith('Words read5,500')), 'the total counts every day');
+  assert.ok(tiles.some((t) => t.startsWith('Time reading35 min')), 'and so does the time');
+  assert.ok(tiles.some((t) => t.startsWith('Today2') && t.includes('25 min')));
 
   assert.equal(d.querySelectorAll('.bars__col').length, 12);
   assert.equal(d.querySelectorAll('#dash-year-grid .heat__cell').length, 53 * 7);

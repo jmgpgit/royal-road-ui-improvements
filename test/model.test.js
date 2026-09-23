@@ -474,8 +474,8 @@ test('a finish counts in its own day and against its fiction', () => {
   log = finish(log, 2, { words: 1500 });
   log = finish(log, 3, { day: '2026-09-02', title: 'Mother of Learning (renamed)' });
 
-  assert.deepEqual(log.d['2026-09-01'], [2, 3500]);
-  assert.deepEqual(log.d['2026-09-02'], [1, 2000]);
+  assert.deepEqual(log.d['2026-09-01'], [2, 3500, 0]);
+  assert.deepEqual(log.d['2026-09-02'], [1, 2000, 0]);
   assert.equal(log.f[21220].c, 3);
   assert.equal(log.f[21220].t, 'Mother of Learning (renamed)', 'the newest title wins');
   assert.deepEqual(log.r, [1, 2, 3]);
@@ -490,6 +490,15 @@ test('a chapter among the recent finishes is not counted again', () => {
   for (let id = 2; id <= model.LOG_RECENT_MAX + 1; id += 1) long = finish(long, id);
   assert.equal(long.r.length, model.LOG_RECENT_MAX);
   assert.notEqual(finish(long, 1), long);
+});
+
+test('reading time adds to its day, beside the finishes', () => {
+  let log = model.logTime(null, '2026-09-01', 90);
+  log = finish(log, 1);
+  log = model.logTime(log, '2026-09-01', 30);
+  log = model.logTime(log, '2026-09-02', 45);
+  assert.deepEqual(log.d['2026-09-01'], [1, 2000, 120]);
+  assert.deepEqual(log.d['2026-09-02'], [0, 0, 45], 'a day with time and no finish is kept');
 });
 
 test('a finish with no title keeps the one already known', () => {
@@ -534,11 +543,11 @@ test('the log survives a backup, and an old backup restores an empty one', () =>
 
 test('junk in a stored log is dropped rather than trusted', () => {
   const out = model.normalizeLog({
-    d: { '2026-09-01': [2, 'x'], yesterday: [1, 1], '2026-09-02': [0, 0] },
+    d: { '2026-09-01': [2, 'x', 90.5], yesterday: [1, 1], '2026-09-02': [0, 0, 0] },
     f: { abc: { t: 'x' }, 7: { t: 42, a: -1, c: '3' } },
     r: [1, 1, 'x', -2, 3],
   });
-  assert.deepEqual(out.d, { '2026-09-01': [2, 0] });
+  assert.deepEqual(out.d, { '2026-09-01': [2, 0, 90] });
   assert.deepEqual(out.f, { 7: { t: '', a: 0, c: 3 } });
   assert.deepEqual(out.r, [1, 3]);
 });

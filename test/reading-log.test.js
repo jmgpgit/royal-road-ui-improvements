@@ -192,3 +192,96 @@ test('it counts with “come back to where you stopped” off', async () => {
   assert.ok(w.__store.log);
   assert.equal(w.__store.chapters, undefined, 'and writes no chapter record');
 });
+
+// --- time spent reading ----------------------------------------------------------
+
+/** `visit` puts the clock at 30 minutes when the page starts listening. */
+const START = 30 * MINUTES;
+const SECONDS = 1000;
+const at = (w, ms) => {
+  w.performance.now = () => START + ms;
+};
+const press = (w) => w.dispatchEvent(new w.KeyboardEvent('keydown'));
+function setVisible(w, visible) {
+  Object.defineProperty(w.document, 'visibilityState', {
+    value: visible ? 'visible' : 'hidden',
+    configurable: true,
+  });
+  w.document.dispatchEvent(new w.Event('visibilitychange'));
+}
+const seconds = (w) => (w.__store.log ? w.__store.log.d[today(w)][2] : 0);
+
+test('time between inputs counts, and a long pause only up to the idle cap', async () => {
+  const { w } = visit();
+  at(w, 20 * SECONDS);
+  press(w);
+  await settle();
+  assert.equal(seconds(w), 0, 'held until a minute has built up');
+
+  at(w, 20 * SECONDS + 10 * MINUTES);
+  press(w);
+  await settle();
+  assert.equal(seconds(w), 20 + w.RRX.readingLog.IDLE_MS / 1000);
+});
+
+test('time is written when the tab is hidden, and not counted while it is', async () => {
+  const { w } = visit();
+  at(w, 30 * SECONDS);
+  press(w);
+  at(w, 40 * SECONDS);
+  setVisible(w, false);
+  await settle();
+  assert.equal(seconds(w), 40);
+
+  at(w, 5 * MINUTES);
+  press(w); // hidden: another tab has the reader
+  at(w, 6 * MINUTES);
+  press(w);
+  await settle();
+  assert.equal(seconds(w), 40, 'inputs while hidden credit nothing');
+  setVisible(w, true);
+  at(w, 6 * MINUTES + 15 * SECONDS);
+  w.dispatchEvent(new w.Event('pagehide'));
+  await settle();
+  assert.equal(seconds(w), 55, 'the hidden stretch counted nothing');
+});
+
+test('no time is counted while the log is off, or after it is switched off', async () => {
+  const off = visit({ settings: {} });
+  at(off.w, 30 * SECONDS);
+  press(off.w);
+  setVisible(off.w, false);
+  await settle();
+  assert.equal(off.w.__store.log, undefined);
+
+  const { w, ctx } = visit();
+  at(w, 30 * SECONDS);
+  press(w);
+  ctx.settings = w.RRX.normalizeSettings({ 'history.log': false });
+  setVisible(w, false);
+  await settle();
+  assert.equal(w.__store.log, undefined, 'the unwritten half minute was dropped');
+});
+
+test('a finish and a time flush in the same moment both land', async () => {
+  // Both rewrite the whole log; unqueued, the second wrote back a log without
+  // the first.
+  const { w } = visit();
+  // A read that answers slower than a frame, so the finish reads before the
+  // flush has written.
+  const local = w.RRX.ext.storage.local;
+  const get = local.get;
+  local.get = (keys) => {
+    const answer = get(keys);
+    return new Promise((resolve) => setTimeout(() => resolve(answer), 30));
+  };
+
+  at(w, 50 * SECONDS);
+  press(w);
+  at(w, 70 * SECONDS);
+  scrollTo(w, AT_END); // input past the flush threshold, and the chapter's end
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  const [chapters, , time] = w.__store.log.d[today(w)];
+  assert.equal(chapters, 1);
+  assert.equal(time, 70);
+});

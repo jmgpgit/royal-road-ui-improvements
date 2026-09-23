@@ -219,7 +219,7 @@
     },
     'history.log': {
       label: 'Keep a reading log',
-      note: 'Counts each chapter you read to the end, with the day and its length, and remembers the fiction’s title. Kept on this device only. Switching it off stops the counting and keeps what is there; “Forget reading history” in Options → Backup deletes it.',
+      note: 'Counts each chapter you read to the end, with the day and its length, remembers the fiction’s title, and adds up the time you spend reading chapter pages. Kept on this device only. Switching it off stops the counting and keeps what is there; “Forget reading history” in Options → Backup deletes it.',
     },
     'recap.mode': {
       label: 'Show the end of the previous chapter',

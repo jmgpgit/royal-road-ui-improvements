@@ -535,6 +535,7 @@ summary.row__note::-webkit-details-marker {
 .tile__sub {
   color: var(--muted);
   font-size: 0.8125rem;
+  text-wrap: balance;
 }
 
 .tile__value {
@@ -680,8 +681,7 @@ summary.row__note::-webkit-details-marker {
 }
 
 .dash-table-wrap {
-  max-height: 24rem;
-  overflow: auto;
+  overflow-x: auto;
 }
 
 .dash-table {
@@ -692,10 +692,22 @@ summary.row__note::-webkit-details-marker {
 
 .dash-table th,
 .dash-table td {
-  padding: 0.35rem 0.5rem;
+  padding: 0.35rem 0.4rem;
   border-top: 1px solid var(--border);
   text-align: right;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (max-width: 36rem) {
+  .dash-table {
+    font-size: 0.8125rem;
+  }
+
+  .dash-table th,
+  .dash-table td {
+    padding-inline: 0.2rem;
+  }
 }
 
 .dash-table th:first-child {

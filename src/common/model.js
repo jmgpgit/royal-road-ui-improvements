@@ -405,9 +405,10 @@
 
   // --- reading log ------------------------------------------------------------
   //
-  // `{ d: { 'YYYY-MM-DD': [c, w] }, f: { [fictionId]: { t, a, c } }, r: [chapterId, …] }`
+  // `{ d: { 'YYYY-MM-DD': [c, w, t] }, f: { [fictionId]: { t, a, c } }, r: [chapterId, …] }`
   //
-  //   d  per local day: chapters finished, and the words in them
+  //   d  per local day: chapters finished, the words in them, and seconds spent
+  //      reading chapter pages (reading-log.js says what counts)
   //   f  per fiction: its title, the last finish (unix seconds), chapters finished
   //   r  the last chapters finished, oldest first. A reread of one of these is
   //      not counted again; a flag on the chapter record would keep a record per
@@ -441,8 +442,8 @@
     const d = {};
     for (const day of Object.keys(days)) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
-      const [c, w] = Array.isArray(days[day]) ? days[day] : [];
-      const entry = [count(c), count(w)];
+      const [c, w, t] = Array.isArray(days[day]) ? days[day] : [];
+      const entry = [count(c), count(w), count(t)];
       if (entry.some(Boolean)) d[day] = entry;
     }
 
@@ -476,8 +477,8 @@
     const id = Number(chapterId);
     if (!isValidId(id) || src.r.includes(id)) return log;
 
-    const [c, w] = src.d[day] || [0, 0];
-    src.d[day] = [c + 1, w + count(words)];
+    const [c, w, t] = src.d[day] || [0, 0, 0];
+    src.d[day] = [c + 1, w + count(words), t];
 
     const fid = Number(fictionId);
     if (isValidId(fid)) {
@@ -487,6 +488,14 @@
     }
 
     src.r = [...src.r, id].slice(-LOG_RECENT_MAX);
+    return src;
+  }
+
+  /** Add seconds spent reading to a day. */
+  function logTime(log, day, seconds) {
+    const src = normalizeLog(log);
+    const [c, w, t] = src.d[day] || [0, 0, 0];
+    src.d[day] = [c, w, t + count(seconds)];
     return src;
   }
 
@@ -637,6 +646,7 @@
     dayKey,
     normalizeLog,
     logFinish,
+    logTime,
     pruneLog,
     LOG_KEEP_DAYS,
     LOG_FICTIONS_MAX,
