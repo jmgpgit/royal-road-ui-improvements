@@ -977,3 +977,41 @@ test('the marks drop the margin Royal Road gives them for the title row', () => 
   const rule = overlay.slice(overlay.indexOf('> div[data-rr-tooltip] i'));
   assert.match(rule.slice(0, rule.indexOf('}')), /margin: 0/, 'the margin is not cleared');
 });
+
+// --- expanding descriptions ------------------------------------------------------
+
+test('expand-all retires the chevron wherever the show-more widget puts it', () => {
+  // Build 4.1.20260923 moved the chevron out of [data-rr-show-more-wrapper], so
+  // hiding the wrapper left a live chevron under every opened blurb. The class is
+  // on <html> on every page, so the fiction page and the chapter page count too.
+  const sheet = fs.readFileSync(path.join(ROOT, 'src/content/inject.css'), 'utf8');
+  const retired = selectorFor(sheet, 'pointer-events: none !important', sheet.indexOf('Expand-all:'));
+  // jsdom cannot hover, so the hover rule is read as if the card were hovered.
+  const peeked = selectorFor(sheet, 'pointer-events: none !important', sheet.indexOf('Hover:')).replace(
+    /:hover/g,
+    ''
+  );
+
+  for (const fixture of [
+    'fictions-rising-stars.new.html',
+    'fiction-detail.new.html',
+    'fiction-reviews.new.html',
+    'chapter.new.html',
+  ]) {
+    for (const [rootClass, rule, gone] of [
+      ['rrx-expand-all', retired, true],
+      ['rrx-hover-expand', peeked, false],
+    ]) {
+      const dom = docFor(fixture, rootClass);
+      const widgets = [...dom.window.document.querySelectorAll('[data-rr-show-more]')];
+      assert.ok(widgets.length > 0, `${fixture} has no show-more widget`);
+      for (const widget of widgets) {
+        const chevron = widget.querySelector('label[for]');
+        assert.ok(chevron, `${fixture}: a widget with no chevron`);
+        // Hidden itself or through an ancestor: the wrapper still goes as well.
+        assert.equal(Boolean(chevron.closest(rule)), gone, `${fixture}, ${rootClass}`);
+      }
+      dom.window.close();
+    }
+  }
+});

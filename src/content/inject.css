@@ -25,8 +25,11 @@ html.rrx-hover-expand .fiction-card-expanded:hover [data-rr-show-more-content] {
   max-height: 9999px !important; /* the value Royal Road itself expands to */
 }
 
-/* Expand-all: the chevron would be a dead control, so retire the whole overlay. */
-html.rrx-expand-all [data-rr-show-more-wrapper] {
+/* Expand-all: the chevron would be a dead control, so retire the whole overlay.
+   The chevron sat inside the wrapper until build 4.1.20260923; it is now the
+   widget's own last child. */
+html.rrx-expand-all [data-rr-show-more-wrapper],
+html.rrx-expand-all [data-rr-show-more] > label {
   opacity: 0 !important;
   pointer-events: none !important;
 }
