@@ -162,6 +162,20 @@ test('turning it off puts every original title back exactly', () => {
   for (const h of headings()) assert.equal(h.hasAttribute('title'), false);
 });
 
+test('with the setting off, a fresh page is not written to at all', () => {
+  // Every list page runs this on every sweep, on or off. A title ending in a
+  // space, as Royal Road sometimes sends, is the one a trimmed copy rewrote.
+  const w = load();
+  const headings = [...w.document.querySelectorAll('.fiction-card-expanded h2')];
+  headings[0].textContent = 'Some Title [LitRPG] ';
+  const texts = () => headings.map((h) => h.firstChild);
+  const before = texts();
+
+  w.RRX.cleanTitles.apply(w.document, false);
+  assert.ok(texts().every((node, i) => node === before[i]), 'every heading keeps its own text node');
+  assert.equal(w.document.querySelectorAll('[data-rrx-full-title]').length, 0);
+});
+
 test('applying twice does not trim the trimmed title again', () => {
   const w = load();
   const ctx = ctxWith(w, true);

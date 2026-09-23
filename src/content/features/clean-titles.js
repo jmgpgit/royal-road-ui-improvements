@@ -70,14 +70,18 @@
    * Runs on every sweep, so every write is guarded by a read. The trimmed form
    * is cached beside the original: recomputing it cost four bracket-regex passes
    * per heading per sweep, for an answer that cannot change.
+   *
+   * The original is kept raw, not trimmed: Royal Road's text can end in a
+   * space, and a trimmed copy made the off state rewrite each such heading once.
    */
   function apply(scope, on) {
     for (const card of scope.querySelectorAll(SEL.listCard)) {
       for (const heading of card.querySelectorAll(SEL.cardTitle)) {
         if (heading.dataset[ORIGINAL] === undefined) {
-          const full = heading.textContent.trim();
-          const short = cleanTitle(full);
-          if (short === full) {
+          if (!on) continue; // never trimmed, so nothing to put back
+          const full = heading.textContent;
+          const short = cleanTitle(full.trim());
+          if (short === full.trim()) {
             heading.dataset[ORIGINAL] = ''; // nothing to do, and nothing to undo
             continue;
           }
@@ -93,7 +97,8 @@
         // The full title stays one hover away. Compared before writing: an
         // unconditional assignment is a DOM write per card per sweep.
         if (on) {
-          if (heading.title !== full) heading.title = full;
+          const tip = full.trim();
+          if (heading.title !== tip) heading.title = tip;
         } else if (heading.hasAttribute('title')) {
           heading.removeAttribute('title');
         }
