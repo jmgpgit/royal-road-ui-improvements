@@ -250,8 +250,13 @@
      *  well as case, so matching either alone finds about half of them. Both
      *  begin "smil", hence the prefix and the case-insensitive flag. */
     commentEmote: 'img[src*="/public/smil" i]',
-    /** Royal Road's own Reading Preferences dialog, which we add a link to. */
-    readingPrefsDialog: '#reading-preferences [data-rr-dialog-content]',
+    /** Royal Road's own Reading Preferences dialog, which we add a link to.
+     *  The dialog is `data-rr-dialog-portal-to-body`: its constructor, run from
+     *  `blazorUIManager.initialize()` at module start rather than on first open,
+     *  moves the container into a body-level `div[data-rr-dialog-portal]` that
+     *  copies `data-rr-dialog-id`. This matches before and after the move;
+     *  `#reading-preferences …` matched only before, so the link never showed. */
+    readingPrefsDialog: '[data-rr-dialog-id="reading-preferences"] [data-rr-dialog-content]',
     /** An anchor inside the poll's `<h5>` title, whose parent is the poll card.
      *  The only poll-specific hook: every id on the card is random per render,
      *  and its classes are Royal Road's generic card, shared with `#donate`. */
