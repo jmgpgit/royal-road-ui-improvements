@@ -101,59 +101,62 @@
   };
 
   /**
-   * Put Royal Road on the layout the reader asked for, and reload into it. The
-   * cookie only decides what the *server* sends, so without the reload nothing
-   * about the page already on screen changes.
+   * Ask Royal Road for `layout` and reload into it: the cookie only decides what
+   * the server sends next.
    *
-   * @param {boolean} wantNew
+   * @param {'redesign'|'legacy'} layout
    */
-  function applyDesign(wantNew) {
+  function applyDesign(layout) {
     try {
-      if (wantNew) document.cookie = RRX.switchDirective();
-      else for (const directive of RRX.clearDirectives()) document.cookie = directive;
+      for (const directive of RRX.switchDirectives(layout)) document.cookie = directive;
     } catch {
-      return false; // cookies blocked outright; nothing here can work
+      return false; // cookies blocked outright
     }
 
-    // A cookie write can silently do nothing (blocked storage; a delete whose
-    // domain does not match the writer's), leaving the reload pointless.
-    if (RRX.usesNewDesign(document.cookie) !== wantNew) {
-      RRX.warn(`could not switch to Royal Road's ${wantNew ? 'new' : 'old'} design`);
+    // A write can silently do nothing, leaving the reload pointless.
+    if (RRX.layoutAsked(document.cookie) !== layout) {
+      RRX.warn(`could not ask Royal Road for its ${layout} layout`);
       return false;
     }
 
     tried.set(true);
+    RRX.boot.switching = true;
     root.location.reload();
     return true;
   }
 
   /**
-   * Enforce the layout choice, before first paint, on every load - the cookie
-   * outlives the tab, so the old layout has to keep clearing a cookie Royal Road
-   * may set again, and a reload, hard ones included, must land on the layout
-   * asked for. "leave" touches nothing, which makes it safe as the default.
+   * Enforce the choice before first paint, on every load, so hard reloads and
+   * Royal Road's own switches are corrected. "leave" reads and writes nothing,
+   * which makes it safe as the default.
    *
-   * The flag makes a change that does not take cost one reload instead of a loop;
-   * it clears once the layout matches, so a later disagreement - Royal Road's own
-   * revert link, say - is corrected next time.
+   * The flag makes a switch that does not take cost one reload, not a loop; it
+   * clears once the cookie matches, so a later revert is corrected next time.
    */
-  function enforceDesign(settings) {
-    const mode = settings['design.mode'];
-    if (mode !== 'new' && mode !== 'old') {
-      tried.set(false);
-      return false;
-    }
-    const wantNew = mode === 'new';
-    if (RRX.usesNewDesign(document.cookie) === wantNew) {
+  function enforceDesign(settings, served) {
+    const layout = RRX.LAYOUT[settings['design.mode']];
+    // `served` only from a popup change on a page already showing: the cookie
+    // can be right while the page is not (another tab switched it, bfcache).
+    const done = RRX.layoutAsked(document.cookie) === layout && (!served || served === layout);
+    if (!layout || done) {
       tried.set(false);
       return false;
     }
     if (tried.get()) return false;
-    return applyDesign(wantNew);
+    return applyDesign(layout);
   }
 
-  /** `legacy` is set by main.js once its DOM probe has run; see `apply`. */
-  RRX.boot = { apply, ready: null, legacy: false, applyDesign, enforceDesign, SWITCHED_KEY };
+  /** `legacy` is set by main.js once its DOM probe has run; see `apply`.
+   *  `switching` means this page is being replaced. */
+  RRX.boot = {
+    apply,
+    ready: null,
+    legacy: false,
+    switching: false,
+    applyDesign,
+    enforceDesign,
+    SWITCHED_KEY,
+  };
 
   // 1. Synchronous, pre-paint: whatever the last Royal Road page load recorded.
   let mirrored = null;

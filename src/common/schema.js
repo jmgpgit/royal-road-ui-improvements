@@ -40,7 +40,7 @@
      * because installing an extension should not change which version of a site
      * somebody sees, and on/off would make "off" mean both "I have not chosen"
      * and "put me back on the old one". Royal Road remembers the choice in a
-     * cookie, so going back needs it actively cleared, not just left alone.
+     * cookie, so going back needs it actively set, not just left alone.
      */
     'design.mode': { type: 'enum', default: 'leave', values: ['leave', 'new', 'old'] },
 

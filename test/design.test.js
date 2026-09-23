@@ -12,6 +12,10 @@
  * the legacy layout Royal Road's ad script puts a sticky unit over the bottom of
  * the viewport, which swallowed the clicks, and winning that fight permanently
  * was not worth it. The offer lives in the popup instead.
+ *
+ * jsdom proves the cookie mechanics only. What Royal Road serves for a cookie was
+ * measured against the live site; `beta-ui-v2` had stopped counting by 4.1.20260923
+ * and every test here still passed, because they checked the cookie, not the page.
  */
 
 const nodeTest = require('node:test');
@@ -43,29 +47,46 @@ nodeTest.after(() => {
 
 // --- the pure part ---------------------------------------------------------
 
-nodeTest('a cookie value is read by exact name', () => {
-  const jar = 'foo=1; beta-ui-v2=always; bar=2';
-  assert.equal(design.cookieValue(jar, 'beta-ui-v2'), 'always');
+nodeTest('a cookie value is read by exact name, the last copy winning', () => {
+  const jar = 'foo=1; rr_ui_mode=redesign; bar=2';
+  assert.equal(design.cookieValue(jar, 'rr_ui_mode'), 'redesign');
   assert.equal(design.cookieValue(jar, 'foo'), '1');
-  assert.equal(design.cookieValue('', 'beta-ui-v2'), null, 'no cookies at all');
-  // Prefix matching would let a future cookie of Royal Road's answer for this one.
-  assert.equal(design.cookieValue('beta-ui-v2-other=always', 'beta-ui-v2'), null);
+  assert.equal(design.cookieValue('', 'rr_ui_mode'), null, 'no cookies at all');
+  assert.equal(design.cookieValue('rr_ui_mode_x=redesign', 'rr_ui_mode'), null, 'no prefix match');
+  // Measured: with two copies Royal Road serves the last one.
+  assert.equal(design.cookieValue('rr_ui_mode=legacy; rr_ui_mode=redesign', 'rr_ui_mode'), 'redesign');
+  assert.equal(design.cookieValue('rr_ui_mode=redesign; rr_ui_mode=legacy', 'rr_ui_mode'), 'legacy');
 });
 
-nodeTest('only the redesign value counts as the redesign', () => {
-  assert.equal(design.usesNewDesign('beta-ui-v2=always'), true);
-  // Royal Road's own revert link writes something else; anything that is not
-  // exactly the opt-in must read as "not the redesign".
-  assert.equal(design.usesNewDesign('beta-ui-v2=never'), false);
-  assert.equal(design.usesNewDesign(''), false);
+nodeTest('beta-ui-v2 no longer asks for anything', () => {
+  // By 4.1.20260923 the server ignores it: `always` alone gets legacy.
+  assert.equal(design.layoutAsked('beta-ui-v2=always'), null);
+  assert.equal(design.layoutAsked('beta-ui-v2=never; rr_ui_mode=redesign'), 'redesign');
 });
 
-nodeTest('the switch directive is scoped to outlast the tab and the subdomain', () => {
-  const directive = design.switchDirective();
-  assert.match(directive, /^beta-ui-v2=always;/, 'asks for the redesign');
-  assert.match(directive, /domain=\.royalroad\.com/, 'holds across subdomains');
-  assert.match(directive, /path=\//, 'and across the whole site');
-  assert.match(directive, /max-age=\d{7,}/, 'and outlives the session');
+nodeTest('the switch is written host-only, after removing both domain-scoped leftovers', () => {
+  const directives = design.switchDirectives('redesign');
+  const write = directives.at(-1);
+  assert.match(write, /^rr_ui_mode=redesign;/);
+  assert.doesNotMatch(write, /domain=/, "host-only, so it is the same cookie as Royal Road's");
+  assert.match(write, /path=\//);
+  assert.match(write, /samesite=lax/);
+  assert.match(write, /; secure;/);
+  assert.match(write, /max-age=\d{7,}/, 'outlives the session');
+
+  const deletes = directives.slice(0, -1);
+  assert.deepEqual(
+    deletes.map((d) => d.split('=')[0]),
+    ['rr_ui_mode', 'beta-ui-v2'],
+    'before the write, so a newer domain copy cannot outrank it'
+  );
+  for (const d of deletes) {
+    assert.match(d, /^[\w-]+=;/, 'empty value');
+    assert.match(d, /domain=\.royalroad\.com/, 'the shape 1.5.4 wrote');
+    assert.match(d, /path=\/.*max-age=0/);
+  }
+  assert.equal(directives.filter((d) => /^beta-ui-v2=[^;]/.test(d)).length, 0, 'never written');
+  assert.match(design.switchDirectives('legacy').at(-1), /^rr_ui_mode=legacy;/);
 });
 
 // --- in a page -------------------------------------------------------------
@@ -74,21 +95,23 @@ nodeTest('the switch directive is scoped to outlast the tab and the subdomain', 
  * Boot the real content scripts over a fixture.
  *
  * `reloads` counts calls rather than navigating, since jsdom cannot reload and
- * the count is the thing worth asserting anyway.
+ * the count is the thing worth asserting anyway. `cookie` may be a list, to seed
+ * two shapes under one name.
  */
-async function boot({ layout = 'legacy', settings = {}, cookie = '' } = {}) {
+async function boot({ layout = 'legacy', settings = {}, cookie = [] } = {}) {
   const file =
     layout === 'legacy' ? 'fictions-rising-stars.legacy.html' : 'fictions-rising-stars.new.html';
   // jsdom refuses to let `location` or its `reload` be redefined, so reloads are
   // counted where they surface instead: calling reload() makes jsdom emit a
   // "Not implemented: navigation" error. Catching it both counts the call and
   // keeps the expected noise out of the test output.
-  const counter = { reloads: 0 };
+  const counter = { reloads: 0, warnings: [] };
   const virtualConsole = new VirtualConsole();
   virtualConsole.on('jsdomError', (err) => {
     if (/Not implemented: navigation/i.test(err.message || '')) counter.reloads += 1;
     else console.error(err.message);
   });
+  virtualConsole.on('warn', (...args) => counter.warnings.push(args.join(' ')));
 
   const dom = new JSDOM(fixture(file), {
     url: 'https://www.royalroad.com/fictions/rising-stars',
@@ -102,7 +125,7 @@ async function boot({ layout = 'legacy', settings = {}, cookie = '' } = {}) {
   // `path=/` because that is how the cookie really arrives: without it the
   // browser scopes a cookie to the directory of the current URL, so one set from
   // /fictions/... lives at /fictions and no site-wide delete can reach it.
-  if (cookie) w.document.cookie = `${cookie}; path=/`;
+  for (const c of [].concat(cookie)) w.document.cookie = `${c}; path=/`;
 
   w.eval(`globalThis.__s = ${JSON.stringify({ settings, hidden: {} })};
     globalThis.__sent = [];
@@ -135,143 +158,174 @@ async function boot({ layout = 'legacy', settings = {}, cookie = '' } = {}) {
 }
 
 const reloads = (w) => w.__counter.reloads;
-const stored = (w) => JSON.parse(JSON.stringify(w.eval('globalThis.__s'))).settings || {};
+const asked = (w) => design.layoutAsked(w.document.cookie);
+const copies = (w) => (w.document.cookie.match(/(?:^|; )rr_ui_mode=/g) || []).length;
+const overridden = (w) => w.__counter.warnings.some((m) => /Display Mode/.test(m));
+/** What the popup does: write the setting, and the browser tells every tab. */
+const choose = (w, mode) =>
+  w.eval(`globalThis.__s.settings['design.mode'] = '${mode}';
+    for (const fn of globalThis.__listeners) fn({ settings: { newValue: globalThis.__s.settings } }, 'local');`);
 
-test('nothing at all happens on the redesign', async () => {
-  // The extension works here, so there is nothing to offer and nothing to fix.
-  const w = await boot({ layout: 'new', cookie: 'beta-ui-v2=always' });
-  assert.equal(reloads(w), 0, 'no reload');
-  assert.equal(design.usesNewDesign(w.document.cookie), true, 'the cookie is left as it was');
+test('with the setting on, a legacy page asks for the redesign and reloads once', async () => {
+  const w = await boot({ layout: 'legacy', settings: { 'design.mode': 'new' } });
+  assert.equal(asked(w), 'redesign');
+  assert.equal(copies(w), 1);
+  assert.equal(reloads(w), 1);
+  assert.equal(overridden(w), false, 'a switch under way is not a switch that failed');
 });
 
-test('with the setting on, the switch happens before the page is painted', async () => {
-  const w = await boot({ layout: 'legacy', settings: { 'design.mode': 'new' } });
-  assert.equal(design.usesNewDesign(w.document.cookie), true, 'the cookie is corrected');
-  assert.equal(reloads(w), 1, 'once');
+test('a reader left on beta-ui-v2 by 1.5.4 is switched properly', async () => {
+  // The regression: 1.5.4's opt-in read as done while Royal Road served legacy
+  // to it, so the extension sat inert with the setting on.
+  const w = await boot({
+    layout: 'legacy',
+    settings: { 'design.mode': 'new' },
+    cookie: 'beta-ui-v2=always; domain=.royalroad.com',
+  });
+  assert.equal(asked(w), 'redesign');
+  assert.equal(copies(w), 1, 'exactly one rr_ui_mode');
+  assert.equal(reloads(w), 1);
+  assert.doesNotMatch(w.document.cookie, /beta-ui-v2/, 'and our leftover is gone');
+});
+
+test("Royal Road's revert is overwritten, not shadowed", async () => {
+  // Their revert writes a host-only rr_ui_mode=legacy. Ours must replace it,
+  // and any domain-scoped copy must go, or two go up and the newer one wins.
+  const w = await boot({
+    layout: 'legacy',
+    settings: { 'design.mode': 'new' },
+    cookie: ['rr_ui_mode=legacy; domain=.royalroad.com', 'rr_ui_mode=legacy'],
+  });
+  assert.equal(asked(w), 'redesign');
+  assert.equal(copies(w), 1, 'one cookie');
+  assert.equal(reloads(w), 1);
 });
 
 test('a switch that does not take costs one reload, not a loop', async () => {
-  // If Royal Road ever ignored the cookie, re-deciding on every load would put
-  // the tab in a reload loop that the reader cannot escape.
   const w = await boot({ layout: 'legacy', settings: { 'design.mode': 'new' } });
   assert.equal(reloads(w), 1);
+  assert.equal(w.eval(`globalThis.sessionStorage.getItem('rrx:design:switched')`), '1');
 
-  const flag = w.eval(`globalThis.sessionStorage.getItem('rrx:design:switched')`);
-  assert.equal(flag, '1', 'the attempt is remembered for this tab');
-
-  // Same tab, cookie still wrong: it must not try again.
+  // Same tab, and the cookie did not survive the reload: no second attempt.
+  w.document.cookie = 'rr_ui_mode=; path=/; max-age=0';
   w.RRX.boot.enforceDesign({ 'design.mode': 'new' });
   assert.equal(reloads(w), 1, 'no second reload');
 });
 
-test('the guard clears once the switch has taken, so a later revert is honoured', async () => {
-  const w = await boot({ layout: 'new', settings: { 'design.mode': 'new' }, cookie: 'beta-ui-v2=always' });
-  assert.equal(reloads(w), 0, 'nothing to do');
-  assert.equal(
-    w.eval(`globalThis.sessionStorage.getItem('rrx:design:switched')`),
-    null,
-    'and the tab is ready to switch again if Royal Road sends it back'
-  );
+test('the guard clears once the cookie matches, so a later revert is honoured', async () => {
+  const w = await boot({
+    layout: 'new',
+    settings: { 'design.mode': 'new' },
+    cookie: 'rr_ui_mode=redesign',
+  });
+  assert.equal(reloads(w), 0);
+  assert.equal(w.eval(`globalThis.sessionStorage.getItem('rrx:design:switched')`), null);
+});
+
+test('when the cookie is right and the layout is not, the console says why', async () => {
+  // Nothing is left to try, and a loop would be worse. A signed-in account's
+  // own Display Mode is the likely cause, and that is not ours to change.
+  const w = await boot({
+    layout: 'legacy',
+    settings: { 'design.mode': 'new' },
+    cookie: 'rr_ui_mode=redesign',
+  });
+  assert.equal(reloads(w), 0);
+  assert.equal(overridden(w), true);
 });
 
 test('ticking the setting in the popup switches the tab you are looking at', async () => {
-  // This is what the removed banner used to do with its "Switch to it" button,
-  // and it is now the only way in. Without it the popup appears to do nothing on
-  // the very page it was opened over, which is the page it was ticked for.
+  // The only way in. Without it the popup appears to do nothing on the very
+  // page it was opened over.
   const w = await boot({ layout: 'legacy' });
   assert.equal(reloads(w), 0, 'nothing has happened yet');
+  choose(w, 'new');
+  await new Promise((r) => setTimeout(r, 120));
+  assert.equal(asked(w), 'redesign');
+  assert.equal(reloads(w), 1);
+});
 
-  // The popup writes the setting; the browser tells every tab.
-  w.eval(`globalThis.__s.settings['design.mode'] = 'new';
+test('a popup change follows the page served, not only the cookie', async () => {
+  // Another tab asked for the redesign after this legacy page loaded, so the
+  // cookie already reads right. Choosing the new design must still reload.
+  const w = await boot({ layout: 'legacy', cookie: 'rr_ui_mode=redesign' });
+  assert.equal(reloads(w), 0);
+
+  // Any other edit leaves the page alone: only this setting says what it should be.
+  w.eval(`globalThis.__s.settings['list.expandAll'] = true;
     for (const fn of globalThis.__listeners) fn({ settings: { newValue: globalThis.__s.settings } }, 'local');`);
   await new Promise((r) => setTimeout(r, 120));
+  assert.equal(reloads(w), 0);
 
-  assert.equal(design.usesNewDesign(w.document.cookie), true, 'the cookie is set');
-  assert.equal(reloads(w), 1, 'and the tab reloads into the redesign');
+  choose(w, 'new');
+  await new Promise((r) => setTimeout(r, 120));
+  assert.equal(reloads(w), 1);
+  assert.equal(copies(w), 1);
 });
 
 test('a legacy page leaves the mirror behind so the next one switches sooner', async () => {
-  // boot.js reads a synchronous localStorage mirror before first paint, and it
-  // is written only by a content script that got as far as running - which never
-  // happened on this layout. Somebody who has only ever seen the old design
-  // would otherwise never get the pre-paint path at all.
+  // boot.js reads a synchronous localStorage mirror before first paint, and only
+  // a content script that ran writes it. Somebody who has only ever seen the old
+  // design would otherwise never get the pre-paint path at all.
   const w = await boot({ layout: 'legacy', settings: { 'list.showToolbar': true } });
   const mirror = w.eval(`globalThis.localStorage.getItem('rrx:v1:boot')`);
   assert.ok(mirror, 'the mirror was written');
   assert.ok(JSON.parse(mirror).settings, 'and it carries the settings');
 });
 
-nodeTest('clearing covers both shapes the cookie can take', () => {
-  // A cookie written with a `domain` and one written without are different
-  // cookies that can coexist under one name, and a delete removes only the one
-  // it matches. Ours has a domain; Royal Road's own may not. Missing either
-  // leaves the opt-in in place, and nothing on screen says why.
-  const clears = design.clearDirectives();
-  assert.equal(clears.length, 2, 'one per shape');
-  for (const directive of clears) {
-    assert.match(directive, /^beta-ui-v2=;/, 'empty value');
-    assert.match(directive, /max-age=0/, 'expiring immediately');
-    assert.match(directive, /path=\//, 'over the whole site');
-  }
-  assert.equal(clears.filter((d) => /domain=/.test(d)).length, 1, 'exactly one carries a domain');
-
-  // The one that does must match how the opt-in was written, or it removes nothing.
-  const domainOf = (d) => (d.match(/domain=[^;]*/) || [''])[0];
-  assert.equal(
-    domainOf(clears.find((d) => /domain=/.test(d))),
-    domainOf(design.switchDirective()),
-    'and it matches the write'
-  );
+test("choosing the old design writes legacy, as Royal Road's revert does", async () => {
+  // Written, not deleted: no cookie is legacy signed out, but a signed-in
+  // account may have its own preference to fall back on.
+  const w = await boot({
+    layout: 'new',
+    settings: { 'design.mode': 'old' },
+    cookie: 'rr_ui_mode=redesign',
+  });
+  assert.equal(asked(w), 'legacy');
+  assert.equal(copies(w), 1);
+  assert.equal(reloads(w), 1);
 });
 
-test('choosing the old design puts you back, which is what off never did', async () => {
-  // The reported bug: turning the setting off left the cookie in place, so Royal
-  // Road kept serving the redesign for ever, and no amount of reloading helped
-  // because the cookie is what decides. "Off" cannot fix that by doing nothing.
-  const w = await boot({ layout: 'new', settings: { 'design.mode': 'old' }, cookie: 'beta-ui-v2=always' });
-  assert.equal(design.usesNewDesign(w.document.cookie), false, 'the opt-in is gone');
-  assert.equal(reloads(w), 1, 'and the page reloads to get the old layout');
-});
+test('leaving it to Royal Road touches nothing, not even our own leftover', async () => {
+  // The default. It must not undo a choice made before, and must not impose one.
+  const optedIn = await boot({ layout: 'new', cookie: 'rr_ui_mode=redesign' });
+  assert.equal(asked(optedIn), 'redesign');
+  assert.equal(reloads(optedIn), 0);
 
-test('leaving it to Royal Road changes nothing in either direction', async () => {
-  // The default. It must not undo a choice made before, and must not impose one:
-  // it is the state of having no opinion, which is the only safe thing to ship.
-  const optedIn = await boot({ layout: 'new', settings: {}, cookie: 'beta-ui-v2=always' });
-  assert.equal(design.usesNewDesign(optedIn.document.cookie), true, 'an opt-in is left alone');
-  assert.equal(reloads(optedIn), 0, 'with no reload');
+  const old = await boot({ layout: 'legacy', cookie: 'beta-ui-v2=always; domain=.royalroad.com' });
+  assert.equal(asked(old), null);
+  assert.match(old.document.cookie, /beta-ui-v2=always/);
+  assert.equal(reloads(old), 0);
 
-  const notOptedIn = await boot({ layout: 'legacy', settings: {} });
-  assert.equal(design.usesNewDesign(notOptedIn.document.cookie), false, 'and so is not opting in');
-  assert.equal(reloads(notOptedIn), 0, 'with no reload');
+  // Leave reads no cookie, so it cannot blame an account's Display Mode.
+  const stuck = await boot({ layout: 'legacy', cookie: 'rr_ui_mode=redesign' });
+  assert.equal(overridden(stuck), false);
 });
 
 test('the choice is re-enforced on every load, so a hard refresh obeys it', async () => {
-  // Royal Road may set the cookie again itself. Acting only when the setting
-  // changes would mean the choice held once and then quietly stopped, which is
-  // exactly what "even with ctrl f5" describes.
-  const w = await boot({ layout: 'new', settings: { 'design.mode': 'old' }, cookie: 'beta-ui-v2=always' });
+  const w = await boot({
+    layout: 'new',
+    settings: { 'design.mode': 'old' },
+    cookie: 'rr_ui_mode=redesign',
+  });
   assert.equal(reloads(w), 1);
 
-  // As if Royal Road put it back: a fresh load must clear it again.
-  w.document.cookie = 'beta-ui-v2=always; path=/';
-  w.eval(`globalThis.sessionStorage.removeItem('rrx:design:switched')`); // a new page, new tab state
+  // Royal Road's own switch puts it back; a fresh load must correct it again.
+  w.document.cookie = 'rr_ui_mode=redesign; path=/; samesite=lax';
+  w.eval(`globalThis.sessionStorage.removeItem('rrx:design:switched')`); // a new page
   w.RRX.boot.enforceDesign({ 'design.mode': 'old' });
-  assert.equal(design.usesNewDesign(w.document.cookie), false, 'cleared again');
-  assert.equal(reloads(w), 2, 'and reloaded again');
+  assert.equal(asked(w), 'legacy');
+  assert.equal(copies(w), 1);
+  assert.equal(reloads(w), 2);
 });
 
 test('switching back from the redesign works from the redesign itself', async () => {
-  // The page you are on when you change your mind is the new layout, where
-  // main.js takes its own path entirely. If only the legacy branch listened, the
-  // one place somebody would actually use this from would be the one that
-  // ignored it.
-  const w = await boot({ layout: 'new', cookie: 'beta-ui-v2=always' });
-  assert.equal(reloads(w), 0, 'nothing yet');
-
-  w.eval(`globalThis.__s.settings['design.mode'] = 'old';
-    for (const fn of globalThis.__listeners) fn({ settings: { newValue: globalThis.__s.settings } }, 'local');`);
+  // main.js takes its own path on the redesign. If only the legacy branch
+  // listened, the page you change your mind on would ignore you.
+  const w = await boot({ layout: 'new', cookie: 'rr_ui_mode=redesign' });
+  assert.equal(reloads(w), 0);
+  choose(w, 'old');
   await new Promise((r) => setTimeout(r, 120));
-
-  assert.equal(design.usesNewDesign(w.document.cookie), false, 'the opt-in is cleared');
-  assert.equal(reloads(w), 1, 'and the tab reloads into the old layout');
+  assert.equal(asked(w), 'legacy');
+  assert.equal(reloads(w), 1);
 });

@@ -1,18 +1,14 @@
 'use strict';
 
 /**
- * Which of Royal Road's two layouts a page is served in, and how to ask for the
- * other one.
+ * Which of Royal Road's two layouts a page asks for, and how to ask for the other.
  *
- * The choice lives in a cookie. Setting it to `always` returns the redesign,
- * signed in or not - the redesign is cookie-only, not account-only.
+ * `rr_ui_mode` decides: `redesign` or `legacy`, and signed out no cookie means
+ * legacy. `beta-ui-v2` used to decide it; by build 4.1.20260923 the server
+ * ignores it both ways.
  *
- * Pure, and separate from the code that touches `document.cookie`, so parsing
- * can be tested without a DOM.
- *
- * The extension only works on the redesign: on the legacy layout main.js finds
- * no `SEL.newUiProbe` and stops, so every feature is silently inert. Reading the
- * cookie is how it can say so and offer a way out.
+ * Pure, so parsing can be tested without a DOM. What was actually served is
+ * main.js's `SEL.newUiProbe`; on legacy every feature is inert.
  */
 (function (root, factory) {
   const isNode = typeof module !== 'undefined' && module.exports;
@@ -21,63 +17,43 @@
   const RRX = (root.RRX = root.RRX || {});
   Object.assign(RRX, api);
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
-  /** Royal Road's own name for the choice. */
-  const DESIGN_COOKIE = 'beta-ui-v2';
+  const DESIGN_COOKIE = 'rr_ui_mode';
 
-  /** The value that asks for the redesign. Royal Road's revert link writes another. */
-  const DESIGN_NEW = 'always';
+  /** Royal Road's own values, keyed by the `design.mode` setting. */
+  const LAYOUT = { new: 'redesign', old: 'legacy' };
 
-  /** A year. Long enough that nobody is asked twice, short enough to lapse. */
+  /** A year, as Royal Road's own switch writes it. */
   const DESIGN_MAX_AGE = 60 * 60 * 24 * 365;
 
-  /** One cookie's value out of a `document.cookie` string, or null. Names match
-   *  exactly, not by prefix, so a future `beta-ui-v2-something` cannot be taken
-   *  for this one. */
+  /** One cookie's value out of a `document.cookie` string, or null. Exact name,
+   *  and the last copy: two can coexist, and the server reads the last. */
   function cookieValue(cookies, name) {
+    let value = null;
     for (const part of String(cookies || '').split(';')) {
       const at = part.indexOf('=');
-      if (at < 0) continue;
-      if (part.slice(0, at).trim() !== name) continue;
-      return decodeURIComponent(part.slice(at + 1).trim());
+      if (at < 0 || part.slice(0, at).trim() !== name) continue;
+      value = decodeURIComponent(part.slice(at + 1).trim());
     }
-    return null;
+    return value;
   }
 
-  /** Whether this page was asked for in the redesign. */
-  const usesNewDesign = (cookies) => cookieValue(cookies, DESIGN_COOKIE) === DESIGN_NEW;
-
-  /** Everything but the lifetime, shared so the two directives cannot drift. */
-  const SCOPE = 'path=/; domain=.royalroad.com; samesite=lax';
-
-  /** Asks for the redesign. `domain` one level up so the choice holds across
-   *  Royal Road's subdomains, as their own switch does; `samesite=lax` so it
-   *  survives arriving from an outside link. */
-  const switchDirective = () =>
-    `${DESIGN_COOKIE}=${DESIGN_NEW}; ${SCOPE}; max-age=${DESIGN_MAX_AGE}`;
+  /** 'redesign', 'legacy', or null when nothing was asked for. */
+  const layoutAsked = (cookies) => cookieValue(cookies, DESIGN_COOKIE);
 
   /**
-   * Gives the choice back to Royal Road, which serves the old layout to anyone
-   * who has not opted in. Deleted rather than set to another value: "no opinion"
-   * is a state their server already understands.
+   * Asks for `layout`, written host-only as Royal Road's helper and its revert
+   * link write it, so there is one cookie and their revert overwrites ours.
    *
-   * Two directives because a cookie written with a `domain` and one written
-   * without are different cookies under the same name, and a delete only removes
-   * the one whose domain it matches. We write ours with a domain; Royal Road may
-   * write its own without. Clearing only our shape leaves theirs behind and the
-   * server goes on seeing the opt-in.
+   * A copy with a Domain is a different cookie under the same name and wins
+   * whenever it is newer, so it is deleted first, as is the domain-scoped
+   * `beta-ui-v2=always` that 1.5.4 and earlier wrote. Royal Road's own host-only
+   * `beta-ui-v2` is not ours and stays.
    */
-  const clearDirectives = () => [
-    `${DESIGN_COOKIE}=; ${SCOPE}; max-age=0`,
-    `${DESIGN_COOKIE}=; path=/; samesite=lax; max-age=0`,
+  const switchDirectives = (layout) => [
+    `${DESIGN_COOKIE}=; path=/; domain=.royalroad.com; max-age=0`,
+    'beta-ui-v2=; path=/; domain=.royalroad.com; max-age=0',
+    `${DESIGN_COOKIE}=${layout}; path=/; samesite=lax; secure; max-age=${DESIGN_MAX_AGE}`,
   ];
 
-  return {
-    DESIGN_COOKIE,
-    DESIGN_NEW,
-    DESIGN_MAX_AGE,
-    cookieValue,
-    usesNewDesign,
-    switchDirective,
-    clearDirectives,
-  };
+  return { LAYOUT, cookieValue, layoutAsked, switchDirectives };
 });

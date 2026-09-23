@@ -10,7 +10,9 @@ a raw capture contains a live `__RequestVerificationToken`. `test/fixtures/` is 
 wholesale. Suites that need a missing fixture skip themselves with a message naming it, so a
 fresh clone still runs green on everything that does not need one.
 
-Captured from build `4.1.20260807.38`.
+Captured from build `4.1.20260923.58`, except five older signed-in captures from August 2026,
+kept on purpose: `chapter-comments-lazy.new.html`, the two `card-loggedin` cards and the two
+saved `.htm` chapter pages.
 
 ## What each one is for
 
@@ -25,7 +27,7 @@ Captured from build `4.1.20260807.38`.
 | `fiction-detail.new.html` | Empty `<div id="recommendations">`: proof the recs carousel is React-rendered | no |
 | `fiction-reviews.new.html` | The reviews accordion, its sort control and its paginator | no |
 | `chapter.new.html` | A chapter: author notes, the author panel, the support block, the "Load comments" button | no |
-| `chapter-poll.new.html` | An 18-option chapter poll with results showing. Build `4.1.20260923.58`, and needed `rr_ui_mode=redesign` beside `beta-ui-v2` | no |
+| `chapter-poll.new.html` | An 18-option chapter poll with results showing | no |
 | `chapter-comments.new.html` | A comments fragment, shallow: depths 0 and 1 only | no |
 | `chapter-comments-deep.new.html` | 45 comments reaching depth 2, and no deeper | no |
 | `chapter-comments-nested.new.html` | A thread nested to depth 6, with deep-reply holders | no |
@@ -51,13 +53,13 @@ is easy to get wrong.
 
 ## Capturing
 
-The redesign is served only when the `beta-ui-v2` cookie is set, so a plain fetch returns the
+The redesign is served only when `rr_ui_mode=redesign` is sent, so a plain fetch returns the
 legacy UI. From PowerShell:
 
 ```powershell
 $ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0'
 $s = New-Object Microsoft.PowerShell.Commands.WebRequestSession
-$s.Cookies.Add((New-Object System.Net.Cookie('beta-ui-v2','always','/','.royalroad.com')))
+$s.Cookies.Add((New-Object System.Net.Cookie('rr_ui_mode','redesign','/','www.royalroad.com')))
 $r = Invoke-WebRequest -Uri 'https://www.royalroad.com/fictions/rising-stars' `
         -UseBasicParsing -UserAgent $ua -WebSession $s
 $r.Content | Out-File 'test/fixtures/fictions-rising-stars.new.html' -Encoding utf8

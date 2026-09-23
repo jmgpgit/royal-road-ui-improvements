@@ -68,13 +68,14 @@ is the same paragraph number, and it is copied across when you leave the page.
 See [`src/common/store.js`](src/common/store.js).
 
 One cookie on royalroad.com is written, and only when you ask for it. Royal Road decides
-which of its two layouts to serve you with a `beta-ui-v2` cookie, and this extension only
-works on the newer one. Choosing **Always the new design** sets that cookie and reloads;
-choosing **Always the old design** deletes it and reloads. On the default, *Leave it to Royal
-Road*, the extension reads that one cookie to see whether anything needs doing and never
-writes it. It records a preference about Royal Road's own appearance and nothing about you; it
-is Royal Road's cookie, and Royal Road's own "Revert To Legacy UI" link overwrites it. The
-extension writes no other cookie and reads no cookie except this one.
+which of its two layouts to serve you with its `rr_ui_mode` cookie, and this extension only
+works on the newer one. Choosing **Always the new design** sets it to `redesign` and reloads;
+choosing **Always the old design** sets it to `legacy` and reloads. On the default, *Leave it
+to Royal Road*, the extension neither reads nor writes a cookie. It records a preference about
+Royal Road's own appearance and nothing about you; it is Royal Road's cookie, and Royal Road's
+own "Revert To Legacy UI" link overwrites it. The extension reads no other cookie, and writes
+no other except to delete the `beta-ui-v2` cookie that versions up to 1.5.4 set, which Royal
+Road no longer reads.
 See [`src/common/design.js`](src/common/design.js).
 
 Nothing is stored anywhere else. There is no account and no identifier of any kind.
@@ -164,9 +165,9 @@ extension, because they have to be readable by royalroad.com's own pages, and th
 - **The two `localStorage` copies** described above — the settings-and-ids mirror, and your
   place in the chapter you are reading. The mirror is a full copy of your settings and of which
   fictions you have hidden and dropped.
-- **The `beta-ui-v2` cookie**, if you chose a layout. It lasts a year, so Royal Road may go on
+- **The `rr_ui_mode` cookie**, if you chose a layout. It lasts a year, so Royal Road may go on
   serving you the design you picked after the extension that asked for it is gone. Royal Road's
-  own "Revert To Legacy UI" link undoes it.
+  own "Revert To Legacy UI" link overwrites it.
 
 Clearing site data for royalroad.com removes all three, and takes the recap and chapter-list
 caches with them — though those go when you close the tab in any case.
