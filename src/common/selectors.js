@@ -207,6 +207,11 @@
     chapterContainer: '#chapter-page-container',
     commentLoader: '#comment-loader',
     commentsPaginate: '#comments-pagination',
+    /** "Showing <span>1</span> to <span>10</span> of <span>137</span> Comments",
+     *  server-rendered as 0/0/0. Royal Road's `updateFooter` takes the footer's
+     *  first `<p>` and rewrites `querySelectorAll('span')[0..2]` by index, so
+     *  nothing may be inserted before those three. */
+    commentsCountLine: '[data-rr-paginate-footer] p',
     /** The comment sort control, `data-reader-preference-binding="commentSorting"`. */
     commentSortDropdown: '#comment-sort-dropdown',
     /** The list Royal Road's comment AJAX fills, and that we append pages to. */

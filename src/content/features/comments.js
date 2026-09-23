@@ -229,15 +229,12 @@
       '.rrx-comment-thanks-hidden:not(:has(.comment-replies, [data-rr-deep-replies]))'
     ).length;
 
-  /** Said on Royal Road's own "Showing 31 to 40 of 137 comments" line, which
-   *  would otherwise be quietly wrong about what is on the page.
-   *
-   *  That line is rendered by Royal Road's own script after the comments load -
-   *  it is in no server response, so there is no selector for it and none can be
-   *  written. It is found by looking inside the pagination block for the leaf
-   *  that talks about a count; if that ever stops matching, the annotation
-   *  simply does not appear. It is an addition to somebody else's sentence: it
-   *  must never be the reason something breaks. */
+  /** Said on Royal Road's own "Showing 31 to 40 of 137 Comments" line, which
+   *  would otherwise be quietly wrong about what is on the page. Appended after
+   *  its number spans (see `SEL.commentsCountLine`). If the line stops reading
+   *  like a count, nothing is added: it is somebody else's sentence and must
+   *  never be the reason something breaks. It looked for a leaf holding the
+   *  whole phrase for a while, which the span-split line never is. */
   function showHiddenCount(scope) {
     const root = document.querySelector(SEL.commentsPaginate);
     if (!root) return;
@@ -256,14 +253,12 @@
       if (existing.isConnected) return;
     }
 
-    // "of 137 comments", the one phrase that line always contains. Deliberately
-    // not anchored to "Showing", the wording most likely to change.
+    // "of 137 Comments" across the spans, the one phrase that line always
+    // contains. Deliberately not anchored to "Showing", the wording most likely
+    // to change.
     const SUMMARY = /of\s+[\d,]+\s+comments?/i;
-    const summary = [...root.querySelectorAll('*')].find(
-      (el) =>
-        !el.children.length &&
-        !el.closest('.' + RRX.UI_CLASS) &&
-        SUMMARY.test(el.textContent || '')
+    const summary = [...root.querySelectorAll(SEL.commentsCountLine)].find((p) =>
+      SUMMARY.test(p.textContent || '')
     );
     if (!summary) return;
 
@@ -349,11 +344,14 @@
   const pager = RRX.pager.create({
     rootSelector: SEL.commentsPaginate,
     container: () => document.querySelector(SEL.commentsContainer),
-    // Royal Road waits for a click before it fetches page one at all.
+    // No container until Royal Road fetches page one, which it does itself when
+    // `#comments-lazy-trigger` nears the viewport.
     ready: () => !!document.querySelector(SEL.commentsContainer),
     // The fetch URL's own `sorting` is whatever the page was rendered with, and
     // Royal Road does not rewrite it when the reader re-sorts.
     sortDropdown: SEL.commentSortDropdown,
+    // Inert on the redesign: nothing on its chapter page defines the button's
+    // inline `loadComments(1)`, so the click throws in the page's console.
     prime: () => {
       const loader = document.querySelector(SEL.commentLoader);
       if (!loader || loader.dataset.rrxClicked) return;

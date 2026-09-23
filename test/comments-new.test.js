@@ -415,32 +415,56 @@ test('only comments actually removed are counted as hidden', () => {
   assert.equal(hiddenCount(w.document), 2);
 });
 
-test('the count joins Royal Road’s own summary line, and goes when nothing is hidden', () => {
-  const { w } = load();
+/** Royal Road's count line as the chapter page serves it, `<p>` and spans. The
+ *  nested capture is a comments fragment and has no footer of its own. */
+function withRealFooter(w) {
+  const page = new w.DOMParser().parseFromString(fixture('chapter.new.html'), 'text/html');
+  const footer = page.querySelector('#comments-pagination [data-rr-paginate-footer]');
   const paginate = w.document.createElement('div');
   paginate.id = 'comments-pagination';
-  const summary = w.document.createElement('span');
-  summary.textContent = 'Showing 1 to 10 of 137 comments';
-  paginate.appendChild(summary);
+  paginate.appendChild(w.document.adoptNode(footer));
   w.document.querySelector('#comments-container').before(paginate);
+  return paginate.querySelector('[data-rr-paginate-footer] p');
+}
 
-  const target = [...w.document.querySelectorAll('[data-comment-id]')].find(
-    (c) => !c.querySelector('[data-comment-id]')
-  );
-  target.classList.add('rrx-comment-thanks-hidden');
-  w.RRX.comments.showHiddenCount(w.document);
+nodeTest(
+  'the count joins Royal Road’s own count line after its numbers, and goes when nothing is hidden',
+  { skip: need('chapter-comments-nested.new.html', 'chapter.new.html') },
+  () => {
+    const { w } = load();
+    const line = withRealFooter(w);
 
-  const note = w.document.getElementById('rrx-hidden-count');
-  assert.ok(note, 'nothing was appended to the summary');
-  assert.equal(note.parentElement, summary);
-  assert.equal(note.textContent, ' (1 hidden)');
-  assert.ok(note.classList.contains(w.RRX.UI_CLASS), 'unmarked, so it would feed the sweep');
-  assert.match(summary.textContent, /Showing 1 to 10 of 137 comments \(1 hidden\)/);
+    const target = [...w.document.querySelectorAll('[data-comment-id]')].find(
+      (c) => !c.querySelector('[data-comment-id]')
+    );
+    target.classList.add('rrx-comment-thanks-hidden');
+    w.RRX.comments.showHiddenCount(w.document);
 
-  target.classList.remove('rrx-comment-thanks-hidden');
-  w.RRX.comments.showHiddenCount(w.document);
-  assert.equal(w.document.getElementById('rrx-hidden-count'), null);
-});
+    const note = w.document.getElementById('rrx-hidden-count');
+    assert.ok(note, 'nothing was appended to the count line');
+    assert.equal(line.lastElementChild, note, 'after Royal Road’s spans, never before them');
+    assert.equal(note.textContent, ' (1 hidden)');
+    assert.ok(note.classList.contains(w.RRX.UI_CLASS), 'unmarked, so it would feed the sweep');
+
+    // What updateFooter does once a page lands: the first three spans, by index.
+    const [from, to, total] = line.querySelectorAll('span');
+    from.textContent = '1';
+    to.textContent = '10';
+    total.textContent = '137';
+    assert.match(line.textContent.replace(/\s+/g, ' '), /Showing 1 to 10 of 137 Comments \(1 hidden\)/);
+
+    // Nothing changed, so a sweep must write nothing, or it feeds itself.
+    const writes = new w.MutationObserver(() => {});
+    writes.observe(line, { subtree: true, childList: true, characterData: true, attributes: true });
+    w.RRX.comments.showHiddenCount(w.document);
+    assert.equal(writes.takeRecords().length, 0);
+    writes.disconnect();
+
+    target.classList.remove('rrx-comment-thanks-hidden');
+    w.RRX.comments.showHiddenCount(w.document);
+    assert.equal(w.document.getElementById('rrx-hidden-count'), null);
+  }
+);
 
 test('no summary to join means no annotation, not an error', () => {
   const { w } = load();
@@ -449,8 +473,8 @@ test('no summary to join means no annotation, not an error', () => {
   );
   target.classList.add('rrx-comment-thanks-hidden');
 
-  // Royal Road renders that line itself, after the comments load. If it ever
-  // stops looking like a count, this must do nothing at all.
+  // This capture has no count line at all. Neither that nor a line that stops
+  // reading like a count may do anything but leave it alone.
   w.RRX.comments.showHiddenCount(w.document);
   assert.equal(w.document.getElementById('rrx-hidden-count'), null);
 });

@@ -842,10 +842,10 @@ test('an emoticon alongside real words is left alone', () => {
 });
 
 test('the loader is clicked once and only once, however many sweeps run', () => {
-  // Royal Road does not fetch page one of the comments until something clicks
-  // its loader, so the pager does the click itself. The guard matters because
-  // the sweep runs repeatedly: a second click would ask Royal Road for the same
-  // page again.
+  // The click does nothing on the redesign today (its `loadComments` is never
+  // defined; Royal Road loads on `#comments-lazy-trigger` instead). The guard
+  // still matters: the sweep runs repeatedly, and a working button pressed
+  // twice would ask for the same page again.
   const w = load('chapter.new.html');
   const button = w.document.querySelector('#comment-loader');
   assert.ok(button, 'Royal Road still ships a "Load comments" button in the page HTML');

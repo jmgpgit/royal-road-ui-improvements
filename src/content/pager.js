@@ -133,7 +133,8 @@
       const url = urlFor(state.next);
       const host = container();
       // Comments are `data-rr-paginate-lazy-load="true"`: until they are loaded
-      // there is no container at all, only a "Load Comments" button, and after a
+      // there is no container at all, only a "Load Comments" button (inert on
+      // the redesign, see `prime` in comments.js), and after a
       // re-sort Royal Road can put the section back in exactly that state. Only
       // `check` used to press that button, so a restart driven from here found
       // nothing, returned, and waited for a scroll that had no reason to come.
@@ -292,13 +293,13 @@
      *
      * Driven by their click rather than inferred afterwards, which is what makes
      * it reliable: everything we appended is thrown away here and now, so it
-     * cannot be left stranded under Royal Road's new page one if Royal Road only
+     * cannot be left stranded under Royal Road's new page if Royal Road only
      * clears the rows it rendered itself.
      *
-     * Then it waits. Royal Road fetches page one of the new order, and until
-     * that lands the fetch URL still describes the old one - so restarting
-     * immediately would ask for page two of the order the reader just abandoned.
-     * `owed` is granted once the list has visibly changed underneath us.
+     * Then it waits. Royal Road refetches the page it is showing (not page one)
+     * in the new order and writes it over the list with `innerHTML`, so a page
+     * appended before that lands is wiped with it. `owed` is granted once the
+     * list has visibly changed underneath us.
      */
     function restart() {
       const host = container();
