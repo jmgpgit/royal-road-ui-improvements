@@ -98,6 +98,7 @@
         "src/content/features/chapter-meta.js",
         "src/content/features/resume.js",
         "src/content/features/recap.js",
+        "src/content/features/polls.js",
         "src/content/features/comments.js",
         "src/content/features/comments-new.js",
         "src/content/features/fiction-page.js",

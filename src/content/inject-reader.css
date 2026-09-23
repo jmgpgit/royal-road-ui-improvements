@@ -133,6 +133,16 @@ html.rrx-wide .author-note-card {
   display: none !important;
 }
 
+/* Under a poll's title. Sized like the rest of the chapter chrome: `.rrx-btn`
+   inherits its font, which here is the card's. */
+.rrx-poll-sort {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0.25rem 0.5rem 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--color-on-surface-muted, #8a8a8a);
+}
+
 /* ==========================================================================
    Chapter facts
    --------------------------------------------------------------------------

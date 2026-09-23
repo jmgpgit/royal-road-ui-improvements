@@ -25,6 +25,7 @@ Captured from build `4.1.20260807.38`.
 | `fiction-detail.new.html` | Empty `<div id="recommendations">`: proof the recs carousel is React-rendered | no |
 | `fiction-reviews.new.html` | The reviews accordion, its sort control and its paginator | no |
 | `chapter.new.html` | A chapter: author notes, the author panel, the support block, the "Load comments" button | no |
+| `chapter-poll.new.html` | An 18-option chapter poll with results showing. Build `4.1.20260923.58`, and needed `rr_ui_mode=redesign` beside `beta-ui-v2` | no |
 | `chapter-comments.new.html` | A comments fragment, shallow: depths 0 and 1 only | no |
 | `chapter-comments-deep.new.html` | 45 comments reaching depth 2, and no deeper | no |
 | `chapter-comments-nested.new.html` | A thread nested to depth 6, with deep-reply holders | no |

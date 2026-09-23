@@ -252,6 +252,17 @@
     commentEmote: 'img[src*="/public/smil" i]',
     /** Royal Road's own Reading Preferences dialog, which we add a link to. */
     readingPrefsDialog: '#reading-preferences [data-rr-dialog-content]',
+    /** An anchor inside the poll's `<h5>` title, whose parent is the poll card.
+     *  The only poll-specific hook: every id on the card is random per render,
+     *  and its classes are Royal Road's generic card, shared with `#donate`. */
+    poll: '#poll',
+    /** An option's label; its parent is the option row. Always scoped to a poll,
+     *  since chapter text can carry `<h6>` too. */
+    pollOptionLabel: 'h6',
+    /** The results bar, `style="width: 3.91%"`. Present only once results show -
+     *  signed out, or after voting. Width styles are all over the page, so only
+     *  ever queried inside an option row. */
+    pollBar: '[style*="width"]',
 
     // --- fiction page -------------------------------------------------------
     accordionTrigger: '[data-rr-accordion-trigger]',
