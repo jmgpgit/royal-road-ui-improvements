@@ -281,6 +281,11 @@
       note: 'A comment whose whole body is one Royal Road emoticon, with nothing written alongside it. An emoticon at the end of a real sentence does not count.',
       optionLabels: ACTION_LABELS,
     },
+    'comments.oneWord': {
+      label: 'Comments that are a single word',
+      note: 'One word and nothing else, such as "nice", "lol" or "+1". Emoji and emoticons around it are ignored. A second word, a link or a picture is enough to leave it alone.',
+      optionLabels: ACTION_LABELS,
+    },
     'comments.patternAction': {
       label: 'Comments matching your own regex patterns',
       note: 'What happens to comments that match the patterns below. It works on its own, whatever the setting above is set to.',
@@ -434,6 +439,7 @@
           keys: [
             'comments.thanks',
             'comments.emotes',
+            'comments.oneWord',
             'comments.patternAction',
             'comments.foldPatterns',
             // Last: it qualifies every rule above it.

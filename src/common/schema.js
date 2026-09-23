@@ -212,6 +212,10 @@
      *  not. It cannot share the machinery either - these have no text at all,
      *  and every text rule sees an empty string. */
     'comments.emotes': { type: 'enum', default: 'keep', values: ['keep', 'fold', 'hide'] },
+    /** Comments that are one word and nothing else: "nice", "lol", "+1". Opt-in
+     *  and its own key: the acknowledgement rule deliberately leaves bare
+     *  reactions alone. */
+    'comments.oneWord': { type: 'enum', default: 'keep', values: ['keep', 'fold', 'hide'] },
     /** Whether the rules above may reach the author's own comments. Off by
      *  default: on a chapter page the author is the one person whose short reply
      *  is worth reading, and "Thanks!" from them means something different.

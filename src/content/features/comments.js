@@ -41,11 +41,15 @@
    *  keeps "Thanks for the chapter! :D" out of the filter while ":)" folds. */
   const EMOTICONS = /(?:[:;=8][-–]?[)([\]dpo3s|/\\]+|\bx+d+\b|<3+|\^[_.-]?\^)/g;
 
-  const normalise = (text) =>
+  /** Lowercased first: EMOTICONS knows only the lowercase ":d" and ":p". */
+  const stripEmotes = (text) =>
     text
       .toLowerCase()
       .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, ' ')
-      .replace(EMOTICONS, ' ')
+      .replace(EMOTICONS, ' ');
+
+  const normalise = (text) =>
+    stripEmotes(text)
       .replace(/[^a-z0-9\s]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
@@ -60,13 +64,24 @@
     if (clean.split(' ').length > 8) return false;
     // Bare reactions - "interesting", "lol", "nice" - were tried here and taken
     // back out: folding those judges worth rather than content.
-    // `comments.foldPatterns` is there for anyone who disagrees.
+    // `comments.oneWord` is the opt-in for anyone who disagrees.
     if (ORDINAL_ONLY.test(clean)) return true;
     if (THANKS_ACRONYMS.test(clean.replace(/\s/g, ''))) return true;
     if (!THANKS_LEAD.test(clean)) return false;
     const remainder = clean.replace(THANKS_LEAD, '').replace(FILLER, '').replace(/\s+/g, ' ').trim();
     return remainder === '';
   }
+
+  /** Letters or digits, joined by an apostrophe or hyphen ("can't",
+   *  "well-written"). Not `normalise`, which splits both of those and drops
+   *  non-ASCII words entirely. */
+  const WORD = /[\p{L}\p{N}][\p{L}\p{M}\p{N}]*(?:['’-][\p{L}\p{N}][\p{L}\p{M}\p{N}]*)*/gu;
+
+  /** One word and nothing else: "nice", "lol", "+1". Emoji and emoticons
+   *  around it are ignored; text with no word at all ("😂", ":)") is not one. */
+  // CJK has no spaces, so a whole Chinese sentence reads as one word.
+  // Intl.Segmenter fixes it but needs Firefox 125; the floor is 121.
+  const isOneWord = (text) => (stripEmotes(text).match(WORD) || []).length === 1;
 
   /** User-supplied patterns, one per line, matched case-insensitively against
    *  the comment text. A line that is not valid regex syntax becomes a literal
@@ -151,6 +166,12 @@
     return images.every((img) => img.matches(SEL.commentEmote));
   }
 
+  /** Only text and Royal Road emoticons. A screenshot or a link beside one
+   *  word is making a point. */
+  const plainBody = (body) =>
+    !body.querySelector('a') &&
+    [...body.querySelectorAll('img')].every((img) => img.matches(SEL.commentEmote));
+
   /** Everything that decides a comment's fate, including the parts needing the
    *  element rather than its text. The author exemption is applied last, over
    *  whatever the rules concluded, so a rule added later cannot forget it. */
@@ -158,8 +179,10 @@
     // Found once and passed down: locating a comment's own body scans its
     // subtree and climbs back out of every match.
     const body = ownBody(comment);
-    const actions = [actionFor(body ? body.textContent.trim() : '', settings)];
+    const text = body ? body.textContent.trim() : '';
+    const actions = [actionFor(text, settings)];
     if (isEmoteOnly(body)) actions.push(settings['comments.emotes']);
+    if (isOneWord(text) && plainBody(body)) actions.push(settings['comments.oneWord']);
 
     let action = 'keep';
     if (actions.includes('hide')) action = 'hide';
@@ -286,14 +309,16 @@
     const collapsible = ctx.settings['comments.collapsible'];
 
     /* Can any rule reach a verdict other than "leave alone"? On the shipped
-     * defaults none can: acknowledgements and emoticons are both set to keep,
-     * and the pattern action has no patterns to act on. Without this, a reader
-     * who has never opened the options still pays for the whole pipeline over
-     * every comment on every sweep - reading each body, matching the rules, and
-     * walking each reply chain twice looking for an author badge. */
+     * defaults none can: acknowledgements, emoticons and single words are set
+     * to keep, and the pattern action has no patterns to act on. Without this,
+     * a reader who has never opened the options still pays for the whole
+     * pipeline over every comment on every sweep - reading each body, matching
+     * the rules, and walking each reply chain twice looking for an author
+     * badge. */
     const canAct =
       ctx.settings['comments.thanks'] !== 'keep' ||
       ctx.settings['comments.emotes'] !== 'keep' ||
+      ctx.settings['comments.oneWord'] !== 'keep' ||
       (ctx.settings['comments.patternAction'] !== 'keep' &&
         ctx.settings['comments.foldPatterns'].trim() !== '');
 
@@ -303,6 +328,7 @@
       ctx.settings['comments.thanks'],
       ctx.settings['comments.patternAction'],
       ctx.settings['comments.emotes'],
+      ctx.settings['comments.oneWord'],
       ctx.settings['comments.foldAuthors'],
     ].join('\0');
 
@@ -388,6 +414,7 @@
     isLowValue,
     isAuthorComment,
     isEmoteOnly,
+    isOneWord,
     matchesPatterns,
     actionFor,
     actionForComment,
