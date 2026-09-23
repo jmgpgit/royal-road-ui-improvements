@@ -18,7 +18,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { JSDOM } = require('jsdom');
 
-const { read: fixture, need } = require('./helpers/fixtures.js');
+const { read: fixture, need, fictionFigures } = require('./helpers/fixtures.js');
 
 const ROOT = path.join(__dirname, '..');
 const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'manifest.json'), 'utf8'));
@@ -34,6 +34,9 @@ const SKIP = need(
   'fictions-weekly-popular.new.html'
 );
 const test = (name, fn) => nodeTest(name, { skip: SKIP }, fn);
+
+/** What the fiction capture shows today, read off its raw HTML. */
+const FICTION = SKIP ? {} : fictionFigures(fixture('fiction-detail.new.html'));
 
 /** Every content script, both batches, in manifest order. */
 const SCRIPTS = manifest.content_scripts.flatMap((entry) => entry.js);
@@ -593,8 +596,8 @@ test('a first visit records the numbers and says nothing', async () => {
 
   const stored = w.__store.stats[21220];
   assert.ok(stored && stored.now, 'but the visit was recorded');
-  assert.equal(stored.now.f, 32866, 'with the followers off the page');
-  assert.equal(stored.now.s, 4.83, 'and the two-decimal score');
+  assert.equal(stored.now.f, FICTION.f, 'with the followers off the page');
+  assert.equal(stored.now.s, FICTION.s, 'and the two-decimal score');
   assert.equal(stored.prev, undefined, 'and no baseline, since this was the first look');
 });
 
@@ -631,10 +634,12 @@ test('opening the same fiction twice in one sitting is enough to get an answer',
 
 test('coming back says what moved, and nothing while the feature is off', async () => {
   const url = 'https://www.royalroad.com/fiction/21220/mother-of-learning';
-  // A look from two days ago, when it had 500 fewer followers and a lower score.
+  // A look from two days ago, when it had 500 fewer followers, three fewer
+  // chapters and a lower score.
   const then = Math.floor(Date.now() / 1000) - 2 * 24 * 3600;
+  const { f, m, s, c, p, r, v } = FICTION;
   const seed = () => ({
-    21220: { now: { a: then, f: 32366, m: 31777, s: 4.81, c: 106, p: 2932, r: 17316, v: 27778323 } },
+    21220: { now: { a: then, f: f - 500, m, s: s - 0.02, c: c - 3, p, r, v } },
   });
 
   const { w } = await boot('fiction-detail.new.html', url, { 'fiction.statDeltas': true }, {}, {}, seed());
@@ -654,8 +659,8 @@ test('coming back says what moved, and nothing while the feature is off', async 
   assert.equal(line.closest('[data-rr-accordion-trigger]'), null);
 
   // The baseline rolled forward, so the record now compares against today.
-  assert.equal(w.__store.stats[21220].prev.f, 32366);
-  assert.equal(w.__store.stats[21220].now.f, 32866);
+  assert.equal(w.__store.stats[21220].prev.f, f - 500);
+  assert.equal(w.__store.stats[21220].now.f, f);
 
   const off = await boot('fiction-detail.new.html', url, { 'fiction.statDeltas': false }, {}, {}, seed());
   await new Promise((resolve) => setTimeout(resolve, 20));
@@ -1875,16 +1880,28 @@ test('the whole published vocabulary is read, genres included', async () => {
 });
 
 test('a busy list page does not pass for the whole vocabulary', async () => {
-  // `load` skipped the fetch on `catalogue.length >= 72`, and rising-stars alone
-  // carries 73 distinct slugs - so the picker offered whatever had been seen and
-  // never learnt the rest. Harvesting on every page made that permanent.
+  // `load` skipped the fetch on `catalogue.length >= 72`, and a rising-stars
+  // page can carry that many distinct slugs on its own - so the picker offered
+  // whatever had been seen and never learnt the rest. Harvesting on every page
+  // made that permanent.
   const { w } = await boot(
     'fictions-rising-stars.new.html',
     'https://www.royalroad.com/fictions/rising-stars'
   );
   await settled();
 
-  assert.ok(w.RRX.tags.all().length >= 72, 'this capture no longer clears the old threshold');
+  // Topped up to the old threshold, whatever the day's cards carry.
+  const row = w.document.querySelector(`.fiction-card-expanded ${w.RRX.SEL.cardTag}`).parentElement;
+  for (let i = 0; w.RRX.tags.harvestChips().length < 72; i += 1) {
+    const chip = w.document.createElement('a');
+    chip.href = `/fictions/search?tagsAdd=busy-${i}`;
+    chip.textContent = `Busy ${i}`;
+    row.appendChild(chip);
+  }
+  w.RRX.tags.harvest();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.ok(w.RRX.tags.all().length >= 72, 'the top-up did not reach the old threshold');
   assert.equal(w.RRX.tags.isFull(), false, 'chips off one list page were taken for the vocabulary');
   assert.equal(w.__store.tagCatalogue.full, false, 'and the cache was marked complete');
 

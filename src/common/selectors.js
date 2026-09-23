@@ -5,7 +5,7 @@
  * redesign change breaks here and nowhere else. `main.js` health-checks these on
  * list pages and warns loudly if the list stops matching.
  *
- * Verified against Royal Road build 4.1.20260807.38. Ground-truth captures of
+ * Verified against Royal Road build 4.1.20260923.58. Ground-truth captures of
  * every page shape live in `test/fixtures/`.
  */
 (function (root, factory) {
@@ -98,11 +98,13 @@
     listCard: '.fiction-card-expanded',
 
     // --- description "show more" widget (pure CSS on RR's side) --------------
-    // <div data-rr-show-more>
-    //   <input type=checkbox id="show-more-blurb-{fictionId}" class="peer sr-only">
-    //   <div data-rr-show-more-content style="max-height:96px">…blurb…</div>
-    //   <div data-rr-show-more-wrapper><div class="gradient-wrapper"></div><label/></div>
+    // <div data-rr-show-more style="--rr-collapsed-height: 96px">
+    //   <div data-rr-show-more-content style="max-height: var(--rr-collapsed-height, 224px)">…blurb…</div>
+    //   <div data-rr-show-more-wrapper><div class="gradient-wrapper"></div></div>
+    //   <input type=checkbox id="show-more-blurb-{fictionId}" class="peer sr-only …">
+    //   <label for="show-more-blurb-{fictionId}">chevron</label>
     // </div>
+    // The checkbox and the chevron used to sit inside the wrapper.
     showMoreRoot: '[data-rr-show-more]',
     showMoreContent: '[data-rr-show-more-content]',
     showMoreWrapper: '[data-rr-show-more-wrapper]',
@@ -117,12 +119,12 @@
     fictionHref: '[href*="/fiction/"]',
 
     // --- bits we read off a card to filter on -------------------------------
-    /** Star widget. Two per card (mobile + desktop); both carry the same value. */
+    /** Star widget, one per card; cards used to carry two, mobile and desktop. */
     cardRating: '[data-rr-initial-rating]',
     /**
      * Stat tiles are `<div><div>2,116</div><div class="… uppercase">Followers</div></div>`.
-     * We find the label and read back to the value: the value div's classes
-     * differ between the mobile and desktop grids, the label text does not.
+     * We find the label and read back to the value: the value div's classes used
+     * to differ between the mobile and desktop grids, the label text did not.
      * Filtered against CARD_STATS, so stray `.uppercase` matches are harmless.
      */
     cardStatLabel: '.uppercase',

@@ -14,7 +14,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { JSDOM } = require('jsdom');
 
-const { read: fixture, need } = require('./helpers/fixtures.js');
+const { read: fixture, need, fictionFigures } = require('./helpers/fixtures.js');
 
 const ROOT = path.join(__dirname, '..');
 const SKIP = need('fiction-detail.new.html');
@@ -32,23 +32,10 @@ const MODULES = [
 
 const URL = 'https://www.royalroad.com/fiction/21220/mother-of-learning';
 
-/** Every number this capture shows, checked against the raw HTML. In the order
- *  Royal Road lays them out: the six tiles, then the overall score and its four
- *  sub-scores, then the chapter count, which is on the table of contents. */
-const EXPECTED = {
-  v: 27778323,
-  w: 254847,
-  f: 32866,
-  m: 31777,
-  r: 17316,
-  p: 2932,
-  s: 4.83,
-  sty: 4.68,
-  sto: 4.8,
-  gra: 4.78,
-  cha: 4.72,
-  c: 109,
-};
+/** Every number this capture shows, read off the raw HTML: the six tiles, the
+ *  overall score and its four sub-scores, and the chapter count on the table of
+ *  contents. */
+const EXPECTED = SKIP ? {} : fictionFigures(fixture('fiction-detail.new.html'));
 
 /** Records are built inside the jsdom realm, so they carry its prototypes and
  *  strict deepEqual rejects them as not reference-equal. */
@@ -91,6 +78,7 @@ test('every number on a real fiction page is read', () => {
   const w = loadPage();
   const stats = w.RRX.fictionStats.readStats();
   for (const [field, value] of Object.entries(EXPECTED)) {
+    assert.ok(Number.isFinite(value), `the capture no longer shows ${field} where fictionFigures looks`);
     assert.equal(stats[field], value, `field ${field}`);
   }
   assert.deepEqual(Object.keys(stats).sort(), Object.keys(EXPECTED).sort(), 'and nothing else');
@@ -100,18 +88,18 @@ test('the score is read to two decimals, not Royal Road’s rounded one', () => 
   // The page displays 4.8 as star geometry; 4.83 is text only. A +0.02 move is
   // invisible at one decimal, which is the entire point of the readout.
   const w = loadPage();
-  assert.equal(w.RRX.fictionStats.readScore(), 4.83);
+  assert.equal(w.RRX.fictionStats.readScore(), EXPECTED.s);
 
   // Each source in turn, most machine-readable first. JSON-LD gone: the panel's
   // own star tooltip says the same.
   for (const script of w.document.querySelectorAll('script[type="application/ld+json"]')) {
     script.remove();
   }
-  assert.equal(w.RRX.fictionStats.readScore(), 4.83, 'the panel tooltip is the fallback');
+  assert.equal(w.RRX.fictionStats.readScore(), EXPECTED.s, 'the panel tooltip is the fallback');
 
   // Panel gone too: the tooltip beside the title, which is outside it.
   w.document.querySelector('#stats-accordion').remove();
-  assert.equal(w.RRX.fictionStats.readScore(), 4.83, 'and the hero tooltip after that');
+  assert.equal(w.RRX.fictionStats.readScore(), EXPECTED.s, 'and the hero tooltip after that');
 
   // And with all three gone it declines rather than reporting the rounded 4.8
   // that data-rr-initial-rating carries - mixing one- and two-decimal readings
@@ -129,19 +117,19 @@ test('every star rating is read, and told apart by its own heading', () => {
 
   const scored = [...widgets].map(([field, el]) => [field, w.RRX.fictionStats.scoreOf(el)]);
   assert.deepEqual(scored, [
-    ['s', 4.83],
-    ['sty', 4.68],
-    ['sto', 4.8],
-    ['gra', 4.78],
-    ['cha', 4.72],
+    ['s', EXPECTED.s],
+    ['sty', EXPECTED.sty],
+    ['sto', EXPECTED.sto],
+    ['gra', EXPECTED.gra],
+    ['cha', EXPECTED.cha],
   ]);
 
   // Reversed, each still reports its own figure rather than its neighbour's.
   const panel = widgets.get('sty').parentElement.parentElement;
   for (const child of [...panel.children].reverse()) panel.appendChild(child);
   const after = w.RRX.fictionStats.scoreWidgets();
-  assert.equal(w.RRX.fictionStats.scoreOf(after.get('gra')), 4.78);
-  assert.equal(w.RRX.fictionStats.scoreOf(after.get('sty')), 4.68);
+  assert.equal(w.RRX.fictionStats.scoreOf(after.get('gra')), EXPECTED.gra);
+  assert.equal(w.RRX.fictionStats.scoreOf(after.get('sty')), EXPECTED.sty);
 });
 
 test('“Ratings” resolves to the tile, not the Overall Score heading of the same name', () => {
@@ -152,9 +140,9 @@ test('“Ratings” resolves to the tile, not the Overall Score heading of the s
     (el) => !el.firstElementChild && el.textContent.trim() === 'Ratings'
   );
   assert.equal(labels.length, 2, 'both still exist, or this test proves nothing');
-  assert.equal(w.RRX.fictionStats.valueNear(labels[0]), 17316, 'the tile');
+  assert.equal(w.RRX.fictionStats.valueNear(labels[0]), EXPECTED.r, 'the tile');
   assert.equal(w.RRX.fictionStats.valueNear(labels[1]), null, 'the heading declines');
-  assert.equal(w.RRX.fictionStats.readStats().r, 17316);
+  assert.equal(w.RRX.fictionStats.readStats().r, EXPECTED.r);
 });
 
 test('the read survives Royal Road moving the tiles around', () => {
@@ -266,11 +254,11 @@ test('each figure carries its own delta, written directly under it', () => {
   );
 
   const [followers, favourites, score] = cells;
-  assert.equal(followers.previousElementSibling.textContent.trim(), '32,866', 'under its own number');
+  assert.equal(followers.previousElementSibling.textContent.trim(), EXPECTED.f.toLocaleString('en-US'), 'under its own number');
   assert.equal(followers.textContent, '(+312)');
   assert.ok(followers.classList.contains('rrx-stat-cell--up'));
 
-  assert.equal(favourites.previousElementSibling.textContent.trim(), '31,777');
+  assert.equal(favourites.previousElementSibling.textContent.trim(), EXPECTED.m.toLocaleString('en-US'));
   assert.equal(favourites.textContent, '(−2)', 'a fall is signed, and reads as one');
   assert.ok(favourites.classList.contains('rrx-stat-cell--down'));
 

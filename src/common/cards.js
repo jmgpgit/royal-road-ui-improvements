@@ -63,7 +63,8 @@
     return { status, type };
   }
 
-  /** Tag slugs, de-duplicated: every card renders its chips twice (mobile + desktop). */
+  /** Tag slugs, de-duplicated: cards used to render their chips twice (mobile +
+   *  desktop). */
   function readTags(card) {
     const tags = new Set();
     for (const a of card.querySelectorAll(SEL.cardTag)) {

@@ -34,4 +34,33 @@ function need(...names) {
   return `missing fixture(s): ${absent.join(', ')}: see test/fixtures/README.md to re-capture`;
 }
 
-module.exports = { DIR, has, read, need };
+/**
+ * Every number a fiction page shows, read from its raw HTML by position rather
+ * than by the label-first walk the extension does, so a recapture moves the
+ * expectation with the page. A tile is `<span>33,805</span> <span>Followers</span>`
+ * (Pages wraps its label in a div, for the help tooltip); a score is its
+ * heading, then its tooltip's "4.68 out of 5".
+ */
+function fictionFigures(html) {
+  const num = (match) => (match ? Number(match[1].replace(/,/g, '')) : NaN);
+  const tile = (label) =>
+    num(new RegExp(`>([\\d,]+)</span>\\s*(?:<div[^>]*>)?<span[^>]*>${label}</span>`).exec(html));
+  const score = (label) =>
+    num(new RegExp(`>${label}</h[34]>[\\s\\S]*?>\\s*([\\d.]+) out of 5\\s*<`).exec(html));
+  return {
+    v: tile('Total Views'),
+    w: tile('Avg\\. Views'),
+    f: tile('Followers'),
+    m: tile('Favorites'),
+    r: tile('Ratings'),
+    p: tile('Pages'),
+    s: score('Overall Score'),
+    sty: score('Style'),
+    sto: score('Story'),
+    gra: score('Grammar'),
+    cha: score('Character'),
+    c: num(/id="chapters"[^>]*data-chapters="(\d+)"/.exec(html)),
+  };
+}
+
+module.exports = { DIR, has, read, need, fictionFigures };

@@ -84,8 +84,11 @@ test('numbers are parsed out of the thousands separators, not truncated at them'
   assert.equal(w.RRX.parseCount('n/a'), null);
 });
 
-test('tags are de-duplicated across the mobile and desktop chip rows', () => {
+test('tags are de-duplicated, and read without their query string', () => {
   const w = loadPage('fictions-rising-stars.new.html', 'https://www.royalroad.com/fictions/rising-stars');
+  // Cards used to render every chip twice, mobile and desktop.
+  const chip = cardsOf(w)[0].querySelector(w.RRX.SEL.cardTag);
+  chip.parentElement.appendChild(chip.cloneNode(true));
   for (const el of cardsOf(w)) {
     const { tags } = w.RRX.readCardData(el);
     assert.equal(new Set(tags).size, tags.length, 'tags must not repeat');

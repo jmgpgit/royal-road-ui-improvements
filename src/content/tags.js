@@ -30,7 +30,7 @@
    *  whatever tags happened to be on the pages visited.
    *
    *  This used to be inferred from `catalogue.length >= 72`, which is not the
-   *  same question: the rising-stars capture alone carries 73 distinct slugs on
+   *  same question: one rising-stars capture alone carried 73 distinct slugs on
    *  its cards, so a count that size proves only that a busy page was read. The
    *  fetch was skipped on that basis and the picker offered whatever had been
    *  seen - which is how a rare tag becomes untypeable, and why a reader with
