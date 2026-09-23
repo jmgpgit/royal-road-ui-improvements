@@ -37,11 +37,12 @@
  */
 
 /* ==========================================================================
-   Shared plumbing for the modes that rebuild the card
+   Covers: the plumbing that rebuilds the card
+   --------------------------------------------------------------------------
+   Two columns repeats it inside its breakpoint below: under 1280px it leaves
+   the card as Royal Road builds it.
    ========================================================================== */
 
-html.rrx-view-two-col .fiction-card-expanded > div,
-html.rrx-view-two-col .fiction-card-expanded > div > div,
 html.rrx-view-grid .fiction-card-expanded > div,
 html.rrx-view-grid .fiction-card-expanded > div > div {
   display: block !important;
@@ -49,7 +50,6 @@ html.rrx-view-grid .fiction-card-expanded > div > div {
 }
 
 /* The card's own flex row. */
-html.rrx-view-two-col .fiction-card-expanded > div > div > div,
 html.rrx-view-grid .fiction-card-expanded > div > div > div {
   display: flex !important;
   flex-wrap: wrap;
@@ -61,25 +61,21 @@ html.rrx-view-grid .fiction-card-expanded > div > div > div {
 
 /* The content column stops being a box, so its blocks join the cover in the
    row. It used to be `.flex-1.min-w-0`; that now names the title link. */
-html.rrx-view-two-col .fiction-card-expanded > div > div > div > div,
 html.rrx-view-grid .fiction-card-expanded > div > div > div > div {
   display: contents !important;
 }
 
 /* The phone-only duplicates would render each fiction twice once the row is
    dissolved. */
-html.rrx-view-two-col .fiction-card-expanded .md\:hidden,
 html.rrx-view-grid .fiction-card-expanded .md\:hidden {
   display: none !important;
 }
 
-html.rrx-view-two-col .fiction-card-expanded .hidden.md\:flex,
 html.rrx-view-grid .fiction-card-expanded .hidden.md\:flex {
   display: flex !important;
 }
 
 /* Nothing may set a width against a narrow column. */
-html.rrx-view-two-col .fiction-card-expanded *,
 html.rrx-view-grid .fiction-card-expanded * {
   max-width: 100%;
   min-width: 0;
@@ -94,8 +90,6 @@ html.rrx-view-grid .fiction-card-expanded * {
  * so the start of the word disappears off the left. Left-aligning and clipping
  * keeps the text inside the pill and readable from its beginning.
  */
-html.rrx-view-two-col .fiction-card-expanded a[href*='tagsAdd='],
-html.rrx-view-two-col .fiction-card-expanded span.bg-accent,
 html.rrx-view-grid .fiction-card-expanded a[href*='tagsAdd='],
 html.rrx-view-grid .fiction-card-expanded span.bg-accent {
   display: inline-block !important;
@@ -115,6 +109,51 @@ html.rrx-view-grid .fiction-card-expanded span.bg-accent {
    ========================================================================== */
 
 @media (min-width: 1280px) {
+  /* The same plumbing as Covers above, only where two columns fit. */
+
+  html.rrx-view-two-col .fiction-card-expanded > div,
+  html.rrx-view-two-col .fiction-card-expanded > div > div {
+    display: block !important;
+    height: 100%;
+  }
+
+  html.rrx-view-two-col .fiction-card-expanded > div > div > div {
+    display: flex !important;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    align-content: flex-start;
+    gap: 0.4rem !important;
+    height: 100%;
+  }
+
+  html.rrx-view-two-col .fiction-card-expanded > div > div > div > div {
+    display: contents !important;
+  }
+
+  html.rrx-view-two-col .fiction-card-expanded .md\:hidden {
+    display: none !important;
+  }
+
+  html.rrx-view-two-col .fiction-card-expanded .hidden.md\:flex {
+    display: flex !important;
+  }
+
+  html.rrx-view-two-col .fiction-card-expanded * {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  html.rrx-view-two-col .fiction-card-expanded a[href*='tagsAdd='],
+  html.rrx-view-two-col .fiction-card-expanded span.bg-accent {
+    display: inline-block !important;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+    line-height: 1.4;
+  }
+
   html.rrx-view-two-col .fiction-list > [data-rr-paginate-item] {
     display: grid !important;
     grid-template-columns: 1fr 1fr;

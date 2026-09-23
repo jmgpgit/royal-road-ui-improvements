@@ -746,6 +746,28 @@ test('each list view gives every block of a real card the layout it was written 
   }
 });
 
+test('two columns only acts where two columns fit', () => {
+  // Below 1280px it is the ordinary card: a rule outside the breakpoint would
+  // flatten the card without the layout that puts it back together.
+  const text = viewsCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  const stack = [];
+  let last = 0;
+  let found = 0;
+  for (const m of text.matchAll(/@media[^{]*\{|\{|\}/g)) {
+    const selector = text.slice(last, m.index);
+    if (m[0] === '}') stack.pop();
+    else {
+      if (m[0] === '{' && selector.includes('rrx-view-two-col')) {
+        found += 1;
+        assert.ok(stack.includes('@media (min-width: 1280px) {'), `outside the breakpoint: ${selector.trim()}`);
+      }
+      stack.push(m[0]);
+    }
+    last = m.index + m[0].length;
+  }
+  assert.ok(found > 10, `sanity: only ${found} two-column rules found`);
+});
+
 test('the default view leaves every block to Royal Road', () => {
   const dom = docFor('fictions-rising-stars.new.html', 'rrx-page-list');
   for (const card of dom.window.document.querySelectorAll('.fiction-card-expanded')) {
