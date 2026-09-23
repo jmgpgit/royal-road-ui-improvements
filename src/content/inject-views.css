@@ -3,7 +3,8 @@
  *
  * The first two attempts failed the same way, and it is worth recording why.
  * A Royal Road card is a flex ROW: cover on the left, everything else in a
- * narrow column on the right. Halve its width and that column has no room: * the title wraps every other word, the stat tiles overlap, the buttons get
+ * narrow column on the right. Halve its width and that column has no room:
+ * the title wraps every other word, the stat tiles overlap, the buttons get
  * crushed, and the cover stretches down the whole card. Neither hiding parts
  * of the wide layout nor swapping in the phone layout fixed that, because both
  * kept the row.
@@ -16,6 +17,23 @@
  *
  * Blocks are matched by what they *contain* rather than by their Tailwind
  * classes, which are dense and change: `:has(> a > h2)` is the title, and so on.
+ *
+ * The card as Royal Road builds it since build 4.1.20260923. Everything is
+ * rendered once except the cover and the Read / Read Later pair:
+ *
+ *   .fiction-card-expanded > div > div > div    the row
+ *     a                                         cover
+ *     div                                       content column
+ *       a.md:hidden                             cover, phone copy
+ *       div   <a data-vt-trigger><h2>  +  div: Read | Read Later
+ *       div   tags and status chips, last-updated date
+ *       div   stats, `grid-cols-5`, plus a phone-only Last Update tile
+ *       div   blurb; on latest-updates a box of recent chapters instead
+ *       div.md:hidden                           Read | Read Later, phone copy
+ *
+ * Royal Road's utilities sit in `@layer utilities`, so any rule here beats them
+ * whatever its specificity, unless theirs is `!important`. Specificity only
+ * decides between rules in this file.
  */
 
 /* ==========================================================================
@@ -30,8 +48,7 @@ html.rrx-view-grid .fiction-card-expanded > div > div {
   height: 100%;
 }
 
-/* The card's own flex row, and the content column inside it, stop being boxes
-   so their children can be laid out together. */
+/* The card's own flex row. */
 html.rrx-view-two-col .fiction-card-expanded > div > div > div,
 html.rrx-view-grid .fiction-card-expanded > div > div > div {
   display: flex !important;
@@ -42,8 +59,10 @@ html.rrx-view-grid .fiction-card-expanded > div > div > div {
   height: 100%;
 }
 
-html.rrx-view-two-col .fiction-card-expanded .flex-1.min-w-0,
-html.rrx-view-grid .fiction-card-expanded .flex-1.min-w-0 {
+/* The content column stops being a box, so its blocks join the cover in the
+   row. It used to be `.flex-1.min-w-0`; that now names the title link. */
+html.rrx-view-two-col .fiction-card-expanded > div > div > div > div,
+html.rrx-view-grid .fiction-card-expanded > div > div > div > div {
   display: contents !important;
 }
 
@@ -108,7 +127,7 @@ html.rrx-view-grid .fiction-card-expanded span.bg-accent {
   }
 
   /* cover: fixed size, top-left, never stretched down the card */
-  html.rrx-view-two-col .fiction-card-expanded > div > div > div > div:has(> a img[data-type='cover']) {
+  html.rrx-view-two-col .fiction-card-expanded > div > div > div > a:has(img[data-type='cover']) {
     order: 1;
     flex: 0 0 auto;
     align-self: flex-start;
@@ -124,6 +143,14 @@ html.rrx-view-grid .fiction-card-expanded span.bg-accent {
     width: auto !important;
   }
 
+  /* Every block of the column is a full-width row after the cover. The rules
+     that follow move title, stats and tags ahead; what is left is the blurb,
+     or the box of recent chapters on latest-updates. */
+  html.rrx-view-two-col .fiction-card-expanded > div > div > div > div > * {
+    order: 5;
+    flex: 1 1 100%;
+  }
+
   /* title row beside the cover */
   html.rrx-view-two-col .fiction-card-expanded div:has(> a[data-vt-trigger] > h2) {
     order: 2;
@@ -131,29 +158,40 @@ html.rrx-view-grid .fiction-card-expanded span.bg-accent {
     flex-wrap: wrap;
   }
 
-  /* stats, tags, blurb, buttons: one full-width row each, in that order */
+  /* then stats, tags, blurb */
   html.rrx-view-two-col .fiction-card-expanded [class*='grid-cols-5'] {
     order: 3;
-    flex: 1 1 100%;
   }
 
-  html.rrx-view-two-col .fiction-card-expanded div:has(> a[href*='tagsAdd=']) {
+  /* "Too few ratings" in place of the stars: a centred flex box, so at this
+     width it clipped at both ends. As a block, `truncate` ends it in an
+     ellipsis instead. */
+  html.rrx-view-two-col .fiction-card-expanded [class*='grid-cols-5'] .truncate {
+    display: block;
+  }
+
+  html.rrx-view-two-col .fiction-card-expanded div:has(> div > a[href*='tagsAdd=']) {
     order: 4;
-    flex: 1 1 100%;
+    flex-wrap: wrap;
   }
 
-  html.rrx-view-two-col .fiction-card-expanded div:has(> [data-rr-show-more]) {
-    order: 5;
+  /* The last-updated date shares the tag row, and at half width it kept its
+     whole length and squeezed the tags into a column. It goes under them. */
+  html.rrx-view-two-col .fiction-card-expanded div:has(> a[href*='tagsAdd=']) {
     flex: 1 1 100%;
   }
 
   /* The Read / Read Later pair is nested inside the title row; pulling it out
-     to its own row is what stops it being crushed to a sliver. */
-  html.rrx-view-two-col .fiction-card-expanded div:has(> form[data-bookmark-form]) {
+     to its own row is what stops it being crushed to a sliver. `:not()` keeps
+     the Following / Favourite icons, the row's other children, beside the
+     title. */
+  html.rrx-view-two-col
+    .fiction-card-expanded
+    div:has(> a[data-vt-trigger] > h2)
+    > div:not([data-rr-tooltip]) {
     order: 6;
     flex: 1 1 100%;
     justify-content: flex-start !important;
-    margin-top: auto; /* pinned to the bottom, so cards of a pair line up */
   }
 
   html.rrx-view-two-col .fiction-card-expanded h2 {
@@ -214,7 +252,7 @@ html.rrx-view-grid .fiction-card-expanded > div > div > div {
  *
  * Royal Road puts the title and the Read / Read Later pair in ONE row:
  *
- *   <div class="hidden md:flex items-center gap-2">
+ *   <div class="flex items-center gap-1.5 flex-wrap">
  *     <a data-vt-trigger><h2>…</h2></a>
  *     <div class="hidden gap-2 md:flex justify-end">Read | Read Later</div>
  *   </div>
@@ -227,11 +265,7 @@ html.rrx-view-grid .fiction-card-expanded > div > div > div {
  * column and can then be placed independently: the buttons at the top of the
  * tile, the title at the bottom.
  */
-/* `.hidden.md\:flex` is repeated here for specificity, not for matching. The
-   blanket "show the desktop blocks" rule above is four classes and also
-   `!important`, so a three-class rule loses to it however late it appears and
-   the row silently stays a flex box. */
-html.rrx-view-grid .fiction-card-expanded div.hidden.md\:flex:has(> a[data-vt-trigger] > h2) {
+html.rrx-view-grid .fiction-card-expanded div:has(> a[data-vt-trigger] > h2) {
   display: contents !important;
 }
 
@@ -244,7 +278,7 @@ html.rrx-view-grid .fiction-card-expanded a[data-vt-trigger]:has(> h2) {
 }
 
 /* 2. cover */
-html.rrx-view-grid .fiction-card-expanded > div > div > div > div:has(> a img[data-type='cover']) {
+html.rrx-view-grid .fiction-card-expanded > div > div > div > a:has(img[data-type='cover']) {
   order: 2;
   flex: 0 0 auto;
   width: 100%;
@@ -295,18 +329,28 @@ html.rrx-view-grid .fiction-card-expanded [class*='grid-cols-5'] > div:first-chi
   border: 0 !important;
 }
 
+/* Centred under the cover like the title; Royal Road starts it at the left
+   from `md` up. */
+html.rrx-view-grid .fiction-card-expanded [class*='grid-cols-5'] > div:first-child > div {
+  justify-content: center;
+}
+
 html.rrx-view-grid .fiction-card-expanded [class*='grid-cols-5'] > div:first-child .uppercase {
   display: none !important;
 }
 
 /* 1. Read / Read Later, small, across the top.
-   Scoped to `.hidden` so it takes the desktop copy only: a card ships the pair
-   twice, and matching both puts two rows of buttons on every tile.
+   Taken from the title row, which holds the desktop copy only: the phone copy
+   is its own `.md:hidden` row and stays down. On search the same slot holds a
+   Preview button, placed the same way.
 
    The height is pinned rather than left to the buttons, so the overlay at the
    end of this section knows where the cover starts: both read the same number
    instead of one guessing at the other. */
-html.rrx-view-grid .fiction-card-expanded div.hidden:has(> form[data-bookmark-form]) {
+html.rrx-view-grid
+  .fiction-card-expanded
+  div:has(> a[data-vt-trigger] > h2)
+  > div:not([data-rr-tooltip]) {
   order: 1;
   display: flex !important;
   width: 100%;
@@ -315,18 +359,35 @@ html.rrx-view-grid .fiction-card-expanded div.hidden:has(> form[data-bookmark-fo
   justify-content: stretch !important;
 }
 
-/* Royal Road builds these two differently: Read is a row (icon beside text),
-   Read Later a column (icon above text). Side by side at tile width that reads
-   as a mistake, so both are forced to the column form. */
-html.rrx-view-grid .fiction-card-expanded div.hidden:has(> form[data-bookmark-form]) > a,
-html.rrx-view-grid .fiction-card-expanded div.hidden:has(> form[data-bookmark-form]) form,
-html.rrx-view-grid .fiction-card-expanded div.hidden:has(> form[data-bookmark-form]) button {
+/* Royal Road draws each button on an inner span, and builds the two
+   differently: Read is a row (icon beside text), Read Later a column (icon
+   above text). Side by side at tile width that reads as a mistake, so both are
+   forced to the column form. */
+html.rrx-view-grid
+  .fiction-card-expanded
+  div:has(> a[data-vt-trigger] > h2)
+  > div:not([data-rr-tooltip])
+  > * {
   flex: 1 1 0 !important;
   min-width: 0;
 }
 
-html.rrx-view-grid .fiction-card-expanded div.hidden:has(> form[data-bookmark-form]) > a,
-html.rrx-view-grid .fiction-card-expanded div.hidden:has(> form[data-bookmark-form]) button {
+html.rrx-view-grid
+  .fiction-card-expanded
+  div:has(> a[data-vt-trigger] > h2)
+  > div:not([data-rr-tooltip])
+  .group\/btn {
+  display: flex !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+html.rrx-view-grid
+  .fiction-card-expanded
+  div:has(> a[data-vt-trigger] > h2)
+  > div:not([data-rr-tooltip])
+  .group\/btn
+  > span {
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
@@ -335,20 +396,27 @@ html.rrx-view-grid .fiction-card-expanded div.hidden:has(> form[data-bookmark-fo
   width: 100% !important;
   height: 100% !important;
   padding: 0.25rem 0.3rem !important;
-  font-size: 0.625rem !important;
   line-height: 1.2 !important;
   text-align: center;
 }
 
-html.rrx-view-grid .fiction-card-expanded div.hidden:has(> form[data-bookmark-form]) i {
-  font-size: 0.8rem !important;
-  margin: 0 !important;
+/* Read Later's label sits in a `text-xs` span of its own. */
+html.rrx-view-grid
+  .fiction-card-expanded
+  div:has(> a[data-vt-trigger] > h2)
+  > div:not([data-rr-tooltip])
+  .group\/btn
+  span {
+  font-size: 0.625rem !important;
 }
 
-/* ...and the phone copy stays down. `.md\:hidden` alone lost the specificity
-   contest against the rule above, which is how it came back. */
-html.rrx-view-grid .fiction-card-expanded div.md\:hidden:has(> form[data-bookmark-form]) {
-  display: none !important;
+html.rrx-view-grid
+  .fiction-card-expanded
+  div:has(> a[data-vt-trigger] > h2)
+  > div:not([data-rr-tooltip])
+  i {
+  font-size: 0.8rem !important;
+  margin: 0 !important;
 }
 
 /*
@@ -380,13 +448,12 @@ html.rrx-view-grid .fiction-card-expanded div.md\:hidden:has(> form[data-bookmar
  * generates a box to lay them out in; a card with only one of the two puts that
  * one first, so it takes the left-hand slot either way.
  *
- * Royal Road already gives each wrapper Tailwind's `.relative`. This wins on
- * specificity without `!important`: two classes, one attribute and a `:has()`
- * that counts as `a[data-vt-trigger] > h2`, against a single class.
+ * Royal Road gives each wrapper Tailwind's `.relative`, which is layered, so
+ * this wins without `!important`.
  */
 html.rrx-view-grid
   .fiction-card-expanded
-  div.hidden.md\:flex:has(> a[data-vt-trigger] > h2)
+  div:has(> a[data-vt-trigger] > h2)
   > div[data-rr-tooltip] {
   position: absolute;
   top: var(--rrx-grid-mark-top);
@@ -420,7 +487,7 @@ html.rrx-view-grid
    and the thing being centred was not. */
 html.rrx-view-grid
   .fiction-card-expanded
-  div.hidden.md\:flex:has(> a[data-vt-trigger] > h2)
+  div:has(> a[data-vt-trigger] > h2)
   > div[data-rr-tooltip] i {
   width: 1em;
   margin: 0;
@@ -432,30 +499,21 @@ html.rrx-view-grid
    of. Directly below costs nothing - the left edge is already clear. */
 html.rrx-view-grid
   .fiction-card-expanded
-  div.hidden.md\:flex:has(> a[data-vt-trigger] > h2)
+  div:has(> a[data-vt-trigger] > h2)
   > div[data-rr-tooltip]:nth-of-type(2) {
   top: calc(var(--rrx-grid-mark-top) + var(--rrx-grid-mark-h) + 0.2rem);
 }
 
-/* Everything else is dropped. These carry `.hidden.md\:flex` so they outrank
-   the blanket "show the desktop blocks" rule; without that the tag row stayed
-   visible and its pills overflowed at tile width. */
-html.rrx-view-grid .fiction-card-expanded div:has(> [data-rr-show-more]),
-html.rrx-view-grid .fiction-card-expanded div.hidden.md\:flex:has(> a[href*='tagsAdd=']),
-html.rrx-view-grid .fiction-card-expanded div.hidden.md\:flex:has(> time) {
-  display: none !important;
-}
-
-/* The wrapper the tag row sits in goes too. Hiding only its contents leaves an
-   empty flex item with no `order`, which sorts ahead of everything that has one
-   and puts a band of gap above the cover.
-
-   Identified by what it holds rather than by its own classes, which are generic.
-   The two `:not()`s keep it off the title and cover blocks. `:has()` cannot be
-   nested inside another `:has()`, so this is one flat check. */
+/* Everything else in the column is dropped: tags, blurb, latest-updates'
+   chapter box, and whatever Royal Road adds next. Anything left in with no
+   `order` sorts ahead of the ordered blocks and pushes the cover down. */
 html.rrx-view-grid
   .fiction-card-expanded
-  div.flex.flex-row:has(a[href*='tagsAdd=']):not(:has(h2)):not(:has(img[data-type='cover'])) {
+  > div
+  > div
+  > div
+  > div
+  > :not(div:has(> a[data-vt-trigger] > h2), [class*='grid-cols-5']) {
   display: none !important;
 }
 
@@ -497,6 +555,14 @@ html.rrx-view-compact .fiction-card-expanded [class*='grid-cols-5'] > div {
   padding: 0 !important;
   background: none !important;
   border: 0 !important;
+}
+
+/* The phone-only Last Update tile. Tailwind's `md:hidden` is layered, so the
+   rule above would otherwise put a full date back on desktop. */
+@media (min-width: 48rem) {
+  html.rrx-view-compact .fiction-card-expanded [class*='grid-cols-5'] > .md\:hidden {
+    display: none;
+  }
 }
 
 /* ==========================================================================

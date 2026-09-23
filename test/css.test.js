@@ -297,77 +297,6 @@ test('every selector in every stylesheet actually parses', () => {
   w.close();
 });
 
-test('a rule meant to override another is actually more specific than it', () => {
-  // The covers tile works by dissolving Royal Road's shared "title + Read /
-  // Read Later" row so the two can be placed separately. That rule has to beat
-  // the blanket rule which forces every desktop block to `display: flex`, and
-  // both are `!important`, so `!important` decides nothing and specificity does.
-  // A shorter selector loses however late it appears in the file, and the
-  // symptom is silent: the row simply stays a flex box and the title sits
-  // beside the buttons.
-  const css = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'content', 'inject-views.css'),
-    'utf8'
-  );
-
-  /** (ids, classes+attrs+pseudo-classes, elements); :has() counts its argument. */
-  const specificity = (selector) => {
-    let s = selector;
-    let a = 0;
-    let b = 0;
-    let c = 0;
-    s = s.replace(/:(?:has|is|not)\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g, (_, inner) => {
-      const [ia, ib, ic] = specificity(inner.replace(/^\s*[>+~]\s*/, ''));
-      a += ia;
-      b += ib;
-      c += ic;
-      return ' ';
-    });
-    a += (s.match(/#[\w-]+/g) || []).length;
-    // `\\.` covers an escaped character inside a class name, as in `md\:flex`.
-    b += (s.match(/\.(?:\\.|[\w-])+/g) || []).length;
-    b += (s.match(/\[[^\]]*\]/g) || []).length;
-    b += (s.match(/:(?!:)[\w-]+/g) || []).length;
-    c += (s.match(/(?:^|[\s>+~])([a-zA-Z][\w-]*)/g) || []).length;
-    return [a, b, c];
-  };
-  const beats = (x, y) => {
-    const [p, q] = [specificity(x), specificity(y)];
-    return p[0] - q[0] || p[1] - q[1] || p[2] - q[2];
-  };
-
-  /** The selector of the first rule after `from` whose body sets prop: value. */
-  const selectorSetting = (property, value, from = 0) => {
-    const at = css.indexOf(`${property}: ${value}`, from);
-    assert.ok(at > 0, `no rule sets ${property}: ${value}`);
-    // Walk back to the brace that opens this block, then to whatever ended the
-    // thing before it: everything between is the selector list.
-    const open = css.lastIndexOf('{', at);
-    const prevEnd = Math.max(css.lastIndexOf('}', open), css.lastIndexOf('*/', open));
-    return css
-      .slice(prevEnd + 1, open)
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .filter((s) => s.includes('rrx-view-grid'))[0];
-  };
-
-  // The class is literally named "md:flex", so the colon is escaped in CSS.
-  const blanket = 'html.rrx-view-grid .fiction-card-expanded .hidden.md\\:flex';
-  assert.ok(css.includes(blanket), 'the blanket desktop-block rule still exists');
-
-  const dissolve = selectorSetting('display', 'contents', css.indexOf('Cover grid:'));
-  assert.ok(dissolve, 'the covers view dissolves the shared title row');
-  assert.ok(
-    beats(dissolve, blanket) > 0,
-    `this loses to the blanket rule and will not apply:\n  ${dissolve}  ${specificity(dissolve)}\n  ${blanket}  ${specificity(blanket)}`
-  );
-
-  // The helper must actually rank these, or the assertion above proves nothing.
-  assert.ok(beats('.a.b.c.d', '.a.b.c') > 0, 'more classes wins');
-  assert.ok(beats('div:has(> a[x] > h2)', '.a.b.c.d') < 0, 'classes outrank elements');
-});
-
 test('the endless-mode rule lives where every page can see it', () => {
   // Comments, reviews and the fiction lists all set `rrx-endless`, so the rule
   // that acts on it cannot sit in one feature's stylesheet.
@@ -616,9 +545,241 @@ test('names with spaces and punctuation survive intact', () => {
   );
 });
 
-// --- the covers overlay, against the markup it is written for ------------------
+// --- the list views, against the markup they are written for -------------------
 
 const viewsCss = fs.readFileSync(path.join(ROOT, 'src/content/inject-views.css'), 'utf8');
+
+/** Splits a selector list on its top-level commas only. */
+function splitList(text) {
+  const out = [];
+  let depth = 0;
+  let from = 0;
+  for (let i = 0; i < text.length; i++) {
+    if ('(['.includes(text[i])) depth += 1;
+    else if (')]'.includes(text[i])) depth -= 1;
+    else if (text[i] === ',' && depth === 0) {
+      out.push(text.slice(from, i).trim());
+      from = i + 1;
+    }
+  }
+  out.push(text.slice(from).trim());
+  return out.filter(Boolean);
+}
+
+const bySpecificity = (x, y) => x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
+
+/** [ids, classes + attributes + pseudo-classes, elements]. `:has()`, `:is()`
+ *  and `:not()` weigh as their most specific argument. An escaped character is
+ *  part of the name, so `.md\:hidden` is one class, not a class and a pseudo. */
+function specificity(selector) {
+  const sum = [0, 0, 0];
+  let rest = '';
+  const s = selector.replace(/\\./g, '_');
+  for (let i = 0; i < s.length; i++) {
+    const fn = /^:(?:has|is|not)\(/.exec(s.slice(i));
+    if (!fn) {
+      rest += s[i];
+      continue;
+    }
+    let j = i + fn[0].length;
+    for (let depth = 1; depth; j++) depth += s[j] === '(' ? 1 : s[j] === ')' ? -1 : 0;
+    const best = splitList(s.slice(i + fn[0].length, j - 1))
+      .map((arg) => specificity(arg.replace(/^[>+~]\s*/, '')))
+      .reduce((a, b) => (bySpecificity(a, b) >= 0 ? a : b));
+    best.forEach((n, k) => (sum[k] += n));
+    rest += ' ';
+    i = j - 1;
+  }
+  rest = rest.replace(/\[[^\]]*\]/g, () => ((sum[1] += 1), ' '));
+  sum[0] += (rest.match(/#[\w-]+/g) || []).length;
+  sum[1] += (rest.match(/\.[\w-]+/g) || []).length;
+  sum[2] += (rest.match(/::[\w-]+/g) || []).length;
+  sum[1] += (rest.replace(/::[\w-]+/g, ' ').match(/:[\w-]+/g) || []).length;
+  sum[2] += (rest.match(/(?:^|[\s>+~])[a-zA-Z][\w-]*/g) || []).length;
+  return sum;
+}
+
+/** Every rule in inject-views.css, one entry per selector. The two-column
+ *  `@media` is flattened: these checks read the page as a desktop wider than
+ *  its 1280px breakpoint. */
+const VIEW_RULES = (() => {
+  const text = viewsCss.replace(/\/\*[\s\S]*?\*\//g, '').replace(/@media[^{]*\{/g, '');
+  const rules = [];
+  for (const block of text.split('}')) {
+    const [head, body] = block.split('{');
+    if (body === undefined) continue;
+    const decls = {};
+    for (const decl of body.split(';')) {
+      const colon = decl.indexOf(':');
+      if (colon < 0) continue;
+      const value = decl.slice(colon + 1).trim();
+      decls[decl.slice(0, colon).trim()] = {
+        value: value.replace(/\s*!important$/, ''),
+        important: /!important$/.test(value),
+      };
+    }
+    for (const selector of splitList(head)) {
+      rules.push({ selector, decls, weight: specificity(selector), at: rules.length });
+    }
+  }
+  return rules;
+})();
+
+/**
+ * The value our own sheet gives `prop` on `el`, or null when it sets none.
+ *
+ * jsdom has no cascade, so this is one: `!important` first, then specificity,
+ * then source order. Royal Road's utilities live in `@layer utilities`, which
+ * any unlayered rule here outranks; its `!important` utilities sit on icons
+ * and labels, not on the blocks checked below. So null means "left to Royal
+ * Road", and anything else is what renders.
+ */
+function ourValue(el, prop) {
+  let best = null;
+  for (const rule of VIEW_RULES) {
+    const decl = rule.decls[prop];
+    if (!decl || !el.matches(rule.selector)) continue;
+    const wins =
+      !best ||
+      (decl.important !== best.decl.important
+        ? decl.important
+        : bySpecificity(rule.weight, best.rule.weight) >= 0);
+    if (wins) best = { rule, decl };
+  }
+  return best && best.decl.value;
+}
+
+/** A list card's blocks, found by position in the skeleton rather than by the
+ *  stylesheet's own selectors, so a rule that drifts off its block shows. */
+function cardBlocks(card) {
+  const row = card.querySelector(':scope > div > div > div');
+  const column = row && row.querySelector(':scope > div');
+  const titleRow = column && column.querySelector(':scope > div:has(> a[data-vt-trigger] > h2)');
+  const stats = column && column.querySelector(':scope > [class*="grid-cols-5"]');
+  const blocks = {
+    column,
+    cover: row && row.querySelector(':scope > a'),
+    phoneCover: column && column.querySelector(':scope > a'),
+    titleRow,
+    title: titleRow && titleRow.querySelector(':scope > a[data-vt-trigger]'),
+    buttons: titleRow && titleRow.querySelector(':scope > div'),
+    tags: column && column.querySelector(':scope > div:has(a[href*="tagsAdd="])'),
+    stats,
+    rating: stats && stats.firstElementChild,
+    followers: stats && stats.children[1],
+    lastUpdate: stats && stats.querySelector(':scope > .md\\:hidden'),
+    // The blurb, or on latest-updates the box of recent chapters in its place.
+    blurb: column && column.querySelector(':scope > div:has([data-rr-show-more], ul)'),
+    phoneButtons: column && column.querySelector(':scope > div.md\\:hidden'),
+  };
+  for (const [name, el] of Object.entries(blocks)) {
+    assert.ok(el, `a card has no ${name}: Royal Road rebuilt the card again`);
+  }
+  return blocks;
+}
+
+const LIST_CAPTURES = [
+  'fictions-rising-stars.new.html',
+  'fictions-weekly-popular.new.html',
+  'fictions-latest-updates.new.html',
+  'fictions-search.new.html',
+];
+
+/** What each mode must make of every block; unlisted blocks are not checked. */
+const VIEW_EXPECT = {
+  'two-col': {
+    display: {
+      column: 'contents',
+      cover: 'flex',
+      phoneCover: 'none',
+      phoneButtons: 'none',
+      lastUpdate: 'none',
+    },
+    // cover and title side by side, then stats, tags, blurb; the buttons are
+    // the title row's own last line
+    order: { cover: '1', titleRow: '2', stats: '3', tags: '4', blurb: '5', buttons: '6' },
+  },
+  grid: {
+    display: {
+      column: 'contents',
+      titleRow: 'contents',
+      cover: 'flex',
+      buttons: 'flex',
+      stats: 'flex',
+      rating: 'block',
+      followers: 'none',
+      lastUpdate: 'none',
+      title: 'block',
+      tags: 'none',
+      blurb: 'none',
+      phoneCover: 'none',
+      phoneButtons: 'none',
+    },
+    order: { buttons: '1', cover: '2', stats: '3', title: '4' },
+  },
+  compact: {
+    display: { followers: 'flex', lastUpdate: 'none' },
+    order: {},
+  },
+};
+
+test('each list view gives every block of a real card the layout it was written for', () => {
+  for (const fixture of LIST_CAPTURES) {
+    for (const [mode, expect] of Object.entries(VIEW_EXPECT)) {
+      const dom = docFor(fixture, `rrx-view-${mode}`);
+      const cards = [...dom.window.document.querySelectorAll('.fiction-card-expanded')];
+      assert.ok(cards.length >= 20, `${fixture}: found ${cards.length} cards`);
+      for (const card of cards) {
+        const blocks = cardBlocks(card);
+        for (const prop of ['display', 'order']) {
+          for (const [name, want] of Object.entries(expect[prop])) {
+            assert.equal(
+              ourValue(blocks[name], prop),
+              want,
+              `${fixture}, ${mode}: ${name} ${prop}`
+            );
+          }
+        }
+      }
+      dom.window.close();
+    }
+  }
+});
+
+test('the default view leaves every block to Royal Road', () => {
+  const dom = docFor('fictions-rising-stars.new.html', 'rrx-page-list');
+  for (const card of dom.window.document.querySelectorAll('.fiction-card-expanded')) {
+    for (const [name, el] of Object.entries(cardBlocks(card))) {
+      assert.equal(ourValue(el, 'display'), null, `${name} display`);
+      assert.equal(ourValue(el, 'order'), null, `${name} order`);
+    }
+  }
+  dom.window.close();
+});
+
+test('the cascade helper ranks the way a browser does', () => {
+  // Every expectation above leans on these, so they must not pass by accident.
+  assert.deepEqual(specificity('div:has(> a[data-vt-trigger] > h2)'), [0, 1, 3]);
+  assert.deepEqual(specificity('.hidden.md\\:flex'), [0, 2, 0], 'an escaped colon is not a pseudo');
+  assert.deepEqual(specificity('div:not(a, #x .y)'), [1, 1, 1], ':not() takes its heaviest argument');
+  assert.deepEqual(specificity('li:nth-of-type(2)::before'), [0, 1, 2]);
+  assert.ok(bySpecificity(specificity('.a.b.c.d'), specificity('.a.b.c')) > 0, 'more classes wins');
+  assert.ok(bySpecificity(specificity('div:has(> a[x] > h2)'), specificity('.a.b')) < 0, 'classes outrank elements');
+
+  // In grid mode both rating-tile rules are !important; the first tile is
+  // shown only because `:first-child` outweighs the blanket hide.
+  const dom = docFor('fictions-rising-stars.new.html', 'rrx-view-grid');
+  const stats = dom.window.document.querySelector('.fiction-card-expanded [class*="grid-cols-5"]');
+  assert.equal(ourValue(stats.children[0], 'display'), 'block');
+  assert.equal(ourValue(stats.children[1], 'display'), 'none');
+  dom.window.close();
+});
+
+// --- the covers overlay --------------------------------------------------------
+//
+// Following and Favourite only exist signed in, so these read the two signed-in
+// captures, which predate the card rebuild of build 4.1.20260923 and still carry
+// a phone copy of the title row.
 
 /** The selector list of the first rule after `from` whose body carries `decl`.
  *  Both delimiters are measured to their end: `lastIndexOf('*​/')` points at the
@@ -652,7 +813,8 @@ test('the covers overlay reaches the Following and Favourite icons, and only tho
   const selector = selectorFor(viewsCss, 'position: absolute', OVERLAY_AT());
   const d = docFor('card-loggedin-marked.html', 'rrx-view-grid').window.document;
 
-  const hit = [...d.querySelectorAll(selector)];
+  // The capture's phone copy sits inside `.md:hidden`, which the view hides.
+  const hit = [...d.querySelectorAll(selector)].filter((n) => !n.closest('.md\\:hidden'));
   assert.equal(hit.length, 2, `expected the two icons, matched ${hit.length}: ${selector}`);
   for (const node of hit) {
     assert.ok(
@@ -664,9 +826,6 @@ test('the covers overlay reaches the Following and Favourite icons, and only tho
   // The other two children of that row must stay in flow: the title is the
   // tile's last item and the buttons its first, and taking either out of flow
   // would empty the tile rather than tidy it.
-  // Reached through the matched icon rather than by selector: the row's class
-  // is literally "md:flex", and one lost backslash turns the escape into an
-  // unknown pseudo-class that matches nothing and fails silently.
   const row = hit[0].parentElement;
   assert.ok(row, 'the shared title row is no longer shaped the way the rule expects');
   assert.ok(row.querySelector('a[data-vt-trigger] > h2'), 'not the title row');
@@ -678,11 +837,15 @@ test('the covers overlay reaches the Following and Favourite icons, and only tho
 });
 
 test('a card with neither mark is left entirely alone', () => {
+  // Read on a current signed-out list, where every card is unmarked but still
+  // carries a lookalike: the last-updated date in the tag row is a tooltip too.
   const selector = selectorFor(viewsCss, 'position: absolute', OVERLAY_AT());
-  const d = docFor('card-loggedin.html', 'rrx-view-grid').window.document;
+  const dom = docFor('fictions-rising-stars.new.html', 'rrx-view-grid');
+  const d = dom.window.document;
 
-  assert.ok(d.querySelector('.fiction-card-expanded'), 'the unmarked fixture has no card at all');
+  assert.ok(d.querySelectorAll('.fiction-card-expanded [data-rr-tooltip]').length >= 50, 'no lookalike to resist');
   assert.equal(d.querySelectorAll(selector).length, 0, 'an unmarked card got an overlay');
+  dom.window.close();
 });
 
 test('the overlay and the button row read the same height, not two guesses', () => {
@@ -693,7 +856,15 @@ test('the overlay and the button row read the same height, not two guesses', () 
   assert.equal(defined.length, 1, 'the height is declared more than once, so they can disagree');
 
   const actions = selectorFor(viewsCss, 'height: var(--rrx-grid-actions-h)');
-  assert.match(actions, /form\[data-bookmark-form\]/, 'the pinned height is not on the button row');
+  const dom = docFor('fictions-rising-stars.new.html', 'rrx-view-grid');
+  const cards = dom.window.document.querySelectorAll('.fiction-card-expanded');
+  const rows = [...dom.window.document.querySelectorAll(actions)];
+  assert.equal(rows.length, cards.length, `not one pinned button row per card: ${actions}`);
+  assert.ok(
+    rows.every((r) => r.querySelector(':scope > form[data-bookmark-form]')),
+    'the pinned height is not on the button row'
+  );
+  dom.window.close();
 
   // The overlay reads it through `--rrx-grid-mark-top`, which is the button row
   // plus the column gap - where the cover starts, so the first chip is level

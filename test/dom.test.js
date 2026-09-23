@@ -396,10 +396,10 @@ test('the covers stylesheet orders buttons, cover, rating, title', () => {
     assert.ok(m, `no order on: ${selectorFragment}`);
     return Number(m[1]);
   };
-  const cover = orderOf("div:has(> a img[data-type='cover'])");
+  const cover = orderOf("> a:has(img[data-type='cover'])");
   const title = orderOf("a[data-vt-trigger]:has(> h2)");
   const stats = orderOf("[class*='grid-cols-5']");
-  const buttons = orderOf("div.hidden:has(> form[data-bookmark-form])");
+  const buttons = orderOf('> div:not([data-rr-tooltip])');
 
   // The title is the only part whose height varies, so it goes last: anywhere
   // else it pushes what follows out of line with the neighbouring tiles.
