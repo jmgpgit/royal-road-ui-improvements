@@ -124,9 +124,9 @@ feature, and usually a smaller one.
 
 ## Across the site
 
-- **A local reading dashboard** — chapters read per week, fictions in progress, what has gone
-  quiet, what you are behind on. Every number comes from records already kept: nothing fetched,
-  nothing sent. This is what makes the stored history pay off.
+- **The reading dashboard: what has gone quiet, what you are behind on.** Needs each fiction's
+  chapter total, which the log does not keep: store the chapter list's count at finish time
+  while `chapter.catchUp` is on, or read `c` from the fiction statistics.
 - **Backup improvements** — merge on import rather than replace, and a nudge when the backup is
   months old. The current import is deliberately wholesale: right for restoring a machine, wrong
   for keeping two in step.

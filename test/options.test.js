@@ -86,8 +86,12 @@ test('the popup only binds settings that exist', () => {
   for (const key of keys) assert.ok(SCHEMA[key], `popup binds unknown setting: ${key}`);
 });
 
-test('both extension pages load the schema before anything that reads it', () => {
-  for (const page of ['src/options/options.html', 'src/popup/popup.html']) {
+test('every extension page loads the schema before anything that reads it', () => {
+  for (const page of [
+    'src/options/options.html',
+    'src/popup/popup.html',
+    'src/dashboard/dashboard.html',
+  ]) {
     const html = fs.readFileSync(path.join(ROOT, page), 'utf8');
     const scripts = [...html.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]);
     const at = (needle) => scripts.findIndex((s) => s.endsWith(needle));

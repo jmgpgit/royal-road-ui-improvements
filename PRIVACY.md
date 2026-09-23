@@ -34,15 +34,17 @@ Eight kinds of thing, all in `browser.storage.local`, which is local to your bro
   are read off the page you just opened. See
   [`src/content/features/fiction-stats.js`](src/content/features/fiction-stats.js) for the
   reading and [`src/common/model.js`](src/common/model.js) for the shape.
-- **A reading log**, once you switch it on. For each day: how many chapters you read to the end,
-  and how many words they held. For each fiction you finished a chapter of: its id, its title,
-  when you last finished one and how many. And the ids of the last 500 chapters finished, so a
-  reread is not counted twice. A chapter counts once its last line has been on screen. Days are
-  kept for two years; a fiction you have not finished a chapter of for a year is dropped, and at
-  most 1,000 are kept. Switching it off stops the counting and keeps what is there; "forget my
-  reading history" deletes it. Nothing is fetched for it. See
-  [`src/content/features/reading-log.js`](src/content/features/reading-log.js) and
-  [`src/common/model.js`](src/common/model.js).
+- **A reading log**, once you switch it on. The switch is on the reading dashboard, the
+  extension page that shows the log. For each day: how many chapters you read to the end, and
+  how many words they held. For each fiction you finished a chapter of: its id, its title, when
+  you last finished one and how many. And the ids of the last 500 chapters finished, so a reread
+  is not counted twice. A chapter counts once its last line has been on screen. Days are kept for
+  two years; a fiction you have not finished a chapter of for a year is dropped, and at most
+  1,000 are kept. Switching it off stops the counting and keeps what is there; "forget my reading
+  history" deletes it. Nothing is fetched for it. See
+  [`src/content/features/reading-log.js`](src/content/features/reading-log.js),
+  [`src/common/model.js`](src/common/model.js) and
+  [`src/dashboard/dashboard.js`](src/dashboard/dashboard.js).
 - **When the housekeeping last ran, and when you last pressed "forget my reading history"** —
   two numbers. The chapter records, the fiction statistics and the reading log above are aged
   out once a day rather than only while the feature that fills them is switched on; the second

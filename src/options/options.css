@@ -488,3 +488,224 @@ summary.row__note::-webkit-details-marker {
   border: 0;
   border-radius: 0;
 }
+
+/* --- reading dashboard ----------------------------------------------------- */
+
+.page--wide {
+  max-width: 64rem;
+}
+
+.page__link {
+  margin-left: auto;
+  color: var(--primary);
+  font-size: 0.875rem;
+}
+
+.dash {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.dash[hidden] {
+  display: none;
+}
+
+/* The page's state when there is nothing to draw, so it reads as text, not a hint. */
+.dash-note {
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.875rem;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 0.75rem;
+}
+
+.tile {
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+}
+
+.tile__label,
+.tile__sub {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.tile__value {
+  font-size: 1.6rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+/* One series, so one colour and no legend: the heading names it. Bars grow from
+   one baseline, capped at 24px so the leftover slot is air. */
+.bars {
+  display: flex;
+  height: 12rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bars__col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.bars__col:hover .bars__bar {
+  opacity: 0.8;
+}
+
+.bars__bar {
+  width: 100%;
+  max-width: 24px;
+  height: calc(var(--v, 0) * (100% - 2.6rem));
+  background: var(--primary);
+  border-radius: 4px 4px 0 0;
+}
+
+.bars__value,
+.bars__label {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3rem;
+  white-space: nowrap;
+}
+
+.bars__label {
+  align-self: stretch;
+  text-align: center;
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 36rem) {
+  /* Every other date, counted from this week, keeping the baseline under it. */
+  .bars__col:nth-last-child(even) .bars__label {
+    color: transparent;
+  }
+}
+
+/* The last year, a column per week. One hue, more is darker in light mode and
+   brighter in dark, mixed toward the surface so both themes get their own steps. */
+.heat {
+  display: flex;
+  gap: 0.4rem;
+  --cell: 0.9rem;
+  --gap: 3px;
+}
+
+.heat__days,
+.heat__months {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.heat__days {
+  display: grid;
+  grid-template-rows: repeat(7, var(--cell));
+  row-gap: var(--gap);
+  margin-top: 1.1rem;
+  line-height: var(--cell);
+}
+
+.heat__scroll {
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 0.3rem;
+}
+
+.heat__months {
+  display: grid;
+  grid-template-columns: repeat(53, var(--cell));
+  column-gap: var(--gap);
+  height: 1.1rem;
+  white-space: nowrap;
+}
+
+.heat__grid {
+  display: grid;
+  grid-template-rows: repeat(7, var(--cell));
+  grid-auto-columns: var(--cell);
+  grid-auto-flow: column;
+  gap: var(--gap);
+}
+
+.heat__cell {
+  display: inline-block;
+  width: var(--cell, 0.8rem);
+  height: var(--cell, 0.8rem);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--text) 8%, var(--surface));
+}
+
+.heat__cell[data-l='1'] {
+  background: color-mix(in srgb, var(--primary) 30%, var(--surface));
+}
+
+.heat__cell[data-l='2'] {
+  background: color-mix(in srgb, var(--primary) 52%, var(--surface));
+}
+
+.heat__cell[data-l='3'] {
+  background: color-mix(in srgb, var(--primary) 76%, var(--surface));
+}
+
+.heat__cell[data-l='4'] {
+  background: var(--primary);
+}
+
+.heat__cell--future {
+  visibility: hidden;
+}
+
+.heat__legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  margin-top: 0.5rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.dash-table-wrap {
+  max-height: 24rem;
+  overflow: auto;
+}
+
+.dash-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.dash-table th,
+.dash-table td {
+  padding: 0.35rem 0.5rem;
+  border-top: 1px solid var(--border);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-table th:first-child {
+  text-align: left;
+  font-weight: 500;
+}
+
+.dash-table thead th {
+  border-top: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}

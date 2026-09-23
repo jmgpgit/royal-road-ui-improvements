@@ -52,9 +52,12 @@ async function open(url) {
       runtime: {
         getManifest: () => ({ version: '9.8.7' }),
         openOptionsPage() {},
-        getURL: (p) => p
+        getURL: (p) => 'moz-extension://id/' + p
       },
-      tabs: { query: async () => ${JSON.stringify(url ? [{ url }] : [{}])} },
+      tabs: {
+        query: async () => ${JSON.stringify(url ? [{ url }] : [{}])},
+        create: async (props) => { globalThis.__opened = props; },
+      },
     };`);
 
   for (const src of [
@@ -199,6 +202,26 @@ test('a rejected options-page request leaves the popup open', async () => {
 
   assert.equal(closed, false);
   assert.equal(warned, true);
+});
+
+test('the dashboard button opens the extension’s own page, then closes the popup', async () => {
+  // tabs.create needs no `tabs` permission for a URL from getURL; a relative one
+  // would resolve against whatever the browser thinks the popup's base is.
+  const w = await open('https://www.royalroad.com/fictions/rising-stars');
+  let closed = false;
+  w.close = () => {
+    closed = true;
+  };
+  const button = w.document.getElementById('p-dashboard');
+  button.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(w.__opened.url, 'moz-extension://id/src/dashboard/dashboard.html');
+  assert.equal(closed, true);
+  assert.ok(
+    fs.existsSync(path.join(ROOT, 'src/dashboard/dashboard.html')),
+    'and the page is where the URL says'
+  );
 });
 
 test('the design row is there whichever page you open the popup over', async () => {
