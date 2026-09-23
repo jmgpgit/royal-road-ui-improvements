@@ -217,6 +217,10 @@
         jump: 'Go straight there',
       },
     },
+    'history.log': {
+      label: 'Keep a reading log',
+      note: 'Counts each chapter you read to the end, with the day and its length, and remembers the fiction’s title. Kept on this device only. Switching it off stops the counting and keeps what is there; “Forget reading history” in Options → Backup deletes it.',
+    },
     'recap.mode': {
       label: 'Show the end of the previous chapter',
       note: 'Puts the closing paragraphs of the chapter before at the top of this one, for when you are reading several fictions at once and cannot remember how the last one left off.',
@@ -460,6 +464,7 @@
     'notes.blockedAuthors': 'a list of author ids, set by editing an exported settings file',
     'tags.colors': 'edited in its own card on this page, the way the two fiction lists are',
     'tags.colorHome': 'a checkbox in that same card, beside the colours it widens',
+    'history.log': 'switched on and off on the reading dashboard; the chapter box is at its row cap',
   };
 
   /** Filter values are set in the panel on the list pages, not here. */

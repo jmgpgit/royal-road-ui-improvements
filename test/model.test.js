@@ -449,3 +449,96 @@ test('parseBackup rejects foreign files with a readable message', () => {
     /newer version/
   );
 });
+
+// --- the reading log -----------------------------------------------------------
+
+const finish = (log, chapterId, over = {}) =>
+  model.logFinish(log, {
+    chapterId,
+    fictionId: 21220,
+    title: 'Mother of Learning',
+    words: 2000,
+    day: '2026-09-01',
+    now: 1_788_000_000,
+    ...over,
+  });
+
+test('a day is the local calendar day, not the UTC one', () => {
+  // 00:30 local on the 2nd is still the 1st in UTC anywhere east of Greenwich.
+  assert.equal(model.dayKey(new Date(2026, 8, 2, 0, 30)), '2026-09-02');
+  assert.equal(model.dayKey(new Date(2026, 0, 5)), '2026-01-05', 'zero-padded, so keys sort');
+});
+
+test('a finish counts in its own day and against its fiction', () => {
+  let log = finish(null, 1);
+  log = finish(log, 2, { words: 1500 });
+  log = finish(log, 3, { day: '2026-09-02', title: 'Mother of Learning (renamed)' });
+
+  assert.deepEqual(log.d['2026-09-01'], [2, 3500]);
+  assert.deepEqual(log.d['2026-09-02'], [1, 2000]);
+  assert.equal(log.f[21220].c, 3);
+  assert.equal(log.f[21220].t, 'Mother of Learning (renamed)', 'the newest title wins');
+  assert.deepEqual(log.r, [1, 2, 3]);
+});
+
+test('a chapter among the recent finishes is not counted again', () => {
+  const log = finish(finish(null, 1), 2);
+  assert.equal(finish(log, 1, { day: '2026-09-03' }), log, 'a reload at the bottom, or a reread');
+
+  // Once it has left the ring it is a new read.
+  let long = finish(null, 1);
+  for (let id = 2; id <= model.LOG_RECENT_MAX + 1; id += 1) long = finish(long, id);
+  assert.equal(long.r.length, model.LOG_RECENT_MAX);
+  assert.notEqual(finish(long, 1), long);
+});
+
+test('a finish with no title keeps the one already known', () => {
+  const log = finish(finish(null, 1), 2, { title: '' });
+  assert.equal(log.f[21220].t, 'Mother of Learning');
+});
+
+test('the log prunes old days, quiet fictions and the oldest past the cap', () => {
+  const now = Math.floor(new Date(2026, 8, 1, 12).getTime() / 1000);
+  const log = {
+    d: { '2024-08-01': [1, 100], '2024-09-10': [2, 200], '2026-09-01': [3, 300] },
+    f: {
+      1: { t: 'Old', a: now - 400 * 86400, c: 1 },
+      2: { t: 'A', a: now - 10, c: 1 },
+      3: { t: 'B', a: now - 20, c: 1 },
+      4: { t: 'C', a: now - 30, c: 1 },
+    },
+    r: [1, 2, 3, 4, 5],
+  };
+  const out = model.pruneLog(log, { now, max: 2, recent: 3 });
+
+  assert.deepEqual(Object.keys(out.d), ['2024-09-10', '2026-09-01'], 'two years of days');
+  assert.deepEqual(Object.keys(out.f), ['2', '3'], 'a year-quiet fiction goes, then the oldest');
+  assert.deepEqual(out.r, [3, 4, 5], 'the ring keeps the newest');
+});
+
+test('the chapter ids go once no day is left', () => {
+  const now = Math.floor(new Date(2026, 8, 1, 12).getTime() / 1000);
+  const out = model.pruneLog({ d: { '2023-01-01': [1, 100] }, f: {}, r: [1, 2] }, { now });
+  assert.equal(Object.keys(out.d).length, 0);
+  assert.equal(out.r.length, 0);
+});
+
+test('the log survives a backup, and an old backup restores an empty one', () => {
+  const log = finish(null, 1);
+  const restored = model.parseBackup(JSON.stringify(model.buildBackup({ log }, 1700000000000)));
+  assert.deepEqual(restored.log, log);
+
+  const old = model.parseBackup(JSON.stringify({ format: model.BACKUP_FORMAT, version: 1 })).log;
+  assert.deepEqual(old, { d: {}, f: {}, r: [] });
+});
+
+test('junk in a stored log is dropped rather than trusted', () => {
+  const out = model.normalizeLog({
+    d: { '2026-09-01': [2, 'x'], yesterday: [1, 1], '2026-09-02': [0, 0] },
+    f: { abc: { t: 'x' }, 7: { t: 42, a: -1, c: '3' } },
+    r: [1, 1, 'x', -2, 3],
+  });
+  assert.deepEqual(out.d, { '2026-09-01': [2, 0] });
+  assert.deepEqual(out.f, { 7: { t: '', a: 0, c: 3 } });
+  assert.deepEqual(out.r, [1, 3]);
+});

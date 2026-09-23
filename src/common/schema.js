@@ -156,6 +156,11 @@
      *  time, so `ask` offers the jump and `jump` takes it. Nothing is recorded
      *  while this is `off`. */
     'chapter.resume': { type: 'enum', default: 'off', values: ['off', 'ask', 'jump'] },
+    /** Count the chapters you finish, per day, for the reading dashboard. Off by
+     *  default: a dated record of what you read is more personal than anything
+     *  else kept here. Switching it off stops the counting and keeps the log;
+     *  "Forget reading history" is what deletes it. */
+    'history.log': { type: 'bool', default: false },
 
     // ── author notes, panels ────────────────────────────────────
     // Off by default: collapsing part of an author's note is a judgement call,

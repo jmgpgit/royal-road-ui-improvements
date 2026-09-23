@@ -7,7 +7,7 @@ below names the file that implements it.
 
 ## What is stored, and where
 
-Seven kinds of thing, all in `browser.storage.local`, which is local to your browser profile:
+Eight kinds of thing, all in `browser.storage.local`, which is local to your browser profile:
 
 - **Your settings.** The list in [`src/common/schema.js`](src/common/schema.js) is exhaustive.
 - **Your hidden fictions.** For each one: its Royal Road id, title, cover URL and the time you
@@ -34,12 +34,21 @@ Seven kinds of thing, all in `browser.storage.local`, which is local to your bro
   are read off the page you just opened. See
   [`src/content/features/fiction-stats.js`](src/content/features/fiction-stats.js) for the
   reading and [`src/common/model.js`](src/common/model.js) for the shape.
+- **A reading log**, once you switch it on. For each day: how many chapters you read to the end,
+  and how many words they held. For each fiction you finished a chapter of: its id, its title,
+  when you last finished one and how many. And the ids of the last 500 chapters finished, so a
+  reread is not counted twice. A chapter counts once its last line has been on screen. Days are
+  kept for two years; a fiction you have not finished a chapter of for a year is dropped, and at
+  most 1,000 are kept. Switching it off stops the counting and keeps what is there; "forget my
+  reading history" deletes it. Nothing is fetched for it. See
+  [`src/content/features/reading-log.js`](src/content/features/reading-log.js) and
+  [`src/common/model.js`](src/common/model.js).
 - **When the housekeeping last ran, and when you last pressed "forget my reading history"** —
-  two numbers. The chapter records and the fiction statistics above are aged out once a day
-  rather than only while the feature that fills them is switched on; the second number is how a
-  Royal Road page learns to clear the `localStorage` copy below, which the options page cannot
-  reach itself. Your hidden and dropped lists are not aged out at all; they stay until you remove
-  them. See [`src/common/store.js`](src/common/store.js).
+  two numbers. The chapter records, the fiction statistics and the reading log above are aged
+  out once a day rather than only while the feature that fills them is switched on; the second
+  number is how a Royal Road page learns to clear the `localStorage` copy below, which the
+  options page cannot reach itself. Your hidden and dropped lists are not aged out at all; they
+  stay until you remove them. See [`src/common/store.js`](src/common/store.js).
 - **Royal Road's list of tags**, cached for a week so the filter panel does not refetch it. The
   options page reads the same cache, to name the tags you have given a colour; it never fetches
   it, so on a cold cache a tag colour is stored under its slug alone. This is Royal Road's own
@@ -140,7 +149,7 @@ browser would already send to royalroad.com.
 
 | Permission | Why |
 |---|---|
-| `storage` | To save your settings, your hidden and dropped lists, your reading progress and the fiction statistics you have seen, on this device. |
+| `storage` | To save your settings, your hidden and dropped lists, your reading progress, the fiction statistics you have seen and your reading log, on this device. |
 | `*://www.royalroad.com/*` | To read and restyle Royal Road pages. This is the whole extension. |
 
 There are no optional permissions, and the host permission cannot be narrowed: the extension
@@ -150,12 +159,13 @@ unhidden content.
 ## Your data is yours
 
 Options -> Backup exports everything the extension holds — settings, hidden fictions, dropped
-fictions, reading progress and the fiction statistics you have seen — as a JSON file, and
-imports it back. Resetting the settings leaves your hidden fictions, dropped fictions and
-reading progress alone, and deletes the fiction statistics: reset returns that setting to its
-default, which is off. Options -> Backup also says how much reading history is stored and has
-a button that forgets all of it: where you got to in every chapter, which comments you had
-seen, and every fiction statistic. The `localStorage` copy of your place in the chapter you are
+fictions, reading progress, the fiction statistics you have seen and the reading log — as a
+JSON file, and imports it back. Resetting the settings leaves your hidden fictions, dropped
+fictions, reading progress and reading log alone, and deletes the fiction statistics: reset
+returns that setting to its default, which is off. It also stops the reading log counting, for
+the same reason. Options -> Backup also says how much reading history is stored and has a
+button that forgets all of it: where you got to in every chapter, which comments you had seen,
+every fiction statistic and the reading log. The `localStorage` copy of your place in the chapter you are
 reading goes with it: at once in any Royal Road tab that is open, and otherwise on the next Royal
 Road page you open.
 

@@ -712,10 +712,18 @@ test('the stored maps age out even with every feature that fills them off', asyn
   assert.ok(w.__store.tidiedAt, 'every page load offers to tidy');
 
   w.__store.chapters = { 3766643: { f: 9, a: old, p: 42, o: 0.5 } };
+  // The reading log is kept while switched off, so only housekeeping ages it.
+  w.__store.log = {
+    d: { '2020-01-01': [3, 6000], [w.RRX.dayKey(new Date())]: [1, 2000] },
+    f: { 9: { t: 'Quiet for a year', a: old, c: 3 } },
+    r: [3766643],
+  };
   delete w.__store.tidiedAt; // as if a day had passed
   assert.equal(await w.RRX.store.tidy(), true, 'it ran');
   assert.equal(Object.keys(w.__store.chapters).length, 0, 'the stale chapter went');
   assert.equal(Object.keys(w.__store.stats).length, 0, 'and the stale fiction');
+  assert.deepEqual(Object.keys(w.__store.log.d), [w.RRX.dayKey(new Date())], 'and the old day');
+  assert.equal(Object.keys(w.__store.log.f).length, 0, 'and the quiet fiction in the log');
 
   // Once a day, not once a page: this reads two maps that reach megabytes.
   assert.equal(await w.RRX.store.tidy(), false, 'not again today');

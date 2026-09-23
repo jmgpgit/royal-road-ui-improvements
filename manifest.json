@@ -103,6 +103,7 @@
         "src/content/features/comments-new.js",
         "src/content/features/fiction-page.js",
         "src/content/features/fiction-stats.js",
+        "src/content/features/reading-log.js",
         "src/content/main.js"
       ]
     }
