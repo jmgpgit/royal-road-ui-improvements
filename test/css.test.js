@@ -757,6 +757,24 @@ test('the default view leaves every block to Royal Road', () => {
   dom.window.close();
 });
 
+test('compact hides the blurb on list cards and nowhere else', () => {
+  // The view class is on <html> on every page, and the fiction page's About
+  // section, its reviews and the chapter page use the same show-more widget.
+  const list = docFor('fictions-rising-stars.new.html', 'rrx-view-compact');
+  const blurbs = [...list.window.document.querySelectorAll('[data-rr-show-more]')];
+  assert.ok(blurbs.length > 0);
+  assert.ok(blurbs.every((el) => ourValue(el, 'display') === 'none'));
+  list.window.close();
+
+  for (const fixture of ['fiction-detail.new.html', 'fiction-reviews.new.html', 'chapter.new.html']) {
+    const dom = docFor(fixture, 'rrx-view-compact');
+    const widgets = [...dom.window.document.querySelectorAll('[data-rr-show-more]')];
+    assert.ok(widgets.length > 0, `${fixture} has no show-more widget to check`);
+    assert.ok(widgets.every((el) => ourValue(el, 'display') === null), `${fixture}: hidden by compact`);
+    dom.window.close();
+  }
+});
+
 test('the cascade helper ranks the way a browser does', () => {
   // Every expectation above leans on these, so they must not pass by accident.
   assert.deepEqual(specificity('div:has(> a[data-vt-trigger] > h2)'), [0, 1, 3]);

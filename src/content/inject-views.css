@@ -524,7 +524,9 @@ html.rrx-view-grid
    and only the blurb needs to go.
    ========================================================================== */
 
-html.rrx-view-compact [data-rr-show-more] {
+/* Scoped to the card: the class is on <html> on every page, and the fiction
+   page's About section and reviews use the same widget. */
+html.rrx-view-compact .fiction-card-expanded [data-rr-show-more] {
   display: none !important;
 }
 
