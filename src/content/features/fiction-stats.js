@@ -122,6 +122,11 @@
     return Number.isInteger(n) && n >= 0 ? n : null;
   }
 
+  /** Read at document_end, before Royal Road's dynamically imported fiction
+   *  chunk mounts React over #chapters' parent and redraws #chapters without
+   *  data-chapters. */
+  const serverChapters = readChapters();
+
   /** Everything the page says about itself right now. Missing fields are left
    *  out rather than zeroed - a stat that could not be read must not look like a
    *  fiction that lost all its followers. */
@@ -143,7 +148,8 @@
       if (score !== null) out.s = score;
     }
 
-    const chapters = readChapters();
+    const live = readChapters();
+    const chapters = live === null ? serverChapters : live;
     if (chapters !== null) out.c = chapters;
 
     return Object.keys(out).length ? out : null;

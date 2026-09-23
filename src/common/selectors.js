@@ -300,7 +300,8 @@
     statsAccordionItem: '#stats-accordion [data-rr-accordion-item]',
     statsAccordionContent: '#stats-accordion [data-rr-accordion-content]',
     /** The chapter count, which is not a stat tile: it lives on the table of
-     *  contents, as an attribute. */
+     *  contents, as an attribute. Server-rendered only: by build 4.1.20260923
+     *  Royal Road redraws #chapters with React, without it. */
     chaptersCount: '#chapters[data-chapters]',
     /** Five sit in the panel - the overall score and four sub-scores - each
      *  beside its own heading, which is how they are told apart. */

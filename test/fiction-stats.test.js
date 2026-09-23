@@ -215,6 +215,19 @@ test('a page with no statistics panel reads what it still can', () => {
   assert.deepEqual(own(w.RRX.fictionStats.readStats()), { c: EXPECTED.c, s: EXPECTED.s });
 });
 
+test('the chapter count survives React redrawing the table of contents', () => {
+  // Royal Road's fiction chunk mounts React on #chapters' parent and draws a new
+  // #chapters without data-chapters, often before record() reads the page.
+  const w = loadPage();
+  const table = w.document.querySelector('#chapters');
+  const redrawn = w.document.createElement('div');
+  redrawn.id = 'chapters';
+  table.parentElement.replaceChildren(redrawn);
+
+  assert.equal(w.RRX.fictionStats.readChapters(), null, 'the live element says nothing');
+  assert.equal(w.RRX.fictionStats.readStats().c, EXPECTED.c, 'the count read at load still does');
+});
+
 test('the readout goes where it can be seen, outside the collapsing panel', () => {
   // Royal Road ships Statistics closed (`max-h-0 invisible`), so anything put
   // inside the content div is invisible on a default install; and anything put
