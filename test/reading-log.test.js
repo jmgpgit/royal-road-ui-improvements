@@ -52,7 +52,7 @@ nodeTest.after(() => {
 });
 
 /** One page view. `storage` stands in for storage.local and outlives the page. */
-function visit({ storage = {}, url = URL_BASE, settings = { 'history.log': true } } = {}) {
+function visit({ storage = {}, url = URL_BASE, settings = { 'history.log': true }, start = true } = {}) {
   const dom = new JSDOM(fixture('chapter.new.html'), {
     url,
     runScripts: 'outside-only',
@@ -85,8 +85,18 @@ function visit({ storage = {}, url = URL_BASE, settings = { 'history.log': true 
   Object.defineProperty(w, 'innerHeight', { value: 800, configurable: true });
 
   const ctx = { page: 'chapter', settings: w.RRX.normalizeSettings(settings) };
-  w.RRX.readingLog.apply(ctx);
+  if (start) w.RRX.readingLog.apply(ctx);
   return { w, ctx };
+}
+
+/** Timers the page sets, held rather than run, so a test decides when. */
+function holdTimers(w) {
+  const timers = [];
+  w.setTimeout = (fn, ms) => timers.push({ fn, ms, live: true });
+  w.clearTimeout = (id) => {
+    if (timers[id - 1]) timers[id - 1].live = false;
+  };
+  return timers;
 }
 
 /** Put the chapter's top `top` px from the viewport top; 10,000 px tall. */
@@ -193,6 +203,22 @@ test('it counts with “come back to where you stopped” off', async () => {
   assert.equal(w.__store.chapters, undefined, 'and writes no chapter record');
 });
 
+test('a chapter that ends on screen counts once it has been visible long enough', async () => {
+  const { w, ctx } = visit({ start: false });
+  const timers = holdTimers(w);
+  // Short enough to end inside the viewport, and nothing is ever scrolled.
+  w.document.querySelector('.chapter-content').getBoundingClientRect = () => ({ top: 0, height: 500, bottom: 500 });
+  w.RRX.readingLog.apply(ctx);
+
+  const words = w.RRX.chapterMeta.wordCount();
+  const share = (w.RRX.readingLog.MIN_SHARE * words * MINUTES) / ctx.settings['chapter.wpm'];
+  assert.equal(timers.length, 1);
+  assert.equal(Math.round(timers[0].ms), Math.round(share), 'the same share the scroll rule waits for');
+  timers[0].fn();
+  await settle();
+  assert.equal(w.__store.log.d[today(w)][0], 1);
+});
+
 // --- time spent reading ----------------------------------------------------------
 
 /** `visit` puts the clock at 30 minutes when the page starts listening. */
@@ -210,6 +236,26 @@ function setVisible(w, visible) {
   w.document.dispatchEvent(new w.Event('visibilitychange'));
 }
 const seconds = (w) => (w.__store.log ? w.__store.log.d[today(w)][2] : 0);
+
+test('only visible time counts towards reading a chapter that ends on screen', () => {
+  const { w, ctx } = visit({ start: false });
+  const timers = holdTimers(w);
+  w.document.querySelector('.chapter-content').getBoundingClientRect = () => ({ top: 0, height: 500, bottom: 500 });
+  setVisible(w, false);
+  w.RRX.readingLog.apply(ctx);
+  assert.equal(timers.length, 0, 'a background tab waits for nothing');
+
+  at(w, 0);
+  setVisible(w, true);
+  const share = timers[0].ms;
+  at(w, share / 2);
+  setVisible(w, false);
+  assert.equal(timers[0].live, false, 'hidden again, so the wait stops');
+
+  at(w, share * 5); // a long stretch in the background counts for nothing
+  setVisible(w, true);
+  assert.equal(Math.round(timers[1].ms), Math.round(share / 2));
+});
 
 test('time between inputs counts, and a long pause only up to the idle cap', async () => {
   const { w } = visit();

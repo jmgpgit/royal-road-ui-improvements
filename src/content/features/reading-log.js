@@ -4,13 +4,15 @@
  * The reading log: one count per chapter read to the end, and the time spent
  * reading chapter pages, for the dashboard.
  *
- * Read means the chapter's last line has been on screen after a scroll, on a
- * page not opened from a comment link, at least MIN_SHARE of the estimated
- * reading time after the page loaded. Once per page view; a chapter among the
- * recent finishes is not counted again (model.js, `logFinish`).
+ * Read means the chapter's last line has been on screen, on a page not opened
+ * from a comment link, at least MIN_SHARE of the estimated reading time after
+ * the page loaded. It is checked on every scroll, and once more when the tab
+ * has been visible for that share: a chapter that ends on screen gets no
+ * scroll. Once per page view; a chapter among the recent finishes is not
+ * counted again (model.js, `logFinish`).
  *
  * Time is the gaps between the reader's scrolls, keys, clicks and touches
- * while the tab is visible, each capped at IDLE_MS. No timer runs: it is
+ * while the tab is visible, each capped at IDLE_MS. It needs no timer: it is
  * credited when the next input comes, or when the tab is hidden or left.
  *
  * Independent of `chapter.resume`: it reuses resume's measure, not its records.
@@ -49,6 +51,10 @@
    *  already listening. */
   const on = () => !!lastCtx && !!lastCtx.settings['history.log'];
 
+  const wordCount = () => (RRX.chapterMeta ? RRX.chapterMeta.wordCount() : 0);
+  /** MIN_SHARE of the estimated reading time, in ms. */
+  const shareMs = (words) => (MIN_SHARE * words * 60000) / (lastCtx.settings['chapter.wpm'] || 250);
+
   function check() {
     if (counted || deepLink || !on()) return;
     const content = RRX.chapterTop && RRX.chapterTop.content();
@@ -56,10 +62,9 @@
     const { seenFraction, END_FRACTION } = RRX.resume;
     if (seenFraction(content.getBoundingClientRect()) < END_FRACTION) return;
 
-    const words = RRX.chapterMeta ? RRX.chapterMeta.wordCount() : 0;
-    const minutes = words / (lastCtx.settings['chapter.wpm'] || 250);
+    const words = wordCount();
     // performance.now() is time since this page's navigation started.
-    if (root.performance.now() < MIN_SHARE * minutes * 60000) return;
+    if (root.performance.now() < shareMs(words)) return;
 
     counted = true;
     Promise.resolve(
@@ -84,6 +89,26 @@
   }
 
   const visible = () => document.visibilityState === 'visible';
+
+  /** The one check that waits for no scroll, run once the tab has been visible
+   *  for the reading-time share. Visible time only: a short chapter opened in a
+   *  background tab has not been read. */
+  let timer = null;
+  let shownFor = 0;
+  let shownAt = null;
+
+  function arm() {
+    root.clearTimeout(timer);
+    if (counted || deepLink || !on() || !visible()) return;
+    shownAt = root.performance.now();
+    timer = root.setTimeout(check, Math.max(0, shareMs(wordCount()) - shownFor));
+  }
+
+  function disarm() {
+    root.clearTimeout(timer);
+    if (shownAt !== null) shownFor += root.performance.now() - shownAt;
+    shownAt = null;
+  }
 
   function credit() {
     const now = root.performance.now();
@@ -120,8 +145,13 @@
   }
 
   function onVisibility() {
-    if (!visible()) onLeave();
-    else if (on()) last = root.performance.now();
+    if (!visible()) {
+      onLeave();
+      disarm();
+      return;
+    }
+    if (on()) last = root.performance.now();
+    arm();
   }
 
   function apply(ctx) {
@@ -135,6 +165,7 @@
     }
     root.addEventListener('pagehide', onLeave);
     document.addEventListener('visibilitychange', onVisibility);
+    arm();
   }
 
   features.list.push({ id: 'readingLog', pages: ['chapter'], onPage: apply });
