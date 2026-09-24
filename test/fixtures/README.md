@@ -31,7 +31,7 @@ kept on purpose: `chapter-comments-lazy.new.html` and the two saved `.htm` chapt
 | `chapter-comments-deep.new.html` | 45 comments reaching depth 2, and no deeper | no |
 | `chapter-comments-nested.new.html` | A thread nested to depth 6, with deep-reply holders | no |
 | `card-loggedin.html` | A card with nothing marked: proof the status icons are absent, not missed | **yes** |
-| `card-loggedin-marked.html` | Two search results: followed + favourited, and followed + Read Later | **yes** |
+| `card-loggedin-marked.html` | Two Active Popular cards: followed + favourited, and followed + Read Later | **yes** |
 
 ### On the three comment captures
 

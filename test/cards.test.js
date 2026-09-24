@@ -109,9 +109,9 @@ test('latest-updates cards parse despite having no blurb', () => {
 // -- personal state, present and absent -------------------------------------
 
 test('a followed + favourited card reports both, and its real numbers', () => {
-  // A search result: the rebuilt card draws the marks as bare icons with a
-  // `title`, and a search result carries no status chip.
-  const w = loadPage('card-loggedin-marked.html', 'https://www.royalroad.com/fictions/search');
+  // From Active Popular: the rebuilt card draws the marks as bare icons with a
+  // `title`, and these two cards carry no status chip.
+  const w = loadPage('card-loggedin-marked.html', 'https://www.royalroad.com/fictions/active-popular');
   const d = w.RRX.readCardData(cardsOf(w)[0]);
 
   assert.equal(d.id, 166359);
@@ -143,7 +143,7 @@ test('a followed + favourited card reports both, and its real numbers', () => {
 });
 
 test('Read Later is read from its form, and one mark does not imply another', () => {
-  const w = loadPage('card-loggedin-marked.html', 'https://www.royalroad.com/fictions/search');
+  const w = loadPage('card-loggedin-marked.html', 'https://www.royalroad.com/fictions/active-popular');
   const d = w.RRX.readCardData(cardsOf(w)[1]);
   assert.equal(d.id, 15935);
   assert.deepEqual(own(d.mine), { follow: true, favorite: false, ril: true, dropped: false });
@@ -163,7 +163,7 @@ test('an unmarked card reports nothing on my shelves', () => {
 });
 
 test('hideMine drops the marked card and keeps the unmarked ones', () => {
-  const marked = loadPage('card-loggedin-marked.html', 'https://www.royalroad.com/fictions/best-rated');
+  const marked = loadPage('card-loggedin-marked.html', 'https://www.royalroad.com/fictions/active-popular');
   const plain = loadPage('card-loggedin.html', 'https://www.royalroad.com/fictions/best-rated');
   const filters = { 'filters.hideMine': ['follow', 'favorite', 'ril'] };
 
