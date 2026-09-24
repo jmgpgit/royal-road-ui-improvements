@@ -135,10 +135,14 @@
    */
   function enforceDesign(settings, served) {
     const layout = RRX.LAYOUT[settings['design.mode']];
+    if (!layout) {
+      tried.set(false);
+      return false;
+    }
     // `served` only from a popup change on a page already showing: the cookie
     // can be right while the page is not (another tab switched it, bfcache).
     const done = RRX.layoutAsked(document.cookie) === layout && (!served || served === layout);
-    if (!layout || done) {
+    if (done) {
       tried.set(false);
       return false;
     }

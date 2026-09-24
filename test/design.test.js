@@ -300,6 +300,21 @@ test('leaving it to Royal Road touches nothing, not even our own leftover', asyn
   // Leave reads no cookie, so it cannot blame an account's Display Mode.
   const stuck = await boot({ layout: 'legacy', cookie: 'rr_ui_mode=redesign' });
   assert.equal(overridden(stuck), false);
+
+  const own = Object.getOwnPropertyDescriptor(stuck.Document.prototype, 'cookie');
+  let read = 0;
+  Object.defineProperty(stuck.document, 'cookie', {
+    configurable: true,
+    get() {
+      read += 1;
+      return own.get.call(this);
+    },
+    set(v) {
+      own.set.call(this, v);
+    },
+  });
+  assert.equal(stuck.RRX.boot.enforceDesign({ 'design.mode': 'leave' }), false);
+  assert.equal(read, 0, 'PRIVACY.md promises leave reads no cookie');
 });
 
 test('the choice is re-enforced on every load, so a hard refresh obeys it', async () => {
