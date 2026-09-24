@@ -69,9 +69,9 @@
    * Words in the chapter itself, cached on text length: this runs on every
    * sweep and every settings change. `.chapter-content` is the right boundary
    * - author notes are siblings of it, and the ad placeholders inside are
-   * empty divs whose iframes hold no text. Two impurities left alone: the
-   * chapter's own title heading, and the anti-scraping sentence Royal Road
-   * sometimes injects. A heuristic for either could eat real prose.
+   * empty divs whose iframes hold no text. Hidden text, Royal Road's anti-theft
+   * sentence included, is dropped by `visible()`. One impurity left alone: the
+   * chapter's own title heading. A heuristic for it could eat real prose.
    *
    * The raw text stays the cache key. It identifies the chapter, and building
    * it is the cheap half of the work below.

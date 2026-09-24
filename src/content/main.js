@@ -349,9 +349,27 @@
       // needs to switch before it paints.
       RRX.store.writeMirror(settings, hidden, dropped);
 
+      // Cookie right, layout wrong: boot.js has nothing left to try, so say why.
+      if (
+        !RRX.boot.switching &&
+        settings['design.mode'] === 'new' &&
+        RRX.layoutAsked(document.cookie) === 'redesign'
+      ) {
+        RRX.warn(
+          "Royal Road sent its old layout although rr_ui_mode asks for the new one; a signed-in account's Display Mode may be overriding it"
+        );
+      }
+
       // Follow a layout change from the popup straight away, or the popup appears
       // to do nothing on the page you changed it for.
-      RRX.store.onChange(({ settings: next }) => RRX.boot.enforceDesign(next));
+      // Only a change of this setting says which layout the page should be; any
+      // other edit must not reload a page that merely disagrees with the cookie.
+      let mode = settings['design.mode'];
+      RRX.store.onChange(({ settings: next }) => {
+        const changed = next['design.mode'] !== mode;
+        mode = next['design.mode'];
+        RRX.boot.enforceDesign(next, changed ? 'legacy' : undefined);
+      });
       return;
     }
     const { settings, hidden, dropped } = await RRX.boot.ready;
@@ -364,10 +382,13 @@
     document.documentElement.classList.add(RRX.ROOT_CLASS.ready);
 
     // Options page, popup, or another tab changed something.
+    let mode = settings['design.mode'];
     RRX.store.onChange(({ settings: s, hidden: h, dropped: d }) => {
       // Switching to the old layout ends this page, so it comes before anything
       // that would restyle a page about to go.
-      if (RRX.boot.enforceDesign(s)) return;
+      const changed = s['design.mode'] !== mode;
+      mode = s['design.mode'];
+      if (RRX.boot.enforceDesign(s, changed ? 'redesign' : undefined)) return;
       adoptState(s, h, d);
       applyState();
       runOnce();

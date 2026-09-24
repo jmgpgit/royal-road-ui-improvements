@@ -135,6 +135,16 @@
     }
   });
 
+  // No `tabs` permission needed to open one of our own pages.
+  $('p-dashboard').addEventListener('click', async () => {
+    try {
+      await RRX.ext.tabs.create({ url: RRX.ext.runtime.getURL('src/dashboard/dashboard.html') });
+      window.close();
+    } catch (err) {
+      RRX.warn('could not open the reading dashboard', err);
+    }
+  });
+
   pageOfActiveTab().then(show);
   refresh();
 })();

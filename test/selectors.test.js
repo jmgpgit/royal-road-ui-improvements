@@ -76,9 +76,10 @@ test('the legacy UI carries none of the hooks we build on', () => {
 });
 
 test('the card link hook is on every server-rendered card', () => {
-  // 2 per card on list pages (mobile + desktop title links), 1 on home cards.
-  assert.equal(count(listPage, 'data-vt-trigger="fiction-card"'), 100);
-  assert.equal(count(latestUpdates, 'data-vt-trigger="fiction-card"'), 40);
+  // One per card, the title link. List cards used to carry two, mobile and
+  // desktop.
+  assert.equal(count(listPage, 'data-vt-trigger="fiction-card"'), 50);
+  assert.equal(count(latestUpdates, 'data-vt-trigger="fiction-card"'), 20);
   assert.ok(count(home, 'data-vt-trigger="fiction-card"') > 0);
 
   const serverRendered = CARD_GROUPS.find((g) => g.link.includes('data-vt-trigger'));
@@ -135,17 +136,20 @@ test('the show-more widget is the pure-CSS checkbox both features rely on', () =
   assert.ok(listPage.includes(SEL.showMoreGradient.slice(1)), 'gradient-wrapper');
 
   // A sr-only checkbox drives it, with the fiction id in its own id.
-  assert.match(listPage, /<input type="checkbox" id="show-more-blurb-\d+" class="peer sr-only"/);
+  assert.match(listPage, /<input type="checkbox" id="show-more-blurb-\d+" class="peer sr-only[ "]/);
   assert.equal(count(listPage, `id="${SEL.blurbCheckboxPrefix}`), 50);
 
   // The collapsed height is a plain inline style - NOT !important - which is
-  // exactly why a single !important override in inject.css can beat it.
-  assert.match(listPage, /style="max-height: 96px;[^"]*" data-rr-show-more-content/);
-  assert.doesNotMatch(listPage, /max-height: 96px !important/);
+  // exactly why a single !important override in inject.css can beat it. It is
+  // now a variable the root sets.
+  assert.match(listPage, /style="--rr-collapsed-height: 96px;[^"]*" data-rr-show-more="true"/);
+  assert.match(listPage, /style="max-height: var\(--rr-collapsed-height, \d+px\);" data-rr-show-more-content/);
+  assert.doesNotMatch(listPage, /--rr-collapsed-height[^;"]*!important/);
 
   // Royal Road's own expanded value, which inject.css matches so the two agree.
-  // (`&` arrives HTML-escaped inside the class attribute, hence the trimmed needle.)
-  assert.ok(listPage.includes(':has(input:checked)_[data-rr-show-more-content]]:!max-h-[9999px]'));
+  // (`&` arrives HTML-escaped inside the class attribute, hence the trimmed
+  // needle. Tailwind v4 puts the important mark last.)
+  assert.ok(listPage.includes(':has(input:checked)_[data-rr-show-more-content]]:max-h-[9999px]!'));
   // And the class their JS adds when a blurb is short enough not to need this.
   assert.ok(listPage.includes('show-more-not-needed'));
 });
@@ -169,7 +173,7 @@ test('home uses its own card variants, and its splash carousel is not fictions',
 
 test('fiction-page recommendations are React-rendered, so only CSS can reach them', () => {
   // Empty in the server HTML - a DOM-walking approach would find nothing.
-  assert.match(fictionPage, /<div id="recommendations"><\/div>/);
+  assert.match(fictionPage, /<div id="recommendations"[^>]*><\/div>/);
   assert.ok(CARD_VARIANTS.includes('.recommendations-carousel .slick-slide'));
 });
 

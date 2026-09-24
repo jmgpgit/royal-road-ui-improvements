@@ -133,6 +133,28 @@ html.rrx-wide .author-note-card {
   display: none !important;
 }
 
+/* Beside a poll's title. The card is a grid only while it holds the button:
+   the title wraps in the first column, everything after it spans both. `div`
+   outranks the card's own `gap-3`, which a grid would start honouring. */
+div:has(> .rrx-poll-sort) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0 0.5rem;
+}
+
+div:has(> .rrx-poll-sort) > :not(h5, .rrx-poll-sort) {
+  grid-column: 1 / -1;
+}
+
+/* Sized like the rest of the chapter chrome: `.rrx-btn` inherits its font,
+   which here is the card's. */
+.rrx-poll-sort {
+  font-size: 0.8125rem;
+  color: var(--color-on-surface-muted, #8a8a8a);
+  white-space: nowrap;
+}
+
 /* ==========================================================================
    Chapter facts
    --------------------------------------------------------------------------

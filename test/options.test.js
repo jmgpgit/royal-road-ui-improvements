@@ -86,8 +86,12 @@ test('the popup only binds settings that exist', () => {
   for (const key of keys) assert.ok(SCHEMA[key], `popup binds unknown setting: ${key}`);
 });
 
-test('both extension pages load the schema before anything that reads it', () => {
-  for (const page of ['src/options/options.html', 'src/popup/popup.html']) {
+test('every extension page loads the schema before anything that reads it', () => {
+  for (const page of [
+    'src/options/options.html',
+    'src/popup/popup.html',
+    'src/dashboard/dashboard.html',
+  ]) {
     const html = fs.readFileSync(path.join(ROOT, page), 'utf8');
     const scripts = [...html.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]);
     const at = (needle) => scripts.findIndex((s) => s.endsWith(needle));
@@ -391,6 +395,67 @@ test('a setting write leaves the changed control mounted and focused', async () 
 
   assert.equal(d.querySelector('[data-setting="tags.colorHome"]'), tagSwitch);
   assert.equal(d.activeElement, tagSwitch);
+});
+
+test('forgetting the reading history names the reading log and deletes it', async () => {
+  const w = await render({
+    log: { d: { '2026-09-01': [2, 4000], '2026-09-02': [1, 2000] }, f: {}, r: [1, 2, 3] },
+  });
+  const d = w.document;
+  assert.match(d.getElementById('history-size').textContent, /2 days of reading log/);
+
+  let asked = '';
+  w.confirm = (text) => {
+    asked = text;
+    return true;
+  };
+  d.getElementById('forget-history').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 40));
+
+  assert.match(asked, /reading log/, 'the dialog agrees to less than it does');
+  assert.equal(Object.keys(w.__s.log).length, 0, 'the log is gone');
+  assert.equal(d.getElementById('history-size').textContent, 'No reading history stored.');
+});
+
+test('importing names the reading log it replaces, and restores the one in the file', async () => {
+  const w = await render({ log: { d: { '2026-09-01': [2, 4000] }, f: {}, r: [1, 2] } });
+  const d = w.document;
+  let asked = '';
+  w.confirm = (text) => {
+    asked = text;
+    return true;
+  };
+  const backup = {
+    format: 'royal-road-ui-improvements',
+    version: 1,
+    log: { d: { '2025-01-01': [5, 9000] } },
+  };
+  const file = new w.File([JSON.stringify(backup)], 'backup.json');
+  const input = d.getElementById('import-file');
+  Object.defineProperty(input, 'files', { value: [file], configurable: true });
+  input.dispatchEvent(new w.Event('change'));
+  await new Promise((resolve) => setTimeout(resolve, 60));
+
+  assert.match(asked, /1 day of your reading log/);
+  assert.deepEqual(Object.keys(w.__s.log.d), ['2025-01-01']);
+});
+
+test('reset keeps the reading log and only stops it counting', async () => {
+  const w = await render({
+    settings: { 'history.log': true },
+    log: { d: { '2026-09-01': [2, 4000] }, f: {}, r: [1, 2] },
+  });
+  let asked = '';
+  w.confirm = (text) => {
+    asked = text;
+    return true;
+  };
+  w.document.getElementById('reset').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 40));
+
+  assert.match(asked, /reading log are kept/);
+  assert.deepEqual(Object.keys(w.__s.log.d), ['2026-09-01']);
+  assert.equal(w.__s.settings['history.log'], false);
 });
 
 test('reset updates mounted controls to their defaults', async () => {

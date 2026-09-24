@@ -84,8 +84,11 @@ test('numbers are parsed out of the thousands separators, not truncated at them'
   assert.equal(w.RRX.parseCount('n/a'), null);
 });
 
-test('tags are de-duplicated across the mobile and desktop chip rows', () => {
+test('tags are de-duplicated, and read without their query string', () => {
   const w = loadPage('fictions-rising-stars.new.html', 'https://www.royalroad.com/fictions/rising-stars');
+  // Cards used to render every chip twice, mobile and desktop.
+  const chip = cardsOf(w)[0].querySelector(w.RRX.SEL.cardTag);
+  chip.parentElement.appendChild(chip.cloneNode(true));
   for (const el of cardsOf(w)) {
     const { tags } = w.RRX.readCardData(el);
     assert.equal(new Set(tags).size, tags.length, 'tags must not repeat');
@@ -106,23 +109,44 @@ test('latest-updates cards parse despite having no blurb', () => {
 // -- personal state, present and absent -------------------------------------
 
 test('a followed + favourited card reports both, and its real numbers', () => {
-  const w = loadPage('card-loggedin-marked.html', 'https://www.royalroad.com/fictions/best-rated');
+  // From Active Popular: the rebuilt card draws the marks as bare icons with a
+  // `title`, and these two cards carry no status chip.
+  const w = loadPage('card-loggedin-marked.html', 'https://www.royalroad.com/fictions/active-popular');
   const d = w.RRX.readCardData(cardsOf(w)[0]);
 
-  assert.equal(d.id, 54508);
+  assert.equal(d.id, 166359);
   assert.equal(d.rating, 4.8);
-  assert.equal(d.followers, 2116);
-  assert.equal(d.pages, 362);
-  assert.equal(d.chapters, 50);
-  assert.equal(d.views, 714646);
-  assert.equal(d.status, 'COMPLETED');
+  assert.equal(d.followers, 2725);
+  assert.equal(d.pages, 1844);
+  assert.equal(d.chapters, 184);
+  assert.equal(d.views, 787178);
+  assert.equal(d.status, null);
   assert.equal(d.type, 'Original');
-  assert.deepEqual(own(d.tags).sort(), ['adventure', 'historical', 'mystery', 'romance']);
-  assert.equal(d.updatedAt, 1780672771);
+  assert.deepEqual(own(d.tags).sort(), [
+    'attractive_lead',
+    'comedy',
+    'contemporary',
+    'cozy',
+    'drama',
+    'female_lead',
+    'litrpg',
+    'modern_knowledge',
+    'progression',
+    'psychological',
+    'slice_of_life',
+  ]);
+  assert.equal(d.updatedAt, 1790170977);
 
   assert.equal(d.mine.follow, true, 'the Following icon must be seen');
   assert.equal(d.mine.favorite, true, 'the Favorited icon must be seen');
   assert.equal(d.mine.ril, false, 'mark="True" means Read Later is NOT set');
+});
+
+test('Read Later is read from its form, and one mark does not imply another', () => {
+  const w = loadPage('card-loggedin-marked.html', 'https://www.royalroad.com/fictions/active-popular');
+  const d = w.RRX.readCardData(cardsOf(w)[1]);
+  assert.equal(d.id, 15935);
+  assert.deepEqual(own(d.mine), { follow: true, favorite: false, ril: true, dropped: false });
 });
 
 test('an unmarked card reports nothing on my shelves', () => {
@@ -139,7 +163,7 @@ test('an unmarked card reports nothing on my shelves', () => {
 });
 
 test('hideMine drops the marked card and keeps the unmarked ones', () => {
-  const marked = loadPage('card-loggedin-marked.html', 'https://www.royalroad.com/fictions/best-rated');
+  const marked = loadPage('card-loggedin-marked.html', 'https://www.royalroad.com/fictions/active-popular');
   const plain = loadPage('card-loggedin.html', 'https://www.royalroad.com/fictions/best-rated');
   const filters = { 'filters.hideMine': ['follow', 'favorite', 'ril'] };
 
@@ -159,6 +183,23 @@ test('a rating filter narrows the real page by the right amount', () => {
   const expected = records.filter((d) => d.rating >= 4.5).length;
   assert.equal(kept.length, expected);
   assert.ok(kept.length > 0 && kept.length < records.length, 'filter must actually narrow');
+});
+
+test('"Too few ratings" cards are told apart from rated ones', () => {
+  const w = loadPage('fictions-latest-updates.new.html', 'https://www.royalroad.com/fictions/latest-updates');
+  const cards = cardsOf(w);
+  const records = cards.map((el) => w.RRX.readCardData(el));
+  const unrated = records.filter((d) => d.unrated);
+
+  assert.ok(unrated.length > 0 && unrated.length < records.length, 'the capture holds both kinds');
+  for (const [i, d] of records.entries()) {
+    const withheld = /Too few ratings/.test(cards[i].textContent);
+    assert.equal(d.unrated, withheld, `card ${d.id}`);
+    assert.equal(d.rating === null, withheld, `card ${d.id}: a rating exactly when not withheld`);
+  }
+
+  const kept = records.filter((d) => matchesFilters(d, { 'filters.hideUnrated': true }));
+  assert.equal(kept.length, records.length - unrated.length);
 });
 
 test('a tag filter narrows the real page by the right amount', () => {

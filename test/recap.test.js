@@ -102,6 +102,22 @@ test('a chapter written as one <p> with <br><br> breaks still has paragraphs', (
   assert.equal(w.RRX.recap.tailOf(doc, 999).split('\n\n').length, 3);
 });
 
+test('Royal Road’s hidden anti-theft sentence is not recapped', () => {
+  // Hidden by a random class a <style> on the fetched page names. Every capture
+  // has it between paragraphs; this is the day it lands inside one. A class
+  // hidden only under a condition stays.
+  const w = load();
+  const doc = new w.DOMParser().parseFromString(
+    `<html><head><style>.cjUw { display: none; speak: never; }
+       .dark .night { display: none } @media print { p { color: red } .ink { display: none } }</style></head><body>
+       <div class="chapter-content"><p>One.<span class="cjUw"><br>Report it on Amazon.<br></span></p>
+       <p><span class="night">Two.</span> <span class="ink">Three.</span></p></div>
+     </body></html>`,
+    'text/html'
+  );
+  assert.equal(w.RRX.recap.tailOf(doc, 2), 'One.\n\nTwo. Three.');
+});
+
 test('whitespace between the two <br>s does not stop them being a break', () => {
   const w = load();
   const doc = new w.DOMParser().parseFromString(

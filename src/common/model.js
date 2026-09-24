@@ -403,6 +403,131 @@
     return capped;
   }
 
+  // --- reading log ------------------------------------------------------------
+  //
+  // `{ d: { 'YYYY-MM-DD': [c, w, t] }, f: { [fictionId]: { t, a, c } }, r: [chapterId, …] }`
+  //
+  //   d  per local day: chapters finished, the words in them, and seconds spent
+  //      reading chapter pages (reading-log.js says what counts)
+  //   f  per fiction: its title, the last finish (unix seconds), chapters finished
+  //   r  the last chapters finished, oldest first. A reread of one of these is
+  //      not counted again; a flag on the chapter record would keep a record per
+  //      finished chapter for a year
+  //
+  // Opt-in (`history.log`). Only ever counts forward: finishes were never
+  // stored before it, so there is nothing to backfill from.
+
+  const LOG_KEEP_DAYS = 730;
+  const LOG_FICTION_MAX_AGE_S = 365 * 24 * 60 * 60;
+  const LOG_FICTIONS_MAX = 1000;
+  const LOG_RECENT_MAX = 500;
+  const TITLE_MAX = 300;
+
+  const pad = (n) => String(n).padStart(2, '0');
+
+  /** Local, not UTC: a chapter read at 1 a.m. belongs to the night it was read. */
+  const dayKey = (date) =>
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+
+  const count = (value) => {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  };
+
+  function normalizeLog(raw) {
+    const src = raw && typeof raw === 'object' ? raw : {};
+    const days = src.d && typeof src.d === 'object' ? src.d : {};
+    const fictions = src.f && typeof src.f === 'object' ? src.f : {};
+
+    const d = {};
+    for (const day of Object.keys(days)) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+      const [c, w, t] = Array.isArray(days[day]) ? days[day] : [];
+      const entry = [count(c), count(w), count(t)];
+      if (entry.some(Boolean)) d[day] = entry;
+    }
+
+    const f = {};
+    for (const key of Object.keys(fictions)) {
+      const id = Number(key);
+      if (!isValidId(id)) continue;
+      const rec = fictions[key] && typeof fictions[key] === 'object' ? fictions[key] : {};
+      f[id] = {
+        t: typeof rec.t === 'string' ? rec.t.slice(0, TITLE_MAX) : '',
+        a: count(rec.a),
+        c: count(rec.c),
+      };
+    }
+
+    const r = Array.isArray(src.r) ? [...new Set(src.r.map(Number).filter(isValidId))] : [];
+    return { d, f, r };
+  }
+
+  /**
+   * Count one finished chapter.
+   *
+   * @param {{chapterId:number, fictionId?:number, title?:string, words?:number,
+   *          day:string, now:number}} entry `day` from `dayKey`, `now` in unix
+   *   SECONDS, both passed in because this module has no clock
+   * @returns {object} the log unchanged (the same object) when the chapter was
+   *   already among the recent finishes
+   */
+  function logFinish(log, { chapterId, fictionId, title, words, day, now }) {
+    const src = normalizeLog(log);
+    const id = Number(chapterId);
+    if (!isValidId(id) || src.r.includes(id)) return log;
+
+    const [c, w, t] = src.d[day] || [0, 0, 0];
+    src.d[day] = [c + 1, w + count(words), t];
+
+    const fid = Number(fictionId);
+    if (isValidId(fid)) {
+      const was = src.f[fid] || { t: '', a: 0, c: 0 };
+      const name = typeof title === 'string' ? title.trim().slice(0, TITLE_MAX) : '';
+      src.f[fid] = { t: name || was.t, a: count(now), c: was.c + 1 };
+    }
+
+    src.r = [...src.r, id].slice(-LOG_RECENT_MAX);
+    return src;
+  }
+
+  /** Add seconds spent reading to a day. */
+  function logTime(log, day, seconds) {
+    const src = normalizeLog(log);
+    const [c, w, t] = src.d[day] || [0, 0, 0];
+    src.d[day] = [c, w, t + count(seconds)];
+    return src;
+  }
+
+  /** Days past `keepDays`, fictions nothing has been finished in for a year, and
+   *  the oldest fictions past the cap. The day totals outlive the fictions: a
+   *  year-old week still counts without knowing what was in it. */
+  function pruneLog(
+    log,
+    {
+      now = 0,
+      keepDays = LOG_KEEP_DAYS,
+      maxAgeS = LOG_FICTION_MAX_AGE_S,
+      max = LOG_FICTIONS_MAX,
+      recent = LOG_RECENT_MAX,
+    } = {}
+  ) {
+    const src = normalizeLog(log);
+    const cutoff = now ? dayKey(new Date((now - keepDays * 86400) * 1000)) : '';
+
+    const d = {};
+    for (const [day, entry] of Object.entries(src.d)) if (day >= cutoff) d[day] = entry;
+
+    let fictions = Object.entries(src.f).filter(
+      ([, rec]) => !now || !rec.a || now - rec.a <= maxAgeS
+    );
+    if (fictions.length > max) fictions = fictions.sort((a, b) => b[1].a - a[1].a).slice(0, max);
+
+    // No day left means nothing to dedupe against: the ids go with the days.
+    const r = Object.keys(d).length ? src.r.slice(-recent) : [];
+    return { d, f: Object.fromEntries(fictions), r };
+  }
+
   // --- synchronous boot mirror --------------------------------------------
   // browser.storage.local is async, which races first paint. Content scripts run
   // in the page's origin, so localStorage reads synchronously at document_start,
@@ -458,6 +583,7 @@
       dropped: normalizeDropped(src.dropped),
       chapters: normalizeChapters(src.chapters),
       stats: normalizeStats(src.stats),
+      log: normalizeLog(src.log),
     };
   }
 
@@ -484,6 +610,7 @@
       dropped: normalizeDropped(data.dropped),
       chapters: normalizeChapters(data.chapters),
       stats: normalizeStats(data.stats),
+      log: normalizeLog(data.log),
     };
   }
 
@@ -516,6 +643,14 @@
     rollStats,
     statsDelta,
     pruneStats,
+    dayKey,
+    normalizeLog,
+    logFinish,
+    logTime,
+    pruneLog,
+    LOG_KEEP_DAYS,
+    LOG_FICTIONS_MAX,
+    LOG_RECENT_MAX,
     buildMirror,
     parseMirror,
     buildBackup,

@@ -28,6 +28,7 @@
     /** A bookmark with a line through it: put down, not thrown away. */
     drop: ['M7 4h10v16l-5-4-5 4z', 'M4.5 4.5l15 15'],
     undrop: ['M7 4h10v16l-5-4-5 4z'],
+    sort: ['M4 6h16', 'M4 12h11', 'M4 18h6'],
   };
 
   /**

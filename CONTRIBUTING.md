@@ -63,16 +63,18 @@ are the files in `src/`.
 
 `npm start` keeps its Firefox profile in `.dev-profile/` (gitignored), so you log into Royal
 Road once, not every launch. The redesign cookie is a session cookie, so it is *not* kept: the
-dev script re-sets it and reloads once on the first page of each run — the flicker you see.
+dev script re-sets it and reloads once on the first page of each run — the flicker you see —
+and never again that run, so a layout you pick afterwards holds.
 `-- --fresh` gives a throwaway profile, for first-run behaviour. Other flags pass through to
 `web-ext run`, so `npm start -- --devtools` works.
 
-`-- --legacy` does the opposite: it removes the opt-in cookie so Royal Road serves the legacy
-layout. That is the only way to test **Always use Royal Road's new design** from a profile
-that has already opted in — which `.dev-profile` becomes after one ordinary launch. It clears
-the cookie **once per tab**, deliberately: on every load it would fight the extension's own
-switch, each undoing the other in a reload loop. So the first load is legacy, and what the
-extension does next is yours to watch.
+`-- --legacy` does the opposite: it sets `rr_ui_mode=legacy`, as Royal Road's own revert does,
+so the legacy layout is served. That is the only way to test **Always the new design** from a
+profile already on the redesign — which `.dev-profile` becomes after one ordinary launch. It
+writes rather than deletes because `.dev-profile` is signed in, and with no cookie the
+account's Display Mode may decide. It does this **once per tab**, deliberately: on every load
+it would fight the extension's own switch, each undoing the other in a reload loop. So the
+first load is legacy, and what the extension does next is yours to watch.
 
 It runs from a generated copy of the tree in `dist/dev/`, not `src/`, because it adds one
 dev-only content script that sets the cookie below. That script exists only in `dist/dev/` and
@@ -86,10 +88,11 @@ Include the page URL, whether you are on the redesign or the legacy layout, and 
 are on. If a list page has stopped working, the console usually carries an `[rr-ui]` warning
 naming the file to look at.
 
-Royal Road serves the redesign only when a cookie is set. To be sure which you are on:
+Royal Road serves the redesign only when its `rr_ui_mode` cookie asks for it. To be sure which
+you are on:
 
 ```js
-document.cookie = 'beta-ui-v2=always; path=/; domain=.royalroad.com';
+document.cookie = 'rr_ui_mode=redesign; path=/; max-age=31536000';
 ```
 
 (`npm start` sets that for you; paste this in a browser you are only using to reproduce a

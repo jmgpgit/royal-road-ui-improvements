@@ -115,11 +115,23 @@ test('an unlabelled stamp is named by position, never invented', () => {
 
 // --- length ----------------------------------------------------------------
 
+/** Words in `el`, with each `<br>` a word boundary. */
+const wordsIn = (el) => {
+  const copy = el.cloneNode(true);
+  for (const br of copy.querySelectorAll('br')) br.replaceWith(' ');
+  return copy.textContent.trim().split(/\s+/).length;
+};
+
 test('the word count is the chapter text, and matches the real chapter', () => {
   const { w } = load();
-  // 2121, not 2120: the fixture's two `<br>`s separate a pair of words that
-  // used to be counted as one, because `<br>` yields no whitespace of its own.
-  assert.equal(w.RRX.chapterMeta.wordCount(), 2121);
+  // Read directly, not through the helper the count itself uses.
+  const content = w.document.querySelector('.chapter-content');
+  // Royal Road's anti-theft sentence, reworded on every request, hidden by a
+  // random class the page's own <style> names.
+  const rule = /\.([\w-]+)\s*\{\s*display:\s*none;\s*speak:\s*never;\s*\}/.exec(fixture('chapter.new.html'));
+  const sentence = rule && content.querySelector(`.${rule[1]}`);
+  assert.ok(sentence, 'the capture carries it, or this proves nothing');
+  assert.equal(w.RRX.chapterMeta.wordCount(), wordsIn(content) - wordsIn(sentence));
 });
 
 test('a <br> is a word boundary, and hidden text is not words at all', () => {
@@ -162,7 +174,7 @@ test('each switch adds only its own fact', () => {
 
   const two = load({ 'chapter.wordCount': 'both', 'chapter.wpm': 250 });
   two.w.RRX.chapterMeta.apply(two.ctx);
-  const wordLabel = `${(2121).toLocaleString()} words`;
+  const wordLabel = `${two.w.RRX.chapterMeta.wordCount().toLocaleString()} words`;
   assert.deepEqual([...texts(two.w)], [wordLabel, '~8 min']);
 
   const three = load({ 'chapter.topTimestamp': true, 'chapter.wordCount': 'words' });

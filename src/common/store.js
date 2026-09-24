@@ -17,6 +17,7 @@
   const KEY_DROPPED = 'dropped';
   const KEY_CHAPTERS = 'chapters';
   const KEY_STATS = 'stats';
+  const KEY_LOG = 'log';
   /** When housekeeping last ran. One number, and the reason it exists is below. */
   const KEY_TIDIED = 'tidiedAt';
   const KEY_FORGOT = 'forgotAt';
@@ -86,8 +87,57 @@
     return {};
   }
 
+  /** The reading log, out of `load()` and `onChange` for the same reasons as
+   *  the statistics: only the dashboard reads it, and a finish in one tab must
+   *  not rebuild the toolbar in every other. */
+  async function loadLog() {
+    const raw = await ext.storage.local.get(KEY_LOG);
+    return RRX.normalizeLog(raw[KEY_LOG]);
+  }
+
   /**
-   * Age out the two growing maps, whatever is or is not still writing to them.
+   * Count a finished chapter in today's bucket. Queued behind this page's other
+   * log writes, but storage.local has no compare-and-set: two tabs writing in
+   * the same moment can still lose one.
+   *
+   * @param {{chapterId:number, fictionId?:number, title?:string, words?:number}} entry
+   * @returns {boolean} false when the chapter was already among the recent finishes
+   */
+  function markRead(entry) {
+    return writeLog((log, now) =>
+      RRX.logFinish(log, { ...entry, day: RRX.dayKey(new Date()), now })
+    );
+  }
+
+  /** Seconds spent reading, added to today. */
+  function addReadingTime(seconds) {
+    return writeLog((log) => RRX.logTime(log, RRX.dayKey(new Date()), seconds));
+  }
+
+  /** One read-modify-write at a time from this page: a finish and a time flush
+   *  land in the same moment often enough, and the second would write back a
+   *  log without the first. */
+  let logQueue = Promise.resolve();
+  function writeLog(change) {
+    const run = async () => {
+      const log = await loadLog();
+      const now = Math.floor(Date.now() / 1000);
+      const next = change(log, now);
+      if (next === log) return false;
+      await ext.storage.local.set({ [KEY_LOG]: RRX.pruneLog(next, { now }) });
+      return true;
+    };
+    logQueue = logQueue.then(run, run);
+    return logQueue;
+  }
+
+  async function forgetLog() {
+    await ext.storage.local.set({ [KEY_LOG]: {} });
+    return RRX.normalizeLog({});
+  }
+
+  /**
+   * Age out the growing maps, whatever is or is not still writing to them.
    *
    * Both prunes live inside their own write path, and every write path is behind
    * a setting - so turning the reading features off stopped the writes *and* the
@@ -120,6 +170,7 @@
     for (const [key, load1, prune] of [
       [KEY_CHAPTERS, loadChapters, (map) => RRX.pruneChapters(map, { now, seenMaxAgeS })],
       [KEY_STATS, loadStats, (map) => RRX.pruneStats(map, { now })],
+      [KEY_LOG, loadLog, (log) => RRX.pruneLog(log, { now })],
     ]) {
       const before = await load1();
       // Compared rather than written blind: at the chapter map's ceiling this is
@@ -218,6 +269,9 @@
    * hidden and dropped lists, this is not something the reader wrote and cannot
    * be browsed or restored, so there is nothing to keep it for.
    *
+   * The reading log is the opposite case and is left alone: it can be browsed,
+   * and reset or an import would otherwise wipe a year of it in passing.
+   *
    * Shared because there are three ways to arrive at the setting being off -
    * changing it, resetting every setting, and importing a backup - and only the
    * first of them used to notice.
@@ -283,13 +337,14 @@
   }
 
   /** Used by import. Replaces every key wholesale. */
-  async function replaceAll({ settings, hidden, dropped, chapters, stats }) {
+  async function replaceAll({ settings, hidden, dropped, chapters, stats, log }) {
     const next = {
       [KEY_SETTINGS]: RRX.normalizeSettings(settings),
       [KEY_HIDDEN]: RRX.normalizeHidden(hidden),
       [KEY_DROPPED]: RRX.normalizeDropped(dropped),
       [KEY_CHAPTERS]: RRX.normalizeChapters(chapters),
       [KEY_STATS]: RRX.normalizeStats(stats),
+      [KEY_LOG]: RRX.normalizeLog(log),
     };
     await ext.storage.local.set(next);
     // An imported file can carry readings alongside a setting that says they are
@@ -304,6 +359,7 @@
       dropped: next[KEY_DROPPED],
       chapters: next[KEY_CHAPTERS],
       stats: kept,
+      log: next[KEY_LOG],
     };
   }
 
@@ -321,10 +377,11 @@
   function onChange(callback) {
     const listener = (changes, area) => {
       if (area !== 'local') return;
-      // `chapters` and `stats` are deliberately absent: their subscriber would be main.js, which
-      // rebuilds the toolbar, re-syncs every card and re-enters every feature's
-      // onPage in every open Royal Road tab - absurd for somebody scrolling a
-      // chapter, which is what writes this key. The next page load reads the truth.
+      // `chapters`, `stats` and `log` are deliberately absent: their subscriber
+      // would be main.js, which rebuilds the toolbar, re-syncs every card and
+      // re-enters every feature's onPage in every open Royal Road tab - absurd
+      // for somebody scrolling a chapter, which is what writes these keys. The
+      // next page load reads the truth.
       if (!(KEY_SETTINGS in changes) && !(KEY_HIDDEN in changes) && !(KEY_DROPPED in changes)) return;
       load().then(callback);
     };
@@ -453,6 +510,10 @@
     loadStats,
     markFictionStats,
     forgetStats,
+    loadLog,
+    markRead,
+    addReadingTime,
+    forgetLog,
     tidy,
     markChapter,
     forgetPosition,

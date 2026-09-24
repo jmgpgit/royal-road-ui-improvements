@@ -217,6 +217,10 @@
         jump: 'Go straight there',
       },
     },
+    'history.log': {
+      label: 'Keep a reading log',
+      note: 'Counts each chapter you read to the end, with the day and its length, remembers the fiction’s title, and adds up the time you spend reading chapter pages. Kept on this device only. Switching it off stops the counting and keeps what is there; “Forget reading history” in Options → Backup deletes it.',
+    },
     'recap.mode': {
       label: 'Show the end of the previous chapter',
       note: 'Puts the closing paragraphs of the chapter before at the top of this one, for when you are reading several fictions at once and cannot remember how the last one left off.',
@@ -279,6 +283,11 @@
     'comments.emotes': {
       label: 'Comments that are only an emoticon',
       note: 'A comment whose whole body is one Royal Road emoticon, with nothing written alongside it. An emoticon at the end of a real sentence does not count.',
+      optionLabels: ACTION_LABELS,
+    },
+    'comments.oneWord': {
+      label: 'Comments that are a single word',
+      note: 'One word and nothing else, such as "nice", "lol" or "+1". Emoji and emoticons around it are ignored. A second word, a link or a picture is enough to leave it alone.',
       optionLabels: ACTION_LABELS,
     },
     'comments.patternAction': {
@@ -434,6 +443,7 @@
           keys: [
             'comments.thanks',
             'comments.emotes',
+            'comments.oneWord',
             'comments.patternAction',
             'comments.foldPatterns',
             // Last: it qualifies every rule above it.
@@ -454,6 +464,7 @@
     'notes.blockedAuthors': 'a list of author ids, set by editing an exported settings file',
     'tags.colors': 'edited in its own card on this page, the way the two fiction lists are',
     'tags.colorHome': 'a checkbox in that same card, beside the colours it widens',
+    'history.log': 'switched on and off on the reading dashboard; the chapter box is at its row cap',
   };
 
   /** Filter values are set in the panel on the list pages, not here. */

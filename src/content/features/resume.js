@@ -66,6 +66,11 @@
     return textLen.len;
   }
 
+  /** How much of the chapter text has been on screen, 0..1, from its rect.
+   *  Shared with reading-log.js, so "read to the end" means one thing. */
+  const seenFraction = (box) =>
+    Math.min(1, Math.max(0, (root.innerHeight - box.top) / (box.height || 1)));
+
   function measure() {
     const content = RRX.chapterTop && RRX.chapterTop.content();
     if (!content) return null;
@@ -82,15 +87,13 @@
     const into = block.height > 0 ? Math.min(1, Math.max(0, -block.top / block.height)) : 0;
 
     const box = content.getBoundingClientRect();
-    const height = box.height || 1;
-    const seen = root.innerHeight - box.top;
 
     return {
       p: index,
       o: Number(into.toFixed(3)),
       n: children.length,
       len: lengthOf(content),
-      d: Number(Math.min(1, Math.max(0, seen / height)).toFixed(3)),
+      d: Number(seenFraction(box).toFixed(3)),
       // Until the chapter text reaches the viewport top the reader is still in
       // the hero, the notes or the recap, where `p`/`o` cannot describe them:
       // the topmost visible block is block 0 at offset 0, i.e. the start of the
@@ -175,6 +178,12 @@
       saved = null;
     }
   })();
+
+  /** A link to a specific comment is a request to go somewhere else and wins
+   *  outright. Royal Road's permalinks are `?comment=N#comment-N`. Read now,
+   *  not in `restore`: once the comments load Royal Road strips the fragment
+   *  with `replaceState`, then scrolls to the comment 500 ms later. */
+  const deepLink = !!location.hash || location.search.includes('comment=');
 
   /** The handlers are latched on and never taken off - the reader can switch
    *  this off in a tab that is already listening, so "off" has to be honoured
@@ -321,11 +330,7 @@
    *  and a second restore would drag the reader back to where they were ten
    *  minutes ago. */
   function restore(mode) {
-    if (restored || userScrolled) return;
-
-    // A link to a specific comment is a request to go somewhere else and wins
-    // outright. Royal Road's own permalinks are `?comment=N#comment-N`.
-    if (location.hash || location.search.includes('comment=')) return;
+    if (restored || userScrolled || deepLink) return;
     if (root.scrollY >= TOP_PX) return;
     if (!saved || saved.p === undefined) return;
 
@@ -433,6 +438,8 @@
   });
 
   RRX.resume = {
+    END_FRACTION,
+    seenFraction,
     measure,
     edited,
     targetFor,

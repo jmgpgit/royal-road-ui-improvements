@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Reading dashboard - UI Improvements for Royal Road</title>
+    <link rel="stylesheet" href="../options/options.css" />
+  </head>
+  <body>
+    <main class="page page--wide">
+      <header class="page__head">
+        <div class="page__title">
+          <h1>Reading dashboard</h1>
+          <a class="page__link" href="../options/options.html">All settings</a>
+        </div>
+        <p class="muted">
+          The chapters you read to the end, counted on this device. Nothing is fetched for it and
+          nothing leaves it.
+        </p>
+      </header>
+
+      <section class="card" aria-label="Reading log">
+        <div class="group">
+          <div class="row">
+            <label class="row__title" id="dash-on-label" for="dash-on"></label>
+            <div class="row__control">
+              <input type="checkbox" id="dash-on" aria-describedby="dash-on-note" />
+            </div>
+            <p class="row__note" id="dash-on-note"></p>
+          </div>
+        </div>
+        <p id="dash-status" class="status dash-note" role="status" hidden></p>
+      </section>
+
+      <div id="dash-data" class="dash" hidden>
+        <section class="card" aria-labelledby="h-tiles">
+          <h2 id="h-tiles">Chapters read</h2>
+          <div id="dash-tiles" class="tiles"></div>
+        </section>
+
+        <section class="card" aria-labelledby="h-weeks">
+          <h2 id="h-weeks">Chapters per week</h2>
+          <ol id="dash-weeks" class="bars"></ol>
+        </section>
+
+        <section class="card" aria-labelledby="h-year">
+          <h2 id="h-year">The last year</h2>
+          <!-- A picture of the table below, which is the accessible version. -->
+          <div
+            class="heat"
+            role="img"
+            aria-label="Chapters read each day over the last year. The table below has the monthly totals."
+          >
+            <div class="heat__days" aria-hidden="true">
+              <span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span>
+            </div>
+            <div id="dash-year-scroll" class="heat__scroll">
+              <div id="dash-year-months" class="heat__months"></div>
+              <div id="dash-year-grid" class="heat__grid"></div>
+            </div>
+          </div>
+          <div class="heat__legend" aria-hidden="true">
+            Less
+            <span class="heat__cell" data-l="0"></span>
+            <span class="heat__cell" data-l="1"></span>
+            <span class="heat__cell" data-l="2"></span>
+            <span class="heat__cell" data-l="3"></span>
+            <span class="heat__cell" data-l="4"></span>
+            More
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="h-months">
+          <h2 id="h-months">Month by month</h2>
+          <div class="dash-table-wrap">
+            <table class="dash-table">
+              <thead>
+                <tr>
+                  <th scope="col">Month</th>
+                  <th scope="col">Chapters</th>
+                  <th scope="col">Words</th>
+                  <th scope="col">Days read</th>
+                  <th scope="col">Time</th>
+                </tr>
+              </thead>
+              <tbody id="dash-months"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <section class="card" id="dash-fictions-card" aria-labelledby="h-fictions" hidden>
+        <h2 id="h-fictions">Fictions</h2>
+        <ul id="dash-fictions" class="fic-list"></ul>
+      </section>
+    </main>
+
+    <script src="../common/browser.js"></script>
+    <script src="../common/schema.js"></script>
+    <script src="../common/model.js"></script>
+    <script src="../common/store.js"></script>
+    <script src="../options/settings-ui.js"></script>
+    <script src="dashboard.js"></script>
+  </body>
+</html>

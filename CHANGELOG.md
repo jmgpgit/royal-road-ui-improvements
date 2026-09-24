@@ -4,6 +4,91 @@ Notable changes, newest first. Versions follow [semantic versioning](https://sem
 the patch number for fixes, the minor for new settings, the major for anything that changes
 what an existing setting does.
 
+## 1.6.0
+
+**New**
+
+- **A reading dashboard.** A new page, opened from the popup's Reading dashboard button or the
+  link at the top of the options page. Switch on "Keep a reading log" there and each chapter you
+  read to the end is counted: its last line has been on screen, the page was not opened from a
+  comment link, and a fifth of its estimated reading time has passed. A chapter short enough to
+  end on screen counts once the tab has been visible that long. Time on chapter pages is added
+  up from your scrolls, key presses, clicks and touches while the tab is visible, with any gap
+  capped at two minutes.
+- It shows today, this week and this month, averages, streaks, the last twelve weeks, the last
+  year, month-by-month totals and the fictions you have been reading.
+- Off by default, and it counts only from when you switch it on. Switching it off, or resetting
+  the settings, keeps the log; "Forget reading history" deletes it; Backup exports it. Nothing is
+  fetched for it and nothing leaves the device.
+- **Sort a chapter poll by votes.** Royal Road lists a poll's options in the author's order, so
+  finding the leader means reading every bar. A button beside the poll's title lists them by
+  vote share; press it again for the author's order. It shows only once the results do — signed
+  out, or after you vote — and not when the options are already in that order. No setting,
+  nothing stored, and the vote form is never touched.
+- **Hide fictions with too few ratings.** Royal Road now shows "Too few ratings" instead of stars
+  on a fiction with too few ratings — half of Latest Updates the day it was checked — and a
+  minimum rating let them all through. "Too few ratings: Hide", under Rating in the filter panel,
+  takes them out.
+- **Fold or hide one-word comments.** A new rule beside the emoticon one, off by default: "nice",
+  "lol", "+1", "Can't.", "Well-written!". Emoji and emoticons around the word are ignored, so
+  "lol :D" and "Nice 👍" count. A second word, a link, or a picture that is not a Royal Road
+  emoticon leaves the comment alone. A few text faces such as "D:" and "XP" count as a word;
+  ":D" and ":)" do not. The author's comments are left alone unless you apply filtering to the
+  author too, and even then are only collapsed. A comment with replies is only ever collapsed.
+
+**Fixes**
+
+- **Choosing a layout works again.** Royal Road now picks its layout from an `rr_ui_mode` cookie
+  and ignores `beta-ui-v2`, the one this extension set. "Always the new design" did nothing, and
+  "Always the old design" could not undo Royal Road's own opt-in. Both now set `rr_ui_mode` the
+  way Royal Road does, so there is one cookie and its "Revert To Legacy UI" link overwrites it.
+  The old `beta-ui-v2` cookie is deleted the next time the extension switches. With the new
+  design chosen, your next page load moves you across; with the old one, you may see one extra
+  reload, once. Signed in, your account's Display Mode may override the cookie; the console says
+  so. If Royal Road's own opt-in used to put you on the new design and you are back on the old
+  one, pick **Always the new design**.
+- **Two columns and Covers fit Royal Road's rebuilt list card.** Royal Road merged each card's
+  phone and desktop layouts into one, and both views came apart: Covers stacked its blocks in
+  the wrong order, and Two columns left the cover alone above the title. Two columns also wraps
+  the tag row, so the last-updated date no longer squeezes the tags. In Compact, Royal Road's new
+  phone-only Last Update tile no longer shows on desktop.
+- **Below 1280px, Two columns leaves the cards as Royal Road builds them.** A narrower window
+  got a flattened card with nothing putting it back together.
+- **Following and Favourite marks line up in Covers again.** Royal Road's new card draws them
+  differently, and on a signed-in reader's marked cards they fell into the tile, pushed the
+  cover down and lost their chips. They sit on the tile's edge again, level with the top of the
+  cover, one under the other.
+- **Compact no longer hides a fiction page's About section and reviews**, or a chapter's
+  show-more. Its blurb rule applied on every page; it is limited to list cards now.
+- **Expand all no longer leaves a dead chevron on every blurb.** Royal Road moved the chevron
+  out of the part expand-all hides, so each opened blurb kept one that only rotated — on the
+  lists, a fiction's About section and reviews, and chapters.
+- **The "More settings" link shows in Royal Road's Reading Preferences dialog.** Royal Road moves
+  the dialog elsewhere in the page as it loads, so the link has likely never appeared.
+- **"(N hidden)" shows on Royal Road's comment count line.** It never did: Royal Road splits
+  "Showing 1 to 10 of 137 Comments" into spans, and the search wanted the phrase whole.
+- **A link to a comment goes to the comment** with "come back to where you stopped" on. Royal
+  Road strips `#comment-N` from the address once the comments load; a restore after that jumped
+  to your stored place, and Royal Road then pulled you to the comment.
+- **The "+N chapters" change on a fiction page no longer goes missing.** Royal Road now redraws
+  the table of contents without its count, and when that happened first the change was dropped
+  for that visit.
+- **Word counts leave out Royal Road's hidden anti-theft sentence.** Every chapter carries an
+  invisible "…report it on Amazon" line, reworded on each load, so the count ran about fifteen
+  words high and moved on every reload.
+- **Turning off "Trim tags out of titles" puts every title back exactly.** A title ending in a
+  space came back trimmed.
+
+**Privacy policy**
+
+- Lists the reading log: what it holds per day and per fiction, fiction titles included, and how
+  long it is kept.
+- Names `rr_ui_mode` as the one cookie written, and says the extension deletes the `beta-ui-v2`
+  cookie that 1.5.4 and earlier set, and any domain-wide copy of `rr_ui_mode`.
+- Names three things earlier versions already did: the popup reading the active tab's address, a
+  per-tab `rrx:design:switched` flag in `sessionStorage`, and each chapter record's paragraph and
+  character counts. Corrects "Load Comments": on the redesign, pressing it does nothing.
+
 ## 1.5.4
 
 **Fixes**

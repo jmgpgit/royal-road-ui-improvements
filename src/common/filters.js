@@ -5,7 +5,7 @@
  * reader. Pure: no DOM, no storage.
  *
  * Two rules keep a markup change or a half-filled form from emptying the page:
- * an unset filter (`null` or empty list) excludes nothing, and an unknown card
+ * an unset filter (`null`, `false` or empty list) excludes nothing, and an unknown card
  * field (`null`, because it could not be read) excludes nothing either. A
  * filter rejects on evidence, never on the absence of it.
  */
@@ -60,7 +60,7 @@
     if (!f['filters.enabled']) return false;
     return Object.entries(f).some(([key, value]) => {
       if (key === 'filters.enabled') return false;
-      if (value === null) return false;
+      if (value === null || value === false) return false;
       if (Array.isArray(value)) return value.length > 0;
       return true;
     });
@@ -85,6 +85,8 @@
       if (dir === 'min' && value < limit) return false;
       if (dir === 'max' && value > limit) return false;
     }
+
+    if (f['filters.hideUnrated'] && card.unrated) return false;
 
     const tags = Array.isArray(card.tags) ? card.tags : [];
     // Conjunction: every named tag must be present.
@@ -137,6 +139,7 @@
     };
 
     range('rating', 'filters.minRating', 'filters.maxRating');
+    if (f['filters.hideUnrated']) parts.push('enough ratings');
     range('followers', 'filters.minFollowers', 'filters.maxFollowers');
     range('views', 'filters.minViews', 'filters.maxViews');
     range('pages', 'filters.minPages', 'filters.maxPages');

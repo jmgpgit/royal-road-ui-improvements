@@ -5,7 +5,7 @@
  * redesign change breaks here and nowhere else. `main.js` health-checks these on
  * list pages and warns loudly if the list stops matching.
  *
- * Verified against Royal Road build 4.1.20260807.38. Ground-truth captures of
+ * Verified against Royal Road build 4.1.20260923.58. Ground-truth captures of
  * every page shape live in `test/fixtures/`.
  */
 (function (root, factory) {
@@ -98,11 +98,13 @@
     listCard: '.fiction-card-expanded',
 
     // --- description "show more" widget (pure CSS on RR's side) --------------
-    // <div data-rr-show-more>
-    //   <input type=checkbox id="show-more-blurb-{fictionId}" class="peer sr-only">
-    //   <div data-rr-show-more-content style="max-height:96px">…blurb…</div>
-    //   <div data-rr-show-more-wrapper><div class="gradient-wrapper"></div><label/></div>
+    // <div data-rr-show-more style="--rr-collapsed-height: 96px">
+    //   <div data-rr-show-more-content style="max-height: var(--rr-collapsed-height, 224px)">…blurb…</div>
+    //   <div data-rr-show-more-wrapper><div class="gradient-wrapper"></div></div>
+    //   <input type=checkbox id="show-more-blurb-{fictionId}" class="peer sr-only …">
+    //   <label for="show-more-blurb-{fictionId}">chevron</label>
     // </div>
+    // The checkbox and the chevron used to sit inside the wrapper.
     showMoreRoot: '[data-rr-show-more]',
     showMoreContent: '[data-rr-show-more-content]',
     showMoreWrapper: '[data-rr-show-more-wrapper]',
@@ -117,15 +119,18 @@
     fictionHref: '[href*="/fiction/"]',
 
     // --- bits we read off a card to filter on -------------------------------
-    /** Star widget. Two per card (mobile + desktop); both carry the same value. */
+    /** Star widget, one per card; cards used to carry two, mobile and desktop. */
     cardRating: '[data-rr-initial-rating]',
     /**
      * Stat tiles are `<div><div>2,116</div><div class="… uppercase">Followers</div></div>`.
-     * We find the label and read back to the value: the value div's classes
-     * differ between the mobile and desktop grids, the label text does not.
+     * We find the label and read back to the value: the value div's classes used
+     * to differ between the mobile and desktop grids, the label text did not.
      * Filtered against CARD_STATS, so stray `.uppercase` matches are harmless.
      */
     cardStatLabel: '.uppercase',
+    /** The rating tile's label. Below some number of ratings Royal Road puts
+     *  "Too few ratings" in that tile instead of the star widget. */
+    cardRatingLabel: 'Rating',
     /** Tag chips - the slug is in the href. */
     cardTag: 'a[href*="tagsAdd="]',
 
@@ -207,6 +212,11 @@
     chapterContainer: '#chapter-page-container',
     commentLoader: '#comment-loader',
     commentsPaginate: '#comments-pagination',
+    /** "Showing <span>1</span> to <span>10</span> of <span>137</span> Comments",
+     *  server-rendered as 0/0/0. Royal Road's `updateFooter` takes the footer's
+     *  first `<p>` and rewrites `querySelectorAll('span')[0..2]` by index, so
+     *  nothing may be inserted before those three. */
+    commentsCountLine: '[data-rr-paginate-footer] p',
     /** The comment sort control, `data-reader-preference-binding="commentSorting"`. */
     commentSortDropdown: '#comment-sort-dropdown',
     /** The list Royal Road's comment AJAX fills, and that we append pages to. */
@@ -250,8 +260,24 @@
      *  well as case, so matching either alone finds about half of them. Both
      *  begin "smil", hence the prefix and the case-insensitive flag. */
     commentEmote: 'img[src*="/public/smil" i]',
-    /** Royal Road's own Reading Preferences dialog, which we add a link to. */
-    readingPrefsDialog: '#reading-preferences [data-rr-dialog-content]',
+    /** Royal Road's own Reading Preferences dialog, which we add a link to.
+     *  The dialog is `data-rr-dialog-portal-to-body`: its constructor, run from
+     *  `blazorUIManager.initialize()` at module start rather than on first open,
+     *  moves the container into a body-level `div[data-rr-dialog-portal]` that
+     *  copies `data-rr-dialog-id`. This matches before and after the move;
+     *  `#reading-preferences …` matched only before, so the link never showed. */
+    readingPrefsDialog: '[data-rr-dialog-id="reading-preferences"] [data-rr-dialog-content]',
+    /** An anchor inside the poll's `<h5>` title, whose parent is the poll card.
+     *  The only poll-specific hook: every id on the card is random per render,
+     *  and its classes are Royal Road's generic card, shared with `#donate`. */
+    poll: '#poll',
+    /** An option's label; its parent is the option row. Always scoped to a poll,
+     *  since chapter text can carry `<h6>` too. */
+    pollOptionLabel: 'h6',
+    /** The results bar, `style="width: 3.91%"`. Present only once results show -
+     *  signed out, or after voting. Width styles are all over the page, so only
+     *  ever queried inside an option row. */
+    pollBar: '[style*="width"]',
 
     // --- fiction page -------------------------------------------------------
     accordionTrigger: '[data-rr-accordion-trigger]',
@@ -279,7 +305,8 @@
     statsAccordionItem: '#stats-accordion [data-rr-accordion-item]',
     statsAccordionContent: '#stats-accordion [data-rr-accordion-content]',
     /** The chapter count, which is not a stat tile: it lives on the table of
-     *  contents, as an attribute. */
+     *  contents, as an attribute. Server-rendered only: by build 4.1.20260923
+     *  Royal Road redraws #chapters with React, without it. */
     chaptersCount: '#chapters[data-chapters]',
     /** Five sit in the panel - the overall score and four sub-scores - each
      *  beside its own heading, which is how they are told apart. */

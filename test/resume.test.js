@@ -125,6 +125,22 @@ test('a comment permalink is never overridden', async () => {
   }
 });
 
+test('a comment permalink still wins after Royal Road strips its fragment', async () => {
+  const { w, ctx } = load({
+    stored: AT_68_PERCENT,
+    url: `${URL_BASE}#comment-22125114`,
+    settings: { 'chapter.resume': 'jump' },
+  });
+  // What Royal Road does once the comments load, which can beat onPage.
+  w.history.replaceState(null, '', w.location.href.split('#')[0]);
+  assert.equal(w.location.hash, '');
+
+  w.RRX.resume.apply(ctx);
+  await settle();
+  assert.equal(w.__scrolls.length, 0, 'restored over the comment Royal Road is about to scroll to');
+  assert.equal(w.document.getElementById('rrx-resume'), null);
+});
+
 test('a reader who has already scrolled is left where they are', async () => {
   const { w, ctx } = load({
     stored: AT_68_PERCENT,

@@ -78,16 +78,36 @@
    * line - and `textContent` reads them as prose. It reached both the recap and
    * the word count.
    *
-   * Inline styles only. Royal Road's own anti-theft sentence is hidden by a
-   * hashed class instead, which would need its stylesheet, and the recap reads
-   * documents that were never rendered, so there is no `getComputedStyle` to ask.
+   * Royal Road's own anti-theft sentence is hidden by a class instead, random
+   * per request and reworded each time, named in a page `<style>`:
+   * `.cjUw… { display: none; speak: never; }`. That rule is read as text: the
+   * recap reads documents that were never rendered, so there is no
+   * `getComputedStyle` to ask.
    */
   function visible(el) {
     const clone = el.cloneNode(true);
     for (const node of clone.querySelectorAll('[style*="display"]')) {
       if (/display:\s*none/i.test(node.getAttribute('style') || '')) node.remove();
     }
+    for (const name of hiddenClasses(el.ownerDocument)) {
+      for (const node of clone.querySelectorAll(`[class~="${name}"]`)) node.remove();
+    }
     return clone;
+  }
+
+  /** Top-level single-class rules the page's `<style>`s set to `display: none`;
+   *  a descendant or `@media` rule hides only sometimes. Every `<style>`, not
+   *  the head's: the August chapter capture parsed with its one in the body. */
+  function hiddenClasses(doc) {
+    const names = [];
+    for (const style of doc.querySelectorAll('style')) {
+      // @-blocks out first: every rule in one after the first follows a `}`.
+      const top = style.textContent.replace(/@[^{}]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, '');
+      for (const [, name, body] of top.matchAll(/(?<=^|\})\s*\.([\w-]+)\s*\{([^}]*)\}/g)) {
+        if (/display:\s*none/i.test(body)) names.push(name);
+      }
+    }
+    return names;
   }
 
   /** Take a slot's block away, if it is there. */

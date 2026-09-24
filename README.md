@@ -2,8 +2,8 @@
 
 A Firefox and Chrome extension for the **redesigned** [royalroad.com](https://www.royalroad.com):
 list filters and layouts, per-fiction hiding and drop marks, chapter typography the site does
-not offer, and clearer comment threads. Every feature is separate and every one can be switched
-off.
+not offer, clearer comment threads, and a reading log that stays on your device. Every feature
+is separate, and all but the poll sort button can be switched off.
 
 Unless noted, settings ship off or are set to "leave alone". Nothing leaves your device: no
 analytics, no server of its own, and no write to your Royal Road account.
@@ -45,10 +45,11 @@ bookmark — and never hides an author's own comments.
   wherever it turns up, but stays in the list and stays clickable, in case you change your mind.
 - **Filters**: rating, followers, views, pages, chapters, tags in and out, status, type, last
   updated or gone quiet, and hiding what you already follow, favourited, saved for later or
-  dropped. None of these exist on Royal Road outside `/fictions/search`. A list filtered down to
-  nothing says so, the panel warns when a tag is in both tag lists — which can never match — and
-  after four pages that match nothing the status line points at your own Global Filters, the
-  site-wide ones you set on Royal Road, which cut these lists before the extension fetches them.
+  dropped, or what Royal Road marks "Too few ratings". None of these exist on Royal Road outside
+  `/fictions/search`. A list filtered down to nothing says so, the panel warns when a tag is in
+  both tag lists — which can never match — and after four pages that match nothing the status
+  line points at your own Global Filters, the site-wide ones you set on Royal Road, which cut
+  these lists before the extension fetches them.
 - **Infinite scroll**: the next page appends as you reach the bottom. Filters and hidden
   fictions apply to whatever arrives, so a strict filter can append a page and show nothing from
   it — Royal Road serves twenty at a time, and one scroll asks for one page rather than fetching
@@ -83,21 +84,24 @@ bookmark — and never hides an author's own comments.
 - **A recap of the previous chapter** at the top of this one, named, for when you are following
   several fictions and cannot remember how the last one ended. Always shown, behind a click, on
   hover, or off. Off by default, and it fetches nothing while off.
+- **Sort a poll by votes.** A button beside a chapter poll's title lists its options by vote
+  share; press it again for the author's order. It shows once the results do: signed out, or
+  after you vote.
 - **New comments since your last visit**, marked, with what you have read optionally folded to
   a dimmed line that opens on hover. Anything with a new reply underneath stays open, and
   nothing is ever hidden. A bar above the comments counts them, filters to just the new ones,
   or clears the marks.
 - **Comments**: a rule between threads, a thread line down each chain in a colour you pick, a
   collapse control on any thread with replies, every reply shown where it was written however
-  deep the chain, and folding or hiding for low-content comments ("thanks", "tyfc"), lone
-  emoticons, and your own phrases or regular expressions. Plus real infinite scroll. Two things
-  are never hidden: a comment with replies, so the replies still make sense, and the author's
-  own comments, which are left alone unless you say otherwise and are only ever folded even
-  then.
+  deep the chain, and folding or hiding for low-content comments ("thanks", "tyfc"), one-word
+  comments ("nice", "lol"), lone emoticons, and your own phrases or regular expressions. Plus
+  real infinite scroll. Two things are never hidden: a comment with replies, so the replies still
+  make sense, and the author's own comments, which are left alone unless you say otherwise and
+  are only ever folded even then.
 
 **Everywhere on the site**: none of the above works on Royal Road's legacy layout, so the
 extension's popup carries a choice of layout — leave it to Royal Road, always the new design,
-or always the old one. No account needed. The old-design option really does stop everything
+or always the old one. It works signed out. The old-design option really does stop everything
 else working, which is why it is there: wanting it back is a fair thing to want.
 
 **On a fiction page**: control each section, in the order it appears. About Fiction,
@@ -113,10 +117,18 @@ and coloured tags are coloured here too.
   opened — no request — and kept on your device, so nothing is shown on a first visit and
   nothing when nothing moved. Off by default; switching it off again deletes what it recorded.
 
+**A reading log**, off until you switch it on in its dashboard, opened from the popup or the top
+of the options page. It counts each chapter you read to the end — its last line on screen, not
+opened from a comment link, and not before a fifth of its estimated reading time — and your time
+on chapter pages, from the gaps between your scrolls, key presses, clicks and touches while the
+tab is visible, each capped at two minutes. It shows today, this week and this month, averages,
+streaks, weekly bars, a year heatmap, month-by-month totals and the fictions you have been
+reading. It fetches nothing and stays on this device.
+
 ### Defaults that change the page
 
-Most settings ship off or as "leave alone". These do something on first run, and each is one
-toggle away in options:
+Most settings ship off or as "leave alone". These do something on first run; all but the poll
+button are one toggle away in options:
 
 - **A toolbar above every fiction list**, carrying the extension's own controls.
 - **Infinite scroll on the lists.**
@@ -126,6 +138,8 @@ toggle away in options:
 - **Comment threading**: a divider between conversations, a line down each reply chain, every
   reply shown however deep it sits, and a collapse control on any comment with replies.
 - **Hyphenation**, which does nothing unless you also turn on justified text.
+- **A "Sort by votes" button on a chapter poll** once its results show. Nothing moves until you
+  press it.
 
 Anything that alters an author's words is opt-in, and so is every rule that folds or hides a
 comment.
@@ -172,17 +186,19 @@ Everything here is built on the newer layout. On the legacy one the extension do
 Pick **Always the new design** under *Royal Road design*, at the top of the popup or first in
 options. It applies to the page you are on immediately, and to later ones before they paint.
 
-To go back, pick **Always the old design**. *Leave it to Royal Road* will not undo an earlier
-choice — the choice lives in a cookie, and only asking for the old design clears it.
+To go back, pick **Always the old design**; *Leave it to Royal Road* will not undo an earlier
+choice.
 
-**No account needed**: the layout is decided by that cookie, not by being signed in. Royal
-Road's own "Revert To Legacy UI" link still works, but with "always the new design" on it is
-undone on your next page load, so turn that off first.
+Royal Road picks the layout from its `rr_ui_mode` cookie. Signed out, only the cookie counts, so no
+account is needed. Signed in, your account's Display Mode may override it; if the new design is
+chosen and the old one still arrives, the console says so. Royal Road's own "Revert To Legacy
+UI" link still works, but with "always the new design" on it is undone on your next page load,
+so turn that off first.
 
 By hand, it is one cookie:
 
 ```js
-document.cookie = 'beta-ui-v2=always; path=/; domain=.royalroad.com';
+document.cookie = 'rr_ui_mode=redesign; path=/; max-age=31536000';
 ```
 
 ## How it works
@@ -252,8 +268,8 @@ its own. No DOM is moved. Blocks are matched by what they contain (`:has(> a > h
 title), not by Tailwind classes.
 
 **Personal state on a card uses three different mechanisms.** Read Later is a real form whose
-`mark` input says what a click *would* do. Following and Favourited are passive tooltip-wrapped
-icons that Royal Road omits entirely when unset, so absence is the normal case, not a parse
+`mark` input says what a click *would* do. Following and Favourited are passive icons beside the
+title that Royal Road omits entirely when unset, so absence is the normal case, not a parse
 failure. Two logged-in fixtures pin both the present and the absent case.
 
 **Card extraction is deliberately tolerant.** Anything unreadable becomes `null`, and a filter
@@ -269,6 +285,7 @@ src/content/   boot.js (document_start) · ui.js · tags.js · pager.js · panel
 src/content/features/       one file per feature, registered on RRX.features.list
 src/background/             15 lines, only so the toolbar can open the options page
 src/options/ src/popup/     settings, the two fiction managers, JSON backup
+src/dashboard/              the reading dashboard
 tools/build.mjs             dist/firefox + dist/chrome
 test/                       node:test suites + captured Royal Road HTML in fixtures/
 ```
@@ -325,9 +342,12 @@ naming what is missing; `test/fixtures/README.md` covers how to re-capture each 
 
 ## Known limitations
 
-- **View modes are the least tested part.** The selectors are known-good, but these cards are
-  dense Tailwind utilities and the layouts were verified by reading, not by eye in a browser.
-  Two columns needs a window at least 1280px wide; below that it falls back to one column.
+- **View modes follow Royal Road's card block by block**, so a card rebuild breaks them until
+  they are re-targeted. Two columns needs a window at least 1280px wide; below that the cards are
+  Royal Road's own.
+- **The status filter lets through a card whose status it cannot read**: some cards carry no
+  status chip, and Royal Road's Inactive status is not one the filter knows. A field that cannot
+  be read never excludes.
 - **Forcing an accordion open races Royal Road.** It binds its handlers in a deferred script
   and then applies its own remembered state, sometimes closing a section the server sent open.
   So the extension watches the full 8 s rather than stopping when the state looks right, and
@@ -345,9 +365,14 @@ naming what is missing; `test/fixtures/README.md` covers how to re-capture each 
   do. Turning comment threading off gives both back.
 - **The low-effort comment rules are a guess.** They fire on short comments that are nothing
   but an acknowledgement once the filler is stripped ("thanks", "tyfc", "cheers"), a position
-  claim ("first"), or a single Royal Road emoticon. Anything with more left in it survives:
-  "thanks for the chapter, but the pacing dragged" is safe. They dim rather than remove by
-  default, and a dimmed comment opens on hover.
+  claim ("first"), a single Royal Road emoticon, or a single word ("nice", "lol", "+1").
+  Anything with more left in it survives: "thanks for the chapter, but the pacing dragged" is
+  safe. They dim rather than remove by default, and a dimmed comment opens on hover.
+- **What counts as one word is rough.** A few text faces such as "D:" and "XP" count as a word,
+  while ":D" and ":)" do not. Chinese and Japanese are written without spaces, so a whole
+  sentence in either counts as one word.
+- **The reading log counts only in this browser, and only from when you switch it on.** Another
+  device keeps its own, and importing a backup replaces the log rather than merging it.
 - **Fonts are local only.** Royal Road's security policy blocks loading font files from an
   injected stylesheet, so only families already installed on the machine work.
 - **The tag vocabulary costs one request.** `/fictions/search` is the only page that states it
@@ -378,12 +403,15 @@ naming what is missing; `test/fixtures/README.md` covers how to re-capture each 
 Everything is stored on the device: settings, your lists and your reading history in
 `browser.storage.local`, plus two copies in royalroad.com's own `localStorage` — the boot mirror,
 and where you are in the chapter you are reading — which a content script can read and write
-synchronously. No analytics, and no server other than royalroad.com. It makes five kinds of
-request, all of them things the site itself asks for: the `?page=N` fetch that adds the next page
-of a list as you scroll, the same for comments and reviews, which it may start by pressing Royal
-Road's own "Load Comments" button or its review sort dropdown, a single request for the tag vocabulary the first time you open the
-filter panel, and — only once you switch them on — the chapter before the one you are reading,
-and the fiction's chapter list behind Royal Road's own "Select a chapter" dropdown. It never
+synchronously. Once you switch it on, the reading log joins them: per day, the chapters you
+finished, their words and your reading time, plus each fiction's title. No analytics, and no
+server other than royalroad.com. It makes five kinds of request, all of them things the site
+itself asks for: the `?page=N` fetch that adds the next page of a list as you scroll, the same
+for comments and reviews, plus a press of Royal Road's own review sort dropdown once you choose a
+default review order, a single request for the tag vocabulary the first time you open the filter
+panel, and — only once you switch them on — the chapter before the one you are reading,
+and the fiction's chapter list behind Royal Road's own "Select a chapter" dropdown. The only
+cookie it sets is Royal Road's `rr_ui_mode`, and only once you pick a layout. It never
 writes to your Royal Road account and never fetches your account pages: what it knows about
 what you follow is read from the page in front of you.
 

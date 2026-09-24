@@ -37,9 +37,15 @@ const MODULES = [
   'src/content/features/author-notes.js',
 ];
 
+const windows = [];
+nodeTest.after(() => {
+  for (const w of windows) w.close();
+});
+
 function load() {
   const dom = new JSDOM(fixture('chapter.new.html'), { url: CHAPTER_URL, runScripts: 'outside-only' });
   const w = dom.window;
+  windows.push(w);
   w.eval(`globalThis.browser = { storage: { local: {}, onChanged: {} }, runtime: {} };`);
   for (const file of MODULES) w.eval(fs.readFileSync(path.join(ROOT, file), 'utf8'));
   return w;
@@ -197,6 +203,45 @@ test('the settings link is added to Royal Road’s own reading preferences dialo
   // Idempotent: onPage runs again on every settings change.
   w.RRX.authorNotes.addSettingsLink();
   assert.equal(dialog.querySelectorAll('.rrx-prefs-link').length, 1);
+});
+
+/** What Royal Road's dialog constructor does to a `portal-to-body` dialog
+ *  (setupPortal in the site bundle), which runs before our onPage. */
+function portalToBody(w) {
+  const doc = w.document;
+  const dialog = doc.querySelector('#reading-preferences');
+  const wrapper = doc.createElement('div');
+  wrapper.setAttribute('data-rr-dialog-portal', 'true');
+  wrapper.className = dialog.className;
+  wrapper.setAttribute('data-rr-dialog-id', dialog.getAttribute('data-rr-dialog-id'));
+  for (const part of dialog.querySelectorAll(':scope > [data-rr-dialog-overlay], :scope > [data-rr-dialog-container]')) {
+    wrapper.appendChild(part);
+  }
+  doc.body.appendChild(wrapper);
+  return wrapper;
+}
+
+test('the settings link reaches the dialog after Royal Road portals it to <body>', () => {
+  const w = load();
+  const wrapper = portalToBody(w);
+  assert.equal(
+    w.document.querySelector('#reading-preferences [data-rr-dialog-content]'),
+    null,
+    'the old selector finds nothing once the dialog has moved'
+  );
+
+  w.RRX.authorNotes.addSettingsLink();
+  assert.ok(wrapper.querySelector('[data-rr-dialog-content] .rrx-prefs-link button'));
+});
+
+test('a link added before the move travels with the dialog', () => {
+  const w = load();
+  w.RRX.authorNotes.addSettingsLink();
+  const wrapper = portalToBody(w);
+
+  w.RRX.authorNotes.addSettingsLink();
+  assert.equal(w.document.querySelectorAll('.rrx-prefs-link').length, 1);
+  assert.ok(wrapper.querySelector('.rrx-prefs-link'));
 });
 
 test('a note that is only a shoutout restores fully when the chip is clicked', () => {

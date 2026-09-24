@@ -725,6 +725,7 @@ test('the author is never hidden, whatever the settings say', () => {
   const brutal = {
     'comments.thanks': 'hide',
     'comments.emotes': 'hide',
+    'comments.oneWord': 'hide',
     'comments.patternAction': 'hide',
     'comments.foldPatterns': '.*',
     'comments.foldAuthors': true,
@@ -754,6 +755,7 @@ test('by default the author is not touched at all', () => {
     ctxWith(w, {
       'comments.thanks': 'hide',
       'comments.emotes': 'hide',
+      'comments.oneWord': 'hide',
       'comments.patternAction': 'hide',
       'comments.foldPatterns': '.*',
       // foldAuthors left at its default
@@ -842,10 +844,10 @@ test('an emoticon alongside real words is left alone', () => {
 });
 
 test('the loader is clicked once and only once, however many sweeps run', () => {
-  // Royal Road does not fetch page one of the comments until something clicks
-  // its loader, so the pager does the click itself. The guard matters because
-  // the sweep runs repeatedly: a second click would ask Royal Road for the same
-  // page again.
+  // The click does nothing on the redesign today (its `loadComments` is never
+  // defined; Royal Road loads on `#comments-lazy-trigger` instead). The guard
+  // still matters: the sweep runs repeatedly, and a working button pressed
+  // twice would ask for the same page again.
   const w = load('chapter.new.html');
   const button = w.document.querySelector('#comment-loader');
   assert.ok(button, 'Royal Road still ships a "Load comments" button in the page HTML');
@@ -944,13 +946,171 @@ test('an emoticon does not rescue a comment from the filter', () => {
 });
 
 
-test('a bare reaction is left alone', () => {
-  // Tried, then withdrawn: a single word is thin, but it is still a reaction to
-  // the chapter, and folding it judges worth rather than content. Anyone who
-  // wants it has comments.foldPatterns.
+test('a bare reaction is left alone by the acknowledgement rule', () => {
+  // Tried there, then withdrawn: a single word is thin, but it is still a
+  // reaction to the chapter, and folding it judges worth rather than content.
+  // comments.oneWord is the opt-in for anyone who wants it gone.
   const w = load();
-  const { isThanks } = w.RRX.comments;
+  const { isThanks, isOneWord } = w.RRX.comments;
   for (const text of ['Interesting', 'nice', 'wow', 'lol', 'oof']) {
     assert.equal(isThanks(text), false, `must NOT fold: ${JSON.stringify(text)}`);
+    assert.equal(isOneWord(text), true, `the opt-in covers it: ${JSON.stringify(text)}`);
   }
+});
+
+// -- one-word comments --------------------------------------------------------
+
+/** Which class a sweep left on a comment, as the reader would see it. */
+const stateOf = (c) =>
+  c.classList.contains('rrx-comment-thanks-hidden')
+    ? 'hide'
+    : c.classList.contains('rrx-comment-thanks')
+      ? 'fold'
+      : 'keep';
+
+test('one word, however it is dressed up, is one word', () => {
+  const w = load();
+  const { isOneWord } = w.RRX.comments;
+  for (const text of [
+    'Nice',
+    'First!!',
+    'lol',
+    'Thanks.',
+    '+1',
+    'o7',
+    '42',
+    "Can't.",
+    'Can’t',
+    'Well-written!',
+    'hmm...',
+    'Noooo!!!',
+    'F',
+    '@SomeUser',
+    // Emoji and emoticons around the word are not words.
+    'lol :D',
+    'Nice 👍',
+    'Lmao 😂😂',
+    // Not only ASCII.
+    '¡Increíble!',
+    'Größe',
+    'ありがとう',
+    // Combining marks belong to the word: an accent typed decomposed, Devanagari.
+    'Increi\u0301ble',
+    'नमस्ते',
+  ]) {
+    assert.equal(isOneWord(text), true, `should catch: ${JSON.stringify(text)}`);
+  }
+});
+
+test('two words, a link, or no word at all is not one word', () => {
+  const w = load();
+  const { isOneWord } = w.RRX.comments;
+  for (const text of [
+    'How so?',
+    'I concur.',
+    'Thanks. Fixed.',
+    'o7 o7',
+    'e.g.',
+    'https://www.royalroad.com/fiction/1',
+    'royalroad.com',
+    // No word at all: left to the emoticon rule, or to nothing. ":D" and "XD"
+    // must be stripped whole, not leave a "d" behind.
+    '😂',
+    ':)',
+    ':D',
+    'XD',
+    '<3',
+    '...',
+    '-_-',
+    'T_T',
+    '',
+    '   ',
+  ]) {
+    assert.equal(isOneWord(text), false, `must NOT catch: ${JSON.stringify(text)}`);
+  }
+});
+
+test('one-word comments on a real page: the reader’s hit, the author spared', () => {
+  // chapter-comments-nested has four one-word comments. Two are the author's,
+  // one has replies, and every other comment on the page must be untouched.
+  const w = load('chapter-comments-nested.new.html');
+  const d = w.document;
+  const byId = (id) => d.querySelector(`[data-comment-id="${id}"]`);
+  const all = [...d.querySelectorAll('[data-comment-id]')];
+  const emotes = all.filter((c) => w.RRX.comments.isEmoteOnly(c));
+  assert.ok(emotes.length > 3, 'the fixture has emoticon-only comments');
+
+  const expected = {
+    21627055: ['MMMMHMMMM', 'hide'],
+    22251378: ['Yes.', 'fold'], // has replies, so hide softens
+    21628512: ['Exactly.', 'keep'], // the author
+    22251388: ['based.', 'keep'], // the author
+  };
+  for (const [id, [text]] of Object.entries(expected)) {
+    assert.equal(w.RRX.comments.bodyText(byId(id)), text, `the fixture still says ${text}`);
+  }
+  assert.ok(w.RRX.comments.bodyText(byId('21630367')).startsWith('I concur.'));
+
+  w.RRX.comments.syncCards(d, ctxWith(w, { 'comments.oneWord': 'hide' }));
+
+  for (const [id, [text, action]] of Object.entries(expected)) {
+    assert.equal(stateOf(byId(id)), action, `${JSON.stringify(text)} should ${action}`);
+  }
+  assert.equal(stateOf(byId('21630367')), 'keep', '"I concur." plus an emoticon is two words');
+  for (const c of emotes) assert.equal(stateOf(c), 'keep', 'an emoticon alone is not a word');
+
+  const touched = all.filter((c) => stateOf(c) !== 'keep').map((c) => c.dataset.commentId);
+  assert.deepEqual(touched.sort(), ['21627055', '22251378'], 'nothing else on the page');
+  w.close();
+});
+
+test('the one-word and acknowledgement rules combine, and the stronger wins', () => {
+  const w = load();
+  const tftc = w.document.querySelector('[data-comment-id="22125725"]');
+  assert.equal(w.RRX.comments.bodyText(tftc), 'TFTC');
+  assert.equal(w.RRX.comments.isAuthorComment(tftc), false);
+  const verdict = (over) => w.RRX.comments.actionForComment(tftc, w.RRX.normalizeSettings(over));
+
+  assert.equal(verdict({ 'comments.thanks': 'keep', 'comments.oneWord': 'fold' }), 'fold');
+  assert.equal(verdict({ 'comments.thanks': 'fold', 'comments.oneWord': 'keep' }), 'fold');
+  assert.equal(verdict({ 'comments.thanks': 'fold', 'comments.oneWord': 'hide' }), 'hide');
+  assert.equal(verdict({ 'comments.thanks': 'hide', 'comments.oneWord': 'fold' }), 'hide');
+  assert.equal(verdict({}), 'keep', 'both at their defaults');
+});
+
+test('a picture or a link beside the word leaves the comment alone', () => {
+  const w = load('chapter-comments-nested.new.html');
+  const comment = w.document.querySelector('[data-comment-id="21627055"]');
+  const body = comment.querySelector('.comment-content');
+  const settings = w.RRX.normalizeSettings({ 'comments.oneWord': 'hide' });
+  const verdictFor = (html) => {
+    body.innerHTML = html;
+    return w.RRX.comments.actionForComment(comment, settings);
+  };
+
+  assert.equal(verdictFor('<p>look <img src="https://i.imgur.com/x.png"></p>'), 'keep', 'screenshot');
+  assert.equal(verdictFor('<p><a href="/x">here</a></p>'), 'keep', 'link');
+  // A Royal Road emoticon is not a picture: the word is still the whole comment.
+  const emote = 'https://www.royalroadcdn.com/public/smilies/drakangentleman-AADAIzZOsww.png';
+  assert.equal(verdictFor(`<p>Nice <img src="${emote}"></p>`), 'hide', 'word plus emoticon');
+  w.close();
+});
+
+test('switching the one-word rule on and off re-evaluates the page', () => {
+  // Fails if the rule is missing from `canAct` (never evaluated while every
+  // other rule is at keep) or from `ruleKey` (the cached verdict survives).
+  const w = load('chapter-comments-nested.new.html');
+  const d = w.document;
+  const target = d.querySelector('[data-comment-id="21627055"]');
+  const apply = (over) => w.RRX.comments.syncCards(d, ctxWith(w, over));
+
+  apply({});
+  assert.equal(stateOf(target), 'keep', 'defaults touch nothing');
+  apply({ 'comments.oneWord': 'fold' });
+  assert.equal(stateOf(target), 'fold');
+  apply({ 'comments.oneWord': 'hide' });
+  assert.equal(stateOf(target), 'hide');
+  apply({});
+  assert.equal(stateOf(target), 'keep', 'and back off');
+  w.close();
 });

@@ -40,7 +40,7 @@
      * because installing an extension should not change which version of a site
      * somebody sees, and on/off would make "off" mean both "I have not chosen"
      * and "put me back on the old one". Royal Road remembers the choice in a
-     * cookie, so going back needs it actively cleared, not just left alone.
+     * cookie, so going back needs it actively set, not just left alone.
      */
     'design.mode': { type: 'enum', default: 'leave', values: ['leave', 'new', 'old'] },
 
@@ -82,6 +82,9 @@
     'filters.enabled': { type: 'bool', default: true },
     'filters.minRating': bound(0, 5),
     'filters.maxRating': bound(0, 5),
+    /** Hide fictions whose rating Royal Road withholds ("Too few ratings"). Its
+     *  own switch: the rating range never excludes a card with no average. */
+    'filters.hideUnrated': { type: 'bool', default: false },
     'filters.minFollowers': bound(0, 1e9),
     'filters.maxFollowers': bound(0, 1e9),
     'filters.minViews': bound(0, 1e12),
@@ -153,6 +156,11 @@
      *  time, so `ask` offers the jump and `jump` takes it. Nothing is recorded
      *  while this is `off`. */
     'chapter.resume': { type: 'enum', default: 'off', values: ['off', 'ask', 'jump'] },
+    /** Count the chapters you finish, per day, for the reading dashboard. Off by
+     *  default: a dated record of what you read is more personal than anything
+     *  else kept here. Switching it off stops the counting and keeps the log;
+     *  "Forget reading history" is what deletes it. */
+    'history.log': { type: 'bool', default: false },
 
     // ── author notes, panels ────────────────────────────────────
     // Off by default: collapsing part of an author's note is a judgement call,
@@ -209,6 +217,10 @@
      *  not. It cannot share the machinery either - these have no text at all,
      *  and every text rule sees an empty string. */
     'comments.emotes': { type: 'enum', default: 'keep', values: ['keep', 'fold', 'hide'] },
+    /** Comments that are one word and nothing else: "nice", "lol", "+1". Opt-in
+     *  and its own key: the acknowledgement rule deliberately leaves bare
+     *  reactions alone. */
+    'comments.oneWord': { type: 'enum', default: 'keep', values: ['keep', 'fold', 'hide'] },
     /** Whether the rules above may reach the author's own comments. Off by
      *  default: on a chapter page the author is the one person whose short reply
      *  is worth reading, and "Thanks!" from them means something different.
