@@ -28,6 +28,13 @@
             </div>
             <p class="row__note" id="dash-on-note"></p>
           </div>
+          <div class="row">
+            <label class="row__title" id="dash-keep-label" for="dash-keep"></label>
+            <div class="row__control">
+              <input type="checkbox" id="dash-keep" aria-describedby="dash-keep-note" />
+            </div>
+            <p class="row__note" id="dash-keep-note"></p>
+          </div>
         </div>
         <p id="dash-status" class="status dash-note" role="status" hidden></p>
       </section>
@@ -79,11 +86,31 @@
                   <th scope="col">Month</th>
                   <th scope="col">Chapters</th>
                   <th scope="col">Words</th>
+                  <th scope="col">Pages</th>
                   <th scope="col">Days read</th>
                   <th scope="col">Time</th>
                 </tr>
               </thead>
               <tbody id="dash-months"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="h-years">
+          <h2 id="h-years">Year by year</h2>
+          <div class="dash-table-wrap">
+            <table class="dash-table">
+              <thead>
+                <tr>
+                  <th scope="col">Year</th>
+                  <th scope="col">Chapters</th>
+                  <th scope="col">Words</th>
+                  <th scope="col">Pages</th>
+                  <th scope="col">Days read</th>
+                  <th scope="col">Time</th>
+                </tr>
+              </thead>
+              <tbody id="dash-years"></tbody>
             </table>
           </div>
         </section>

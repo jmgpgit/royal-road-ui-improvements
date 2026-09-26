@@ -585,10 +585,14 @@
         dropped ? `${dropped} dropped fiction${dropped === 1 ? '' : 's'}` : '',
         read ? `where you had got to in ${read} chapter${read === 1 ? '' : 's'}` : '',
         watched ? `the statistics you have seen for ${watched} fiction${watched === 1 ? '' : 's'}` : '',
-        logged ? `${logged} day${logged === 1 ? '' : 's'} of your reading log` : '',
+        logged
+          ? `${logged} day${logged === 1 ? '' : 's'} of your reading log`
+          : logHeld()
+            ? 'your reading log'
+            : '',
       ].filter(Boolean);
       if (
-        (current || dropped || read || watched || logged) &&
+        (current || dropped || read || watched || logHeld()) &&
         !confirm(
           `Replace your current settings, ${current} hidden fiction${current === 1 ? '' : 's'}` +
             `${also.length ? `, ${new Intl.ListFormat('en-GB').format(also)}` : ''}` +
@@ -608,9 +612,11 @@
 
   // Not the fiction statistics: reset returns that setting to its default, which
   // is off, and off deletes them. Promising otherwise would be a lie in a
-  // confirm dialog. The reading log is kept; reset only stops it counting.
+  // confirm dialog. The reading log is kept; reset only stops it counting, and
+  // leaves `history.keep` as it is.
   const KEPT =
-    'Your hidden fictions, dropped fictions, reading progress and reading log are kept.';
+    'Your hidden fictions, dropped fictions, reading progress and reading log are kept, ' +
+    `and “${COPY['history.keep'].label}” stays as it is.`;
 
   $('reset').addEventListener('click', async () => {
     if (!confirm(`Reset every setting to its default? ${KEPT}`)) return;
@@ -621,6 +627,11 @@
   });
 
   const loggedDays = () => Object.keys((state.log && state.log.d) || {}).length;
+  const loggedYears = () => Object.keys((state.log && state.log.y) || {}).length;
+  // A chapter opened and left unread keeps its fiction's title, and no day; two
+  // idle years leave only the year totals.
+  const logHeld = () =>
+    loggedDays() || loggedYears() || Object.keys((state.log && state.log.f) || {}).length;
 
   /** What the reader has accumulated by reading, as opposed to by choosing. The
    *  hidden and dropped lists have their own managers; this is the half nobody
@@ -629,14 +640,24 @@
     const chapters = Object.keys(state.chapters || {}).length;
     const fictions = Object.keys(state.stats || {}).length;
     const days = loggedDays();
+    const years = loggedYears();
+    const titles = Object.keys((state.log && state.log.f) || {}).length;
     const parts = [];
     if (chapters) parts.push(`${chapters} chapter${chapters === 1 ? '' : 's'}`);
     if (fictions) parts.push(`${fictions} fiction${fictions === 1 ? '' : 's'}`);
     if (days) parts.push(`${days} day${days === 1 ? '' : 's'} of reading log`);
+    else if (years) parts.push(`${years} year${years === 1 ? '' : 's'} of reading totals`);
+    else if (titles) parts.push(`${titles} fiction title${titles === 1 ? '' : 's'} in the reading log`);
 
+    const kept =
+      state.settings['history.keep'] && logHeld()
+        ? ' except the reading log'
+        : years
+          ? " except the reading log's year totals"
+          : '';
     $('history-size').textContent = parts.length
       ? `Reading history: ${new Intl.ListFormat('en-GB').format(parts)}. ` +
-        'Kept on this device, and aged out on its own.'
+        `Kept on this device, and aged out on its own${kept}.`
       : 'No reading history stored.';
     $('forget-history').disabled = !parts.length;
   }

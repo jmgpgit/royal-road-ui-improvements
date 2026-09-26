@@ -219,7 +219,11 @@
     },
     'history.log': {
       label: 'Keep a reading log',
-      note: 'Counts each chapter you read to the end, with the day and its length, remembers the fiction’s title, and adds up the time you spend reading chapter pages. Kept on this device only. Switching it off stops the counting and keeps what is there; “Forget reading history” in Options → Backup deletes it.',
+      note: 'Counts each chapter you read to the end, with the day and its length, remembers the fiction’s title, and adds up the time you spend reading chapter pages. Kept on this device only. Switching it off stops the counting and deletes nothing; “Forget reading history” in Options → Backup deletes it.',
+    },
+    'history.keep': {
+      label: 'Keep the reading log for good',
+      note: 'With this off, days go after two years, and a fiction a year after you last finished a chapter of it. The year totals stay either way.',
     },
     'recap.mode': {
       label: 'Show the end of the previous chapter',
@@ -465,6 +469,7 @@
     'tags.colors': 'edited in its own card on this page, the way the two fiction lists are',
     'tags.colorHome': 'a checkbox in that same card, beside the colours it widens',
     'history.log': 'switched on and off on the reading dashboard; the chapter box is at its row cap',
+    'history.keep': 'switched on the reading dashboard',
   };
 
   /** Filter values are set in the panel on the list pages, not here. */

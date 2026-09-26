@@ -109,6 +109,12 @@
     );
   }
 
+  /** Keep a fiction's title, counting nothing. Writes only when the log lacks it
+   *  or it changed. */
+  function noteFiction(fictionId, title) {
+    return writeLog((log, now) => RRX.logTitle(log, { fictionId, title, now }));
+  }
+
   /** Seconds spent reading, added to today. */
   function addReadingTime(seconds) {
     return writeLog((log) => RRX.logTime(log, RRX.dayKey(new Date()), seconds));
@@ -116,7 +122,8 @@
 
   /** One read-modify-write at a time from this page: a finish and a time flush
    *  land in the same moment often enough, and the second would write back a
-   *  log without the first. */
+   *  log without the first. Held to the cap here, not aged: that needs
+   *  `history.keep`, which only `tidy` reads. */
   let logQueue = Promise.resolve();
   function writeLog(change) {
     const run = async () => {
@@ -124,7 +131,7 @@
       const now = Math.floor(Date.now() / 1000);
       const next = change(log, now);
       if (next === log) return false;
-      await ext.storage.local.set({ [KEY_LOG]: RRX.pruneLog(next, { now }) });
+      await ext.storage.local.set({ [KEY_LOG]: RRX.pruneLog(next, { now, keep: true }) });
       return true;
     };
     logQueue = logQueue.then(run, run);
@@ -139,10 +146,10 @@
   /**
    * Age out the growing maps, whatever is or is not still writing to them.
    *
-   * Both prunes live inside their own write path, and every write path is behind
-   * a setting - so turning the reading features off stopped the writes *and* the
-   * expiries, and what was there stayed for good. An expiry that only runs while
-   * the feature is on is not an expiry, it is a side effect of continued use.
+   * The chapter and statistics prunes also run inside their write paths, which
+   * are behind settings - so turning those features off stopped the expiries
+   * too, and what was there stayed for good. The reading log is aged only
+   * here, the one place that reads `history.keep`.
    *
    * Once a day, from any Royal Road page. The cost on all the other loads is one
    * read of a single number.
@@ -170,7 +177,7 @@
     for (const [key, load1, prune] of [
       [KEY_CHAPTERS, loadChapters, (map) => RRX.pruneChapters(map, { now, seenMaxAgeS })],
       [KEY_STATS, loadStats, (map) => RRX.pruneStats(map, { now })],
-      [KEY_LOG, loadLog, (log) => RRX.pruneLog(log, { now })],
+      [KEY_LOG, loadLog, (log) => RRX.pruneLog(log, { now, keep: settings['history.keep'] })],
     ]) {
       const before = await load1();
       // Compared rather than written blind: at the chapter map's ceiling this is
@@ -366,9 +373,12 @@
   /** Settings only. Reset went through `replaceAll` for a while, which meant every
    *  future key had to be threaded through it or be silently dropped. */
   async function resetSettings() {
-    const next = RRX.normalizeSettings({});
+    // All but `history.keep`: reset promises to keep the log, and with that off
+    // the next tidy would delete its older days.
+    const { settings } = await load();
+    const next = RRX.normalizeSettings({ 'history.keep': settings['history.keep'] });
     await ext.storage.local.set({ [KEY_SETTINGS]: next });
-    // Reset returns every setting to its default, and this one's default is off.
+    // The fiction statistics' setting defaults to off, which deletes them.
     return settleSettings(next);
   }
 
@@ -512,6 +522,7 @@
     forgetStats,
     loadLog,
     markRead,
+    noteFiction,
     addReadingTime,
     forgetLog,
     tidy,

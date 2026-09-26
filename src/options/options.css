@@ -706,7 +706,19 @@ summary.row__note::-webkit-details-marker {
 
   .dash-table th,
   .dash-table td {
-    padding-inline: 0.2rem;
+    padding-inline: 0.125rem;
+  }
+
+  /* Time carries a unit: that close, "301 529 h" reads as one number. */
+  .dash-table th:last-child,
+  .dash-table td:last-child {
+    padding-inline-start: 0.5rem;
+  }
+
+  /* With the padding above, "Days read" on two lines keeps the table inside a
+     384px screen. */
+  .dash-table thead th {
+    white-space: normal;
   }
 }
 
@@ -716,6 +728,7 @@ summary.row__note::-webkit-details-marker {
 }
 
 .dash-table thead th {
+  vertical-align: bottom;
   border-top: 0;
   color: var(--muted);
   font-size: 0.75rem;

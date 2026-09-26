@@ -36,6 +36,11 @@
 
   const firstDay = (log) => Object.keys(log.d).sort()[0] || '';
 
+  // Royal Road's search page, "Number of Pages": "Each page is counted as 275 words".
+  const WORDS_PER_PAGE = 275;
+
+  const pages = (words) => Math.round(words / WORDS_PER_PAGE);
+
   /** Chapters, words, seconds reading and days with a chapter in them, over
    *  `from`..`to`. */
   function tally(log, from, to) {
@@ -50,10 +55,12 @@
     return out;
   }
 
-  /** "45 min", "3 h 5 min". Measured time, so no "~". */
+  /** "45 min", "3 h 5 min", "1,204 h". Measured time, so no "~". Past 100
+   *  hours the minutes are noise, and wrapped the tile. */
   function duration(seconds) {
     const minutes = Math.round(seconds / 60);
     if (minutes < 60) return `${minutes} min`;
+    if (minutes >= 6000) return `${Math.round(minutes / 60).toLocaleString()} h`;
     const rest = minutes % 60;
     return `${Math.floor(minutes / 60)} h${rest ? ` ${rest} min` : ''}`;
   }
@@ -84,6 +91,19 @@
         m = 1;
         y += 1;
       }
+    }
+    return out.reverse();
+  }
+
+  /** The same by year, from the year totals, which outlive the days. */
+  function years(log, today) {
+    const first = Object.keys(log.y).sort()[0];
+    if (!first) return [];
+    const out = [];
+    for (let year = Number(first); ; year += 1) {
+      const [c, w, t, days] = log.y[year] || [0, 0, 0, 0];
+      out.push({ year: String(year), c, w, t, days });
+      if (year >= Number(today.slice(0, 4))) break;
     }
     return out.reverse();
   }
@@ -142,11 +162,17 @@
   }
 
   function summary(log, today) {
+    const all = { c: 0, w: 0, t: 0 };
+    for (const [c, w, t] of Object.values(log.y)) {
+      all.c += c;
+      all.w += w;
+      all.t += t;
+    }
     return {
       today: tally(log, today, today),
       week: tally(log, weekStart(today), today),
       month: tally(log, `${today.slice(0, 7)}-01`, today),
-      all: tally(log, '', today),
+      all,
       averages: averages(log, today),
       streaks: streaks(log, today),
     };
@@ -154,7 +180,8 @@
 
   /**
    * The log's fictions, joined with the chapters resume has a position for,
-   * most recent first.
+   * most recent first. A fiction the log holds only a title for is listed only
+   * once something of it is part-read.
    *
    * @param {object} chapters resume's records; only those with a position count
    * @param {object} names fiction id to title, for a fiction the log has not seen
@@ -177,7 +204,7 @@
     for (const fiction of out.values()) {
       fiction.title = fiction.title || (names && names[fiction.id]) || `Fiction ${fiction.id}`;
     }
-    return [...out.values()].sort((a, b) => b.last - a.last);
+    return [...out.values()].filter((f) => f.read || f.open).sort((a, b) => b.last - a.last);
   }
 
   return {
@@ -186,9 +213,12 @@
     weekStart,
     spanDays,
     tally,
+    WORDS_PER_PAGE,
+    pages,
     duration,
     weeks,
     months,
+    years,
     streaks,
     averages,
     year,
@@ -205,6 +235,7 @@
 
   const D = RRX.dashboard;
   const KEY = 'history.log';
+  const KEEP = 'history.keep';
 
   function el(tag, props, children) {
     const node = document.createElement(tag);
@@ -220,6 +251,7 @@
 
   const num = (n) => n.toLocaleString();
   const plural = (n, word) => `${num(n)} ${word}${n === 1 ? '' : 's'}`;
+  const pages = (words) => plural(D.pages(words), 'page');
   const date = (key, opts) => D.parse(key).toLocaleDateString(undefined, opts);
   const SHORT = { day: 'numeric', month: 'short' };
   const LONG = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
@@ -227,35 +259,37 @@
   const DATED = { ...SHORT, year: 'numeric' };
   const fromUnix = (s) => new Date(s * 1000).toLocaleDateString(undefined, DATED);
 
-  // --- the switch --------------------------------------------------------------
+  // --- the switches ------------------------------------------------------------
 
-  const copy = RRX.COPY[KEY];
-  $('dash-on-label').textContent = copy.label;
-  $('dash-on-note').textContent = copy.note;
-
-  $('dash-on').addEventListener('change', async (event) => {
-    await RRX.store.saveSettings({ [KEY]: event.target.checked });
-    load();
-  });
+  const SWITCHES = { 'dash-on': KEY, 'dash-keep': KEEP };
+  for (const [id, key] of Object.entries(SWITCHES)) {
+    $(`${id}-label`).textContent = RRX.COPY[key].label;
+    $(`${id}-note`).textContent = RRX.COPY[key].note;
+    $(id).addEventListener('change', async (event) => {
+      await RRX.store.saveSettings({ [key]: event.target.checked });
+      load();
+    });
+  }
 
   /** There is no history from before the switch: finishes were never stored. */
-  function statusFor(on, hasData) {
+  function statusFor(on, hasData, kept) {
     if (!hasData && on) {
       return (
-        'Counting since you switched this on. Read a chapter to the end on Royal Road and it ' +
-        'shows up here.'
+        'Counting since you switched the log on. Read a chapter to the end on Royal Road and ' +
+        'it shows up here.'
       );
     }
     if (!hasData) {
       return (
-        'Nothing counted yet. Switch this on and the chapters you read to the end are counted ' +
-        'from then on. There is no history from before it.'
+        'Nothing counted yet. Switch the log on and the chapters you read to the end are ' +
+        'counted from then on. There is no history from before it.'
       );
     }
     if (!on) {
       return (
-        'Paused: nothing new is counted. What is here is kept until you forget it in ' +
-        'Options → Backup.'
+        'Paused: nothing new is counted. What is here ' +
+        (kept ? 'is kept until you forget it' : 'still ages out, or you can forget it now') +
+        ' in Options → Backup.'
       );
     }
     return '';
@@ -274,7 +308,7 @@
 
   function renderTiles(s) {
     const host = $('dash-tiles');
-    const words = (t) => [plural(t.w, 'word'), t.t ? D.duration(t.t) : ''];
+    const words = (t) => [plural(t.w, 'word'), pages(t.w), t.t ? D.duration(t.t) : ''];
     const avg = s.averages;
     const streak = s.streaks;
     const one = (n) => n.toLocaleString(undefined, { maximumFractionDigits: 1 });
@@ -290,8 +324,12 @@
             tile('Per month', one(avg.month), 'on average'),
           ]
         : []),
-      tile('Streak', plural(streak.current, 'day'), `longest ${plural(streak.longest, 'day')}`),
-      tile('Words read', num(s.all.w), `in ${plural(s.all.c, 'chapter')}`),
+      tile(
+        'Streak',
+        plural(streak.current, 'day'),
+        streak.longest && `longest ${plural(streak.longest, 'day')}`
+      ),
+      tile('Words read', num(s.all.w), pages(s.all.w), `in ${plural(s.all.c, 'chapter')}`),
       tile('Time reading', D.duration(s.all.t), 'on chapter pages, while active')
     );
   }
@@ -340,13 +378,17 @@
     scroller.scrollLeft = scroller.scrollWidth; // this week is the end people look for
   }
 
-  function renderMonths(rows) {
-    $('dash-months').replaceChildren(
+  /** Months or years: `head` names the row. */
+  function renderRows(id, rows, head) {
+    // No month is left once every day has aged out; the years still are.
+    $(id).closest('section').hidden = !rows.length;
+    $(id).replaceChildren(
       ...rows.map((row) =>
         el('tr', {}, [
-          el('th', { scope: 'row', text: date(`${row.month}-01`, MONTH) }),
+          el('th', { scope: 'row', text: head(row) }),
           el('td', { text: num(row.c) }),
           el('td', { text: num(row.w) }),
+          el('td', { text: num(D.pages(row.w)) }),
           el('td', { text: num(row.days) }),
           el('td', { text: D.duration(row.t) }),
         ])
@@ -382,10 +424,15 @@
   function render({ settings, log, chapters, names }) {
     const today = RRX.dayKey(new Date());
     const on = !!settings[KEY];
-    const hasData = Object.keys(log.d).length > 0;
+    const days = Object.keys(log.d).length > 0;
+    // Two idle years can leave only the year totals.
+    const hasData = days || Object.keys(log.y).length > 0;
 
     $('dash-on').checked = on;
-    const status = statusFor(on, hasData);
+    $('dash-keep').checked = !!settings[KEEP];
+    // The year totals never age out; the days and fictions do, unless kept.
+    const kept = !!settings[KEEP] || !(days || Object.keys(log.f).length);
+    const status = statusFor(on, hasData, kept);
     $('dash-status').textContent = status;
     $('dash-status').hidden = !status;
     $('dash-data').hidden = !hasData;
@@ -394,7 +441,11 @@
       renderTiles(D.summary(log, today));
       renderWeeks(D.weeks(log, today));
       renderYear(D.year(log, today));
-      renderMonths(D.months(log, today));
+      // Drawn from the days, like the month table, so empty without them.
+      $('dash-weeks').closest('section').hidden = !days;
+      $('dash-year-grid').closest('section').hidden = !days;
+      renderRows('dash-months', D.months(log, today), (row) => date(`${row.month}-01`, MONTH));
+      renderRows('dash-years', D.years(log, today), (row) => row.year);
     }
     renderFictions(D.fictions(log, chapters, names));
   }

@@ -405,21 +405,28 @@
 
   // --- reading log ------------------------------------------------------------
   //
-  // `{ d: { 'YYYY-MM-DD': [c, w, t] }, f: { [fictionId]: { t, a, c } }, r: [chapterId, …] }`
+  // `{ d: { 'YYYY-MM-DD': [c, w, t] }, f: { [fictionId]: { t, a, c } }, r: [chapterId, …],
+  //    y: { 'YYYY': [c, w, t, days] } }`
   //
   //   d  per local day: chapters finished, the words in them, and seconds spent
   //      reading chapter pages (reading-log.js says what counts)
-  //   f  per fiction: its title, the last finish (unix seconds), chapters finished
+  //   f  per fiction: its title, the last finish (unix seconds), chapters finished.
+  //      A fiction opened but not finished has c 0 and `a` from when its title
+  //      was first kept, so it ages out like the rest
   //   r  the last chapters finished, oldest first. A reread of one of these is
   //      not counted again; a flag on the chapter record would keep a record per
   //      finished chapter for a year
+  //   y  per local year: d's three totals and the days with a chapter finished.
+  //      Kept until forgotten, so a year's count outlives its days
   //
   // Opt-in (`history.log`). Only ever counts forward: finishes were never
   // stored before it, so there is nothing to backfill from.
 
   const LOG_KEEP_DAYS = 730;
   const LOG_FICTION_MAX_AGE_S = 365 * 24 * 60 * 60;
-  const LOG_FICTIONS_MAX = 1000;
+  /** About 85 bytes a fiction, so under 1 MB: the whole log is rewritten on
+   *  every write. With `history.keep` on, this is the only limit. */
+  const LOG_FICTIONS_MAX = 10000;
   const LOG_RECENT_MAX = 500;
   const TITLE_MAX = 300;
 
@@ -434,10 +441,18 @@
     return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
   };
 
+  /** The year is the day key's first four characters, so local like the day. */
+  function addYear(y, day, c, w, t, days) {
+    const key = day.slice(0, 4);
+    const [c0, w0, t0, n0] = y[key] || [0, 0, 0, 0];
+    y[key] = [c0 + c, w0 + w, t0 + t, n0 + days];
+  }
+
   function normalizeLog(raw) {
     const src = raw && typeof raw === 'object' ? raw : {};
     const days = src.d && typeof src.d === 'object' ? src.d : {};
     const fictions = src.f && typeof src.f === 'object' ? src.f : {};
+    const years = src.y && typeof src.y === 'object' && !Array.isArray(src.y) ? src.y : null;
 
     const d = {};
     for (const day of Object.keys(days)) {
@@ -445,6 +460,19 @@
       const [c, w, t] = Array.isArray(days[day]) ? days[day] : [];
       const entry = [count(c), count(w), count(t)];
       if (entry.some(Boolean)) d[day] = entry;
+    }
+
+    const y = {};
+    if (years) {
+      for (const year of Object.keys(years)) {
+        if (!/^\d{4}$/.test(year)) continue;
+        const [c, w, t, n] = Array.isArray(years[year]) ? years[year] : [];
+        const entry = [count(c), count(w), count(t), count(n)];
+        if (entry.some(Boolean)) y[year] = entry;
+      }
+    } else {
+      // A 1.6.0 log or backup: derived once, then kept.
+      for (const [day, [c, w, t]] of Object.entries(d)) addYear(y, day, c, w, t, c ? 1 : 0);
     }
 
     const f = {};
@@ -460,7 +488,7 @@
     }
 
     const r = Array.isArray(src.r) ? [...new Set(src.r.map(Number).filter(isValidId))] : [];
-    return { d, f, r };
+    return { d, f, r, y };
   }
 
   /**
@@ -479,6 +507,7 @@
 
     const [c, w, t] = src.d[day] || [0, 0, 0];
     src.d[day] = [c + 1, w + count(words), t];
+    addYear(src.y, day, 1, count(words), 0, c ? 0 : 1);
 
     const fid = Number(fictionId);
     if (isValidId(fid)) {
@@ -491,21 +520,42 @@
     return src;
   }
 
+  /**
+   * Keep a fiction's title without counting anything, so the dashboard can
+   * name one that is only part-read.
+   *
+   * @returns {object} the log unchanged (the same object) when there is no
+   *   title or it is already the one kept
+   */
+  function logTitle(log, { fictionId, title, now }) {
+    const src = normalizeLog(log);
+    const fid = Number(fictionId);
+    const name = typeof title === 'string' ? title.trim().slice(0, TITLE_MAX) : '';
+    const was = src.f[fid];
+    if (!isValidId(fid) || !name || (was && was.t === name)) return log;
+    src.f[fid] = was ? { ...was, t: name } : { t: name, a: count(now), c: 0 };
+    return src;
+  }
+
   /** Add seconds spent reading to a day. */
   function logTime(log, day, seconds) {
     const src = normalizeLog(log);
     const [c, w, t] = src.d[day] || [0, 0, 0];
     src.d[day] = [c, w, t + count(seconds)];
+    addYear(src.y, day, 0, 0, count(seconds), 0);
     return src;
   }
 
-  /** Days past `keepDays`, fictions nothing has been finished in for a year, and
-   *  the oldest fictions past the cap. The day totals outlive the fictions: a
-   *  year-old week still counts without knowing what was in it. */
+  /** Days past `keepDays`, fictions whose `a` is a year old, and past the cap
+   *  the oldest, title-only ones first. `keep` (`history.keep`) lifts the two
+   *  age limits, not the cap. The day totals outlive the fictions: a year-old
+   *  week still counts without knowing what was in it. The year totals are
+   *  never pruned. */
   function pruneLog(
     log,
     {
       now = 0,
+      keep = false,
       keepDays = LOG_KEEP_DAYS,
       maxAgeS = LOG_FICTION_MAX_AGE_S,
       max = LOG_FICTIONS_MAX,
@@ -513,19 +563,24 @@
     } = {}
   ) {
     const src = normalizeLog(log);
-    const cutoff = now ? dayKey(new Date((now - keepDays * 86400) * 1000)) : '';
+    const ages = !keep && now;
+    const cutoff = ages ? dayKey(new Date((now - keepDays * 86400) * 1000)) : '';
 
     const d = {};
     for (const [day, entry] of Object.entries(src.d)) if (day >= cutoff) d[day] = entry;
 
     let fictions = Object.entries(src.f).filter(
-      ([, rec]) => !now || !rec.a || now - rec.a <= maxAgeS
+      ([, rec]) => !ages || !rec.a || now - rec.a <= maxAgeS
     );
-    if (fictions.length > max) fictions = fictions.sort((a, b) => b[1].a - a[1].a).slice(0, max);
+    if (fictions.length > max) {
+      fictions = fictions
+        .sort((a, b) => Math.sign(b[1].c) - Math.sign(a[1].c) || b[1].a - a[1].a)
+        .slice(0, max);
+    }
 
     // No day left means nothing to dedupe against: the ids go with the days.
     const r = Object.keys(d).length ? src.r.slice(-recent) : [];
-    return { d, f: Object.fromEntries(fictions), r };
+    return { d, f: Object.fromEntries(fictions), r, y: src.y };
   }
 
   // --- synchronous boot mirror --------------------------------------------
@@ -646,6 +701,7 @@
     dayKey,
     normalizeLog,
     logFinish,
+    logTitle,
     logTime,
     pruneLog,
     LOG_KEEP_DAYS,

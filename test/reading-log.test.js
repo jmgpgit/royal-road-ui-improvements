@@ -109,6 +109,12 @@ function scrollTo(w, top) {
 const AT_END = -9300;
 const settle = () => new Promise((resolve) => setTimeout(resolve, 40));
 const today = (w) => w.RRX.dayKey(new Date());
+/** Anything counted. Opening a chapter keeps its fiction's title, which is not. */
+const counted = (w) => {
+  const log = w.__store.log;
+  if (!log) return false;
+  return Object.keys(log.d).length > 0 || log.r.length > 0 || Object.values(log.f).some((f) => f.c);
+};
 
 test('a chapter read to the end is counted once per page view', async () => {
   const { w } = visit();
@@ -147,14 +153,54 @@ test('switching it off in an open tab stops the counting there', async () => {
   ctx.settings = w.RRX.normalizeSettings({ 'history.log': false });
   scrollTo(w, AT_END);
   await settle();
-  assert.equal(w.__store.log, undefined);
+  assert.equal(counted(w), false);
+});
+
+test('opening a chapter keeps its fiction’s title, and counts nothing', async () => {
+  const { w } = visit();
+  await settle();
+  const log = w.__store.log;
+  assert.equal(log.f[FICTION].t, w.RRX.recap.fictionTitleIn(w.document));
+  assert.ok(log.f[FICTION].t, 'and the fixture has one');
+  assert.equal(log.f[FICTION].c, 0);
+  assert.equal(Object.keys(log.d).length, 0, 'no chapter and no time');
+  assert.equal(log.r.length, 0);
+});
+
+test('switching it on in an open tab keeps the title there', async () => {
+  const { w, ctx } = visit({ settings: {} });
+  await settle();
+  assert.equal(w.__store.log, undefined, 'nothing while it is off');
+  ctx.settings = w.RRX.normalizeSettings({ 'history.log': true });
+  w.RRX.readingLog.apply(ctx);
+  await settle();
+  assert.ok(w.__store.log.f[FICTION].t);
+  assert.equal(counted(w), false);
+});
+
+test('a title already kept is not written again', async () => {
+  const storage = {};
+  visit({ storage });
+  await settle();
+  const kept = storage.log;
+  assert.ok(kept.f[FICTION].t);
+
+  const { w } = visit({ storage, start: false });
+  let writes = 0;
+  const { set } = w.browser.storage.local;
+  w.browser.storage.local.set = (patch) => ((writes += 1), set(patch));
+  const settings = w.RRX.normalizeSettings({ 'history.log': true });
+  w.RRX.readingLog.apply({ page: 'chapter', settings });
+  await settle();
+  assert.equal(writes, 0);
+  assert.equal(storage.log, kept);
 });
 
 test('a chapter not yet at its last line is not counted', async () => {
   const { w } = visit();
   scrollTo(w, -5000);
   await settle();
-  assert.equal(w.__store.log, undefined);
+  assert.equal(counted(w), false);
 });
 
 test('a page opened from a comment link is not counted', async () => {
@@ -164,7 +210,7 @@ test('a page opened from a comment link is not counted', async () => {
     w.history.replaceState(null, '', URL_BASE);
     scrollTo(w, AT_END);
     await settle();
-    assert.equal(w.__store.log, undefined, url);
+    assert.equal(counted(w), false, url);
   }
 });
 
@@ -173,7 +219,7 @@ test('reaching the end too soon after opening is a skim, until enough time has p
   w.performance.now = () => 5000;
   scrollTo(w, AT_END);
   await settle();
-  assert.equal(w.__store.log, undefined, 'five seconds into a chapter of a few thousand words');
+  assert.equal(counted(w), false, 'five seconds into a chapter of a few thousand words');
 
   w.performance.now = () => 30 * MINUTES;
   scrollTo(w, AT_END);
@@ -235,7 +281,7 @@ function setVisible(w, visible) {
   });
   w.document.dispatchEvent(new w.Event('visibilitychange'));
 }
-const seconds = (w) => (w.__store.log ? w.__store.log.d[today(w)][2] : 0);
+const seconds = (w) => ((w.__store.log && w.__store.log.d[today(w)]) || [])[2] || 0;
 
 test('only visible time counts towards reading a chapter that ends on screen', () => {
   const { w, ctx } = visit({ start: false });
@@ -306,7 +352,7 @@ test('no time is counted while the log is off, or after it is switched off', asy
   ctx.settings = w.RRX.normalizeSettings({ 'history.log': false });
   setVisible(w, false);
   await settle();
-  assert.equal(w.__store.log, undefined, 'the unwritten half minute was dropped');
+  assert.equal(counted(w), false, 'the unwritten half minute was dropped');
 });
 
 test('a finish and a time flush in the same moment both land', async () => {
