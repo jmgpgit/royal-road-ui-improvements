@@ -17,6 +17,7 @@ const { JSDOM } = require('jsdom');
 
 const D = require('../src/dashboard/dashboard.js');
 const { dayKey } = require('../src/common/model.js');
+const { read: fixture, need } = require('./helpers/fixtures.js');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -104,6 +105,25 @@ test('measured time reads as minutes, then hours and minutes', () => {
   assert.equal(t, 900, 'a day with no finish still counts');
 });
 
+test(
+  'a page is as many words as Royal Road counts one',
+  { skip: need('fictions-search.new.html') },
+  () => {
+    const text = fixture('fictions-search.new.html').replace(/\s+/g, ' ');
+    assert.match(text, new RegExp(`counted as ${D.WORDS_PER_PAGE} words`));
+  }
+);
+
+test('a page is 275 words, rounded to the nearest', () => {
+  assert.equal(D.pages(0), 0);
+  assert.equal(D.pages(137), 0);
+  assert.equal(D.pages(138), 1);
+  assert.equal(D.pages(275), 1);
+  assert.equal(D.pages(412), 1);
+  assert.equal(D.pages(413), 2);
+  assert.equal(D.pages(11242), 41);
+});
+
 test('fictions join the log with chapters part-read, newest first', () => {
   const list = D.fictions(
     log({}, { f: { 1: { t: 'Logged', a: 100, c: 4 } } }),
@@ -142,6 +162,14 @@ const windows = [];
 test.after(() => {
   for (const w of windows) w.close();
 });
+
+/** A tile's lines under its number, found by its label. */
+function subs(d, label) {
+  const tile = [...d.querySelectorAll('.tile')].find(
+    (t) => t.querySelector('.tile__label').textContent === label
+  );
+  return [...tile.querySelectorAll('.tile__sub')].map((sub) => sub.textContent);
+}
 
 async function render(store) {
   const html = fs.readFileSync(path.join(ROOT, 'src/dashboard/dashboard.html'), 'utf8');
@@ -190,6 +218,16 @@ test('a seeded log draws every part of the page', async () => {
   assert.ok(tiles.some((t) => t.startsWith('Words read5,500')), 'the total counts every day');
   assert.ok(tiles.some((t) => t.startsWith('Time reading35 min')), 'and so does the time');
   assert.ok(tiles.some((t) => t.startsWith('Today2') && t.includes('25 min')));
+  assert.deepEqual(subs(d, 'Today'), ['4,000 words', '15 pages', '25 min']);
+  assert.deepEqual(subs(d, 'Words read'), ['20 pages', 'in 3 chapters']);
+
+  const head = [...d.querySelectorAll('.dash-table thead th')].map((th) => th.textContent);
+  assert.deepEqual(head, ['Month', 'Chapters', 'Words', 'Pages', 'Days read', 'Time']);
+  const thisMonth = [...d.querySelectorAll('#dash-months tr')][0];
+  assert.deepEqual(
+    [...thisMonth.querySelectorAll('td')].map((td) => td.textContent),
+    ['2', '4,000', '15', '1', '25 min']
+  );
 
   assert.equal(d.querySelectorAll('.bars__col').length, 12);
   assert.equal(d.querySelectorAll('#dash-year-grid .heat__cell').length, 53 * 7);
@@ -214,6 +252,14 @@ test('a fiction only part-read shows the title kept on opening, and no “0 chap
   assert.equal(items.length, 1, items.join(' | '));
   assert.match(items[0], /^Kept on opening1 part-read · last /);
   assert.ok(!items[0].includes('0 chapters'), items[0]);
+});
+
+test('one page is singular, on the tiles', async () => {
+  const today = dayKey(new Date());
+  const w = await render({ settings: { 'history.log': true }, log: log({ [today]: [1, 275, 0] }) });
+  const d = w.document;
+  assert.deepEqual(subs(d, 'Today'), ['275 words', '1 page']);
+  assert.deepEqual(subs(d, 'Words read'), ['1 page', 'in 1 chapter']);
 });
 
 test('a clock set back past every recorded day leaves out the averages, not the page', async () => {

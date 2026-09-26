@@ -36,6 +36,11 @@
 
   const firstDay = (log) => Object.keys(log.d).sort()[0] || '';
 
+  // Royal Road's search page, "Number of Pages": "Each page is counted as 275 words".
+  const WORDS_PER_PAGE = 275;
+
+  const pages = (words) => Math.round(words / WORDS_PER_PAGE);
+
   /** Chapters, words, seconds reading and days with a chapter in them, over
    *  `from`..`to`. */
   function tally(log, from, to) {
@@ -187,6 +192,8 @@
     weekStart,
     spanDays,
     tally,
+    WORDS_PER_PAGE,
+    pages,
     duration,
     weeks,
     months,
@@ -221,6 +228,7 @@
 
   const num = (n) => n.toLocaleString();
   const plural = (n, word) => `${num(n)} ${word}${n === 1 ? '' : 's'}`;
+  const pages = (words) => plural(D.pages(words), 'page');
   const date = (key, opts) => D.parse(key).toLocaleDateString(undefined, opts);
   const SHORT = { day: 'numeric', month: 'short' };
   const LONG = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
@@ -275,7 +283,7 @@
 
   function renderTiles(s) {
     const host = $('dash-tiles');
-    const words = (t) => [plural(t.w, 'word'), t.t ? D.duration(t.t) : ''];
+    const words = (t) => [plural(t.w, 'word'), pages(t.w), t.t ? D.duration(t.t) : ''];
     const avg = s.averages;
     const streak = s.streaks;
     const one = (n) => n.toLocaleString(undefined, { maximumFractionDigits: 1 });
@@ -292,7 +300,7 @@
           ]
         : []),
       tile('Streak', plural(streak.current, 'day'), `longest ${plural(streak.longest, 'day')}`),
-      tile('Words read', num(s.all.w), `in ${plural(s.all.c, 'chapter')}`),
+      tile('Words read', num(s.all.w), pages(s.all.w), `in ${plural(s.all.c, 'chapter')}`),
       tile('Time reading', D.duration(s.all.t), 'on chapter pages, while active')
     );
   }
@@ -348,6 +356,7 @@
           el('th', { scope: 'row', text: date(`${row.month}-01`, MONTH) }),
           el('td', { text: num(row.c) }),
           el('td', { text: num(row.w) }),
+          el('td', { text: num(D.pages(row.w)) }),
           el('td', { text: num(row.days) }),
           el('td', { text: D.duration(row.t) }),
         ])
