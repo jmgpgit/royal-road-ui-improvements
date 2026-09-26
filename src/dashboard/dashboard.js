@@ -55,10 +55,12 @@
     return out;
   }
 
-  /** "45 min", "3 h 5 min". Measured time, so no "~". */
+  /** "45 min", "3 h 5 min", "1,204 h". Measured time, so no "~". Past 100
+   *  hours the minutes are noise, and wrapped the tile. */
   function duration(seconds) {
     const minutes = Math.round(seconds / 60);
     if (minutes < 60) return `${minutes} min`;
+    if (minutes >= 6000) return `${Math.round(minutes / 60).toLocaleString()} h`;
     const rest = minutes % 60;
     return `${Math.floor(minutes / 60)} h${rest ? ` ${rest} min` : ''}`;
   }
@@ -89,6 +91,19 @@
         m = 1;
         y += 1;
       }
+    }
+    return out.reverse();
+  }
+
+  /** The same by year, from the year totals, which outlive the days. */
+  function years(log, today) {
+    const first = Object.keys(log.y).sort()[0];
+    if (!first) return [];
+    const out = [];
+    for (let year = Number(first); ; year += 1) {
+      const [c, w, t, days] = log.y[year] || [0, 0, 0, 0];
+      out.push({ year: String(year), c, w, t, days });
+      if (year >= Number(today.slice(0, 4))) break;
     }
     return out.reverse();
   }
@@ -147,11 +162,17 @@
   }
 
   function summary(log, today) {
+    const all = { c: 0, w: 0, t: 0 };
+    for (const [c, w, t] of Object.values(log.y)) {
+      all.c += c;
+      all.w += w;
+      all.t += t;
+    }
     return {
       today: tally(log, today, today),
       week: tally(log, weekStart(today), today),
       month: tally(log, `${today.slice(0, 7)}-01`, today),
-      all: tally(log, '', today),
+      all,
       averages: averages(log, today),
       streaks: streaks(log, today),
     };
@@ -197,6 +218,7 @@
     duration,
     weeks,
     months,
+    years,
     streaks,
     averages,
     year,
@@ -299,7 +321,11 @@
             tile('Per month', one(avg.month), 'on average'),
           ]
         : []),
-      tile('Streak', plural(streak.current, 'day'), `longest ${plural(streak.longest, 'day')}`),
+      tile(
+        'Streak',
+        plural(streak.current, 'day'),
+        streak.longest && `longest ${plural(streak.longest, 'day')}`
+      ),
       tile('Words read', num(s.all.w), pages(s.all.w), `in ${plural(s.all.c, 'chapter')}`),
       tile('Time reading', D.duration(s.all.t), 'on chapter pages, while active')
     );
@@ -349,11 +375,14 @@
     scroller.scrollLeft = scroller.scrollWidth; // this week is the end people look for
   }
 
-  function renderMonths(rows) {
-    $('dash-months').replaceChildren(
+  /** Months or years: `head` names the row. */
+  function renderRows(id, rows, head) {
+    // No month is left once every day has aged out; the years still are.
+    $(id).closest('section').hidden = !rows.length;
+    $(id).replaceChildren(
       ...rows.map((row) =>
         el('tr', {}, [
-          el('th', { scope: 'row', text: date(`${row.month}-01`, MONTH) }),
+          el('th', { scope: 'row', text: head(row) }),
           el('td', { text: num(row.c) }),
           el('td', { text: num(row.w) }),
           el('td', { text: num(D.pages(row.w)) }),
@@ -392,7 +421,9 @@
   function render({ settings, log, chapters, names }) {
     const today = RRX.dayKey(new Date());
     const on = !!settings[KEY];
-    const hasData = Object.keys(log.d).length > 0;
+    const days = Object.keys(log.d).length > 0;
+    // Two idle years can leave only the year totals.
+    const hasData = days || Object.keys(log.y).length > 0;
 
     $('dash-on').checked = on;
     const status = statusFor(on, hasData);
@@ -404,7 +435,11 @@
       renderTiles(D.summary(log, today));
       renderWeeks(D.weeks(log, today));
       renderYear(D.year(log, today));
-      renderMonths(D.months(log, today));
+      // Drawn from the days, like the month table, so empty without them.
+      $('dash-weeks').closest('section').hidden = !days;
+      $('dash-year-grid').closest('section').hidden = !days;
+      renderRows('dash-months', D.months(log, today), (row) => date(`${row.month}-01`, MONTH));
+      renderRows('dash-years', D.years(log, today), (row) => row.year);
     }
     renderFictions(D.fictions(log, chapters, names));
   }

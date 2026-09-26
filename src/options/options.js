@@ -625,8 +625,11 @@
   });
 
   const loggedDays = () => Object.keys((state.log && state.log.d) || {}).length;
-  // A chapter opened and left unread keeps its fiction's title, and no day.
-  const logHeld = () => loggedDays() || Object.keys((state.log && state.log.f) || {}).length;
+  const loggedYears = () => Object.keys((state.log && state.log.y) || {}).length;
+  // A chapter opened and left unread keeps its fiction's title, and no day; two
+  // idle years leave only the year totals.
+  const logHeld = () =>
+    loggedDays() || loggedYears() || Object.keys((state.log && state.log.f) || {}).length;
 
   /** What the reader has accumulated by reading, as opposed to by choosing. The
    *  hidden and dropped lists have their own managers; this is the half nobody
@@ -635,16 +638,19 @@
     const chapters = Object.keys(state.chapters || {}).length;
     const fictions = Object.keys(state.stats || {}).length;
     const days = loggedDays();
+    const years = loggedYears();
     const titles = Object.keys((state.log && state.log.f) || {}).length;
     const parts = [];
     if (chapters) parts.push(`${chapters} chapter${chapters === 1 ? '' : 's'}`);
     if (fictions) parts.push(`${fictions} fiction${fictions === 1 ? '' : 's'}`);
     if (days) parts.push(`${days} day${days === 1 ? '' : 's'} of reading log`);
+    else if (years) parts.push(`${years} year${years === 1 ? '' : 's'} of reading totals`);
     else if (titles) parts.push(`${titles} fiction title${titles === 1 ? '' : 's'} in the reading log`);
 
+    const kept = years ? " except the reading log's year totals" : '';
     $('history-size').textContent = parts.length
       ? `Reading history: ${new Intl.ListFormat('en-GB').format(parts)}. ` +
-        'Kept on this device, and aged out on its own.'
+        `Kept on this device, and aged out on its own${kept}.`
       : 'No reading history stored.';
     $('forget-history').disabled = !parts.length;
   }

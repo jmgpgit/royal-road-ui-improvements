@@ -84,6 +84,25 @@ test('months run from the first to this one, empty ones included, newest first',
   );
 });
 
+test('years run from the first total to this one, empty ones included, newest first', () => {
+  const totals = log({}, { y: { 2023: [5, 50, 9, 2], 2025: [1, 10, 3, 1] } });
+  assert.deepEqual(
+    D.years(totals, '2026-01-01').map((r) => [r.year, r.c, r.w, r.t, r.days]),
+    [
+      ['2026', 0, 0, 0, 0],
+      ['2025', 1, 10, 3, 1],
+      ['2024', 0, 0, 0, 0],
+      ['2023', 5, 50, 9, 2],
+    ]
+  );
+  assert.deepEqual(D.years(log({}, { y: {} }), '2026-01-01'), []);
+  assert.deepEqual(
+    D.years(totals, '2022-06-01').map((r) => r.year),
+    ['2023'],
+    'a clock behind the first year still lists it'
+  );
+});
+
 test('the year is 53 Monday-first weeks ending with this one', () => {
   const cells = D.year(log({ '2026-09-02': [3, 1] }), '2026-09-02');
   assert.equal(cells.length, 53 * 7);
@@ -95,11 +114,14 @@ test('the year is 53 Monday-first weeks ending with this one', () => {
   );
 });
 
-test('measured time reads as minutes, then hours and minutes', () => {
+test('measured time reads as minutes, then hours and minutes, then hours', () => {
   assert.equal(D.duration(0), '0 min');
   assert.equal(D.duration(2700), '45 min');
   assert.equal(D.duration(3600), '1 h');
   assert.equal(D.duration(3 * 3600 + 5 * 60), '3 h 5 min');
+  assert.equal(D.duration(99 * 3600 + 59 * 60), '99 h 59 min');
+  assert.equal(D.duration(939 * 3600 + 8 * 60), '939 h', 'past 100 h, no minutes');
+  assert.equal(D.duration(1204 * 3600), `${(1204).toLocaleString()} h`);
   const days = log({ '2026-09-01': [1, 2000, 600], '2026-09-02': [0, 0, 300] });
   const { t } = D.tally(days, '2026-09-01', '2026-09-02');
   assert.equal(t, 900, 'a day with no finish still counts');
@@ -221,7 +243,9 @@ test('a seeded log draws every part of the page', async () => {
   assert.deepEqual(subs(d, 'Today'), ['4,000 words', '15 pages', '25 min']);
   assert.deepEqual(subs(d, 'Words read'), ['20 pages', 'in 3 chapters']);
 
-  const head = [...d.querySelectorAll('.dash-table thead th')].map((th) => th.textContent);
+  const head = [...d.querySelectorAll('#h-months + .dash-table-wrap thead th')].map(
+    (th) => th.textContent
+  );
   assert.deepEqual(head, ['Month', 'Chapters', 'Words', 'Pages', 'Days read', 'Time']);
   const thisMonth = [...d.querySelectorAll('#dash-months tr')][0];
   assert.deepEqual(
@@ -237,6 +261,60 @@ test('a seeded log draws every part of the page', async () => {
   assert.equal(link.textContent, 'Mother of Learning');
   assert.equal(link.getAttribute('href'), 'https://www.royalroad.com/fiction/21220');
   assert.equal(link.getAttribute('rel'), 'noreferrer');
+});
+
+/** A table's rows as text, header cell first. */
+const rows = (d, id) =>
+  [...d.querySelectorAll(`#${id} tr`)].map((tr) =>
+    [...tr.children].map((cell) => cell.textContent)
+  );
+
+test('the all-time tiles and the year table come from the year totals, not the days', async () => {
+  const today = dayKey(new Date());
+  const year = Number(today.slice(0, 4));
+  const w = await render({
+    settings: { 'history.log': true },
+    log: {
+      d: { [today]: [2, 4000, 1500] }, // the older days have aged out
+      f: {},
+      r: [1, 2],
+      y: { [year - 2]: [100, 196000, 36000, 50], [year]: [2, 4000, 1500, 1] },
+    },
+  });
+  const d = w.document;
+  assert.deepEqual(subs(d, 'Words read'), ['727 pages', 'in 102 chapters']);
+  const tiles = [...d.querySelectorAll('.tile')].map((t) => t.textContent);
+  assert.ok(tiles.some((t) => t.startsWith('Words read200,000')), tiles.join(' | '));
+  assert.ok(tiles.some((t) => t.startsWith('Time reading10 h 25 min')), tiles.join(' | '));
+
+  const head = [...d.querySelectorAll('#h-years + .dash-table-wrap thead th')].map(
+    (th) => th.textContent
+  );
+  assert.deepEqual(head, ['Year', 'Chapters', 'Words', 'Pages', 'Days read', 'Time']);
+  assert.deepEqual(rows(d, 'dash-years'), [
+    [String(year), '2', '4,000', '15', '1', '25 min'],
+    [String(year - 1), '0', '0', '0', '0', '0 min'],
+    [String(year - 2), '100', '196,000', '713', '50', '10 h'],
+  ]);
+  assert.equal(rows(d, 'dash-months').length, 1, 'the months still come from the days');
+});
+
+test('a log left with only its year totals still shows them', async () => {
+  const year = new Date().getFullYear();
+  const w = await render({
+    settings: { 'history.log': true },
+    log: { d: {}, f: {}, r: [], y: { [year - 2]: [3, 6000, 600, 2] } },
+  });
+  const d = w.document;
+  assert.equal(d.getElementById('dash-data').hidden, false);
+  assert.equal(d.getElementById('dash-status').hidden, true, 'not "counting since…"');
+  assert.equal(rows(d, 'dash-years').length, 3);
+  const months = d.getElementById('dash-months').closest('section');
+  assert.equal(months.hidden, true, 'no empty month table');
+  assert.equal(d.getElementById('dash-weeks').closest('section').hidden, true, 'nor weeks');
+  assert.equal(d.getElementById('dash-year-grid').closest('section').hidden, true, 'nor last year');
+  assert.deepEqual(subs(d, 'Words read'), ['22 pages', 'in 3 chapters']);
+  assert.deepEqual(subs(d, 'Streak'), [], 'no "longest 0 days"');
 });
 
 test('a fiction only part-read shows the title kept on opening, and no “0 chapters read”', async () => {

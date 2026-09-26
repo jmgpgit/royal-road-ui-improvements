@@ -444,9 +444,10 @@ test('a log holding only titles is still history to forget, and named by an impo
   const log = { d: {}, f: { 149588: { t: 'One Was Worthy', a: 1790437528, c: 0 } }, r: [] };
   const w = await render({ log });
   const d = w.document;
-  assert.match(
+  assert.equal(
     d.getElementById('history-size').textContent,
-    /^Reading history: 1 fiction title in the reading log\./
+    'Reading history: 1 fiction title in the reading log. ' +
+      'Kept on this device, and aged out on its own.'
   );
   assert.equal(d.getElementById('forget-history').disabled, false);
 
@@ -466,6 +467,37 @@ test('a log holding only titles is still history to forget, and named by an impo
 
   assert.match(asked, /your reading log/, 'replaced without asking');
   assert.equal(w.__s.log.f[149588].t, 'One Was Worthy', 'cancelling keeps it');
+});
+
+test('a log of only year totals is still history: named, asked about, forgotten', async () => {
+  const w = await render({ log: { d: {}, f: {}, r: [], y: { 2024: [3, 6000, 600, 2] } } });
+  const d = w.document;
+  assert.equal(
+    d.getElementById('history-size').textContent,
+    'Reading history: 1 year of reading totals. ' +
+      "Kept on this device, and aged out on its own except the reading log's year totals."
+  );
+
+  let asked = '';
+  w.confirm = (text) => {
+    asked = text;
+    return false;
+  };
+  const file = new w.File(
+    [JSON.stringify({ format: 'royal-road-ui-improvements', version: 1 })],
+    'backup.json'
+  );
+  const input = d.getElementById('import-file');
+  Object.defineProperty(input, 'files', { value: [file], configurable: true });
+  input.dispatchEvent(new w.Event('change'));
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  assert.match(asked, /your reading log/, 'replaced without asking');
+
+  w.confirm = () => true;
+  d.getElementById('forget-history').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  assert.equal(Object.keys(w.__s.log).length, 0, 'forgetting takes the year totals too');
+  assert.equal(d.getElementById('history-size').textContent, 'No reading history stored.');
 });
 
 test('reset keeps the reading log and only stops it counting', async () => {
