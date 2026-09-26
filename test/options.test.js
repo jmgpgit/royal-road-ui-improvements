@@ -500,9 +500,21 @@ test('a log of only year totals is still history: named, asked about, forgotten'
   assert.equal(d.getElementById('history-size').textContent, 'No reading history stored.');
 });
 
+test('a log kept for good is not said to age out', async () => {
+  const w = await render({
+    settings: { 'history.keep': true },
+    log: { d: { '2026-09-01': [2, 4000] }, f: {}, r: [1, 2] },
+  });
+  assert.equal(
+    w.document.getElementById('history-size').textContent,
+    'Reading history: 1 day of reading log. ' +
+      'Kept on this device, and aged out on its own except the reading log.'
+  );
+});
+
 test('reset keeps the reading log and only stops it counting', async () => {
   const w = await render({
-    settings: { 'history.log': true },
+    settings: { 'history.log': true, 'history.keep': true },
     log: { d: { '2026-09-01': [2, 4000] }, f: {}, r: [1, 2] },
   });
   let asked = '';
@@ -513,9 +525,11 @@ test('reset keeps the reading log and only stops it counting', async () => {
   w.document.getElementById('reset').dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
   await new Promise((resolve) => setTimeout(resolve, 40));
 
-  assert.match(asked, /reading log are kept/);
+  assert.match(asked, /reading log are kept, and “Keep the reading log for good” stays as it is/);
   assert.deepEqual(Object.keys(w.__s.log.d), ['2026-09-01']);
   assert.equal(w.__s.settings['history.log'], false);
+  // Off, the next housekeeping would drop the days reset just promised to keep.
+  assert.equal(w.__s.settings['history.keep'], true, 'kept for good stays so');
 });
 
 test('reset updates mounted controls to their defaults', async () => {

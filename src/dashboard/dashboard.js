@@ -235,6 +235,7 @@
 
   const D = RRX.dashboard;
   const KEY = 'history.log';
+  const KEEP = 'history.keep';
 
   function el(tag, props, children) {
     const node = document.createElement(tag);
@@ -258,35 +259,37 @@
   const DATED = { ...SHORT, year: 'numeric' };
   const fromUnix = (s) => new Date(s * 1000).toLocaleDateString(undefined, DATED);
 
-  // --- the switch --------------------------------------------------------------
+  // --- the switches ------------------------------------------------------------
 
-  const copy = RRX.COPY[KEY];
-  $('dash-on-label').textContent = copy.label;
-  $('dash-on-note').textContent = copy.note;
-
-  $('dash-on').addEventListener('change', async (event) => {
-    await RRX.store.saveSettings({ [KEY]: event.target.checked });
-    load();
-  });
+  const SWITCHES = { 'dash-on': KEY, 'dash-keep': KEEP };
+  for (const [id, key] of Object.entries(SWITCHES)) {
+    $(`${id}-label`).textContent = RRX.COPY[key].label;
+    $(`${id}-note`).textContent = RRX.COPY[key].note;
+    $(id).addEventListener('change', async (event) => {
+      await RRX.store.saveSettings({ [key]: event.target.checked });
+      load();
+    });
+  }
 
   /** There is no history from before the switch: finishes were never stored. */
-  function statusFor(on, hasData) {
+  function statusFor(on, hasData, kept) {
     if (!hasData && on) {
       return (
-        'Counting since you switched this on. Read a chapter to the end on Royal Road and it ' +
-        'shows up here.'
+        'Counting since you switched the log on. Read a chapter to the end on Royal Road and ' +
+        'it shows up here.'
       );
     }
     if (!hasData) {
       return (
-        'Nothing counted yet. Switch this on and the chapters you read to the end are counted ' +
-        'from then on. There is no history from before it.'
+        'Nothing counted yet. Switch the log on and the chapters you read to the end are ' +
+        'counted from then on. There is no history from before it.'
       );
     }
     if (!on) {
       return (
-        'Paused: nothing new is counted. What is here is kept until you forget it in ' +
-        'Options → Backup.'
+        'Paused: nothing new is counted. What is here ' +
+        (kept ? 'is kept until you forget it' : 'still ages out, or you can forget it now') +
+        ' in Options → Backup.'
       );
     }
     return '';
@@ -426,7 +429,10 @@
     const hasData = days || Object.keys(log.y).length > 0;
 
     $('dash-on').checked = on;
-    const status = statusFor(on, hasData);
+    $('dash-keep').checked = !!settings[KEEP];
+    // The year totals never age out; the days and fictions do, unless kept.
+    const kept = !!settings[KEEP] || !(days || Object.keys(log.f).length);
+    const status = statusFor(on, hasData, kept);
     $('dash-status').textContent = status;
     $('dash-status').hidden = !status;
     $('dash-data').hidden = !hasData;

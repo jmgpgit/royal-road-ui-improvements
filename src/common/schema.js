@@ -161,6 +161,8 @@
      *  else kept here. Switching it off stops the counting and keeps the log;
      *  "Forget reading history" is what deletes it. */
     'history.log': { type: 'bool', default: false },
+    /** Lifts the log's age limits: days after two years, fictions after one. */
+    'history.keep': { type: 'bool', default: false },
 
     // ── author notes, panels ────────────────────────────────────
     // Off by default: collapsing part of an author's note is a judgement call,

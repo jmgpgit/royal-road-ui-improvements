@@ -695,8 +695,8 @@ test('the tag cache ages from when it was fetched, not from when it was last use
 });
 
 test('the stored maps age out even with every feature that fills them off', async () => {
-  // The prunes live inside the write paths, and every write path is behind a
-  // setting. With those off nothing wrote and so nothing expired either: what
+  // The chapter and statistics prunes live inside write paths that are behind
+  // settings. With those off nothing wrote and so nothing expired either: what
   // was there stayed for good. Housekeeping is what makes the expiry real.
   const year = 400 * 24 * 3600;
   const old = Math.floor(Date.now() / 1000) - year;
@@ -766,6 +766,59 @@ test('housekeeping prunes against the reader’s own expiry, not the built-in on
   await w.RRX.store.tidy();
   assert.ok(w.__store.chapters[3766643], 'kept, because the reader asked for 300 days');
   assert.equal(w.__store.chapters[3766643].s, days(200), 'watermark and all');
+});
+
+test('a kept reading log survives writes and housekeeping, until keep goes off', async () => {
+  // The 1.4.1 bug's shape again: a write that aged the log without reading
+  // `history.keep` would delete what it keeps.
+  const ago = (days) => Math.floor(Date.now() / 1000) - days * 24 * 3600;
+  const { w } = await boot(
+    'fictions-rising-stars.new.html',
+    'https://www.royalroad.com/fictions/rising-stars',
+    { 'history.log': true, 'history.keep': true }
+  );
+  const today = w.RRX.dayKey(new Date());
+  const threeYears = w.RRX.dayKey(new Date(ago(3 * 365) * 1000));
+  w.__store.log = {
+    d: { [threeYears]: [3, 6000] },
+    f: { 9: { t: 'Quiet for two years', a: ago(730), c: 3 } },
+    r: [1],
+  };
+
+  await w.RRX.store.markRead({ chapterId: 2, fictionId: 10, title: 'Read today', words: 100 });
+  assert.deepEqual(Object.keys(w.__store.log.d), [threeYears, today], 'a write keeps the old day');
+  assert.ok(w.__store.log.f[9], 'and the quiet fiction');
+
+  delete w.__store.tidiedAt;
+  await w.RRX.store.tidy();
+  assert.deepEqual(Object.keys(w.__store.log.d), [threeYears, today], 'so does housekeeping');
+  assert.ok(w.__store.log.f[9]);
+
+  await w.RRX.store.saveSettings({ 'history.keep': false });
+  delete w.__store.tidiedAt;
+  await w.RRX.store.tidy();
+  assert.deepEqual(Object.keys(w.__store.log.d), [today], 'switched off, the next one prunes');
+  assert.equal(w.__store.log.f[9], undefined);
+  assert.ok(w.__store.log.y[threeYears.slice(0, 4)], 'the year totals stay');
+});
+
+test('a write still holds the reading log to its cap', async () => {
+  const { w } = await boot(
+    'fictions-rising-stars.new.html',
+    'https://www.royalroad.com/fictions/rising-stars',
+    { 'history.log': true, 'history.keep': true }
+  );
+  const now = Math.floor(Date.now() / 1000);
+  const f = {};
+  for (let id = 1; id <= w.RRX.LOG_FICTIONS_MAX; id += 1) f[id] = { t: `F${id}`, a: now - id, c: 0 };
+  w.__store.log = { d: {}, f, r: [] };
+
+  const fresh = w.RRX.LOG_FICTIONS_MAX + 1;
+  await w.RRX.store.noteFiction(fresh, 'Opened today');
+  const kept = Object.keys(w.__store.log.f);
+  assert.equal(kept.length, w.RRX.LOG_FICTIONS_MAX);
+  assert.ok(w.__store.log.f[fresh], 'the newest stays');
+  assert.equal(w.__store.log.f[w.RRX.LOG_FICTIONS_MAX], undefined, 'the oldest goes');
 });
 
 test('forgetting the reading history reaches the scratchpad with no tab open', async () => {

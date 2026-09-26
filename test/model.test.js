@@ -569,6 +569,24 @@ test('past the cap, fictions only opened go before ones with a finish', () => {
   assert.deepEqual(Object.keys(model.pruneLog(log, { now, max: 2 }).f), ['1', '3']);
 });
 
+test('keep lifts both age limits, not the cap', () => {
+  const now = Math.floor(new Date(2026, 8, 1, 12).getTime() / 1000);
+  const log = {
+    d: { '2023-08-01': [1, 100], '2026-09-01': [3, 300] },
+    f: {
+      1: { t: 'Two years quiet', a: now - 730 * 86400, c: 1 },
+      2: { t: 'A', a: now - 10, c: 1 },
+      3: { t: 'B', a: now - 20, c: 1 },
+    },
+    r: [1, 2],
+  };
+  const out = model.pruneLog(log, { now, keep: true });
+  assert.deepEqual(Object.keys(out.d), ['2023-08-01', '2026-09-01']);
+  assert.deepEqual(Object.keys(out.f), ['1', '2', '3']);
+  const capped = model.pruneLog(log, { now, keep: true, max: 2 });
+  assert.deepEqual(Object.keys(capped.f), ['2', '3'], 'the cap still drops the oldest');
+});
+
 test('the chapter ids go once no day is left', () => {
   const now = Math.floor(new Date(2026, 8, 1, 12).getTime() / 1000);
   const out = model.pruneLog({ d: { '2023-01-01': [1, 100] }, f: {}, r: [1, 2] }, { now });

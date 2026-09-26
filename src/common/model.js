@@ -424,7 +424,9 @@
 
   const LOG_KEEP_DAYS = 730;
   const LOG_FICTION_MAX_AGE_S = 365 * 24 * 60 * 60;
-  const LOG_FICTIONS_MAX = 1000;
+  /** About 85 bytes a fiction, so under 1 MB: the whole log is rewritten on
+   *  every write. With `history.keep` on, this is the only limit. */
+  const LOG_FICTIONS_MAX = 10000;
   const LOG_RECENT_MAX = 500;
   const TITLE_MAX = 300;
 
@@ -545,13 +547,15 @@
   }
 
   /** Days past `keepDays`, fictions whose `a` is a year old, and past the cap
-   *  the oldest, title-only ones first. The day totals outlive the fictions: a
-   *  year-old week still counts without knowing what was in it. The year totals
-   *  are never pruned. */
+   *  the oldest, title-only ones first. `keep` (`history.keep`) lifts the two
+   *  age limits, not the cap. The day totals outlive the fictions: a year-old
+   *  week still counts without knowing what was in it. The year totals are
+   *  never pruned. */
   function pruneLog(
     log,
     {
       now = 0,
+      keep = false,
       keepDays = LOG_KEEP_DAYS,
       maxAgeS = LOG_FICTION_MAX_AGE_S,
       max = LOG_FICTIONS_MAX,
@@ -559,13 +563,14 @@
     } = {}
   ) {
     const src = normalizeLog(log);
-    const cutoff = now ? dayKey(new Date((now - keepDays * 86400) * 1000)) : '';
+    const ages = !keep && now;
+    const cutoff = ages ? dayKey(new Date((now - keepDays * 86400) * 1000)) : '';
 
     const d = {};
     for (const [day, entry] of Object.entries(src.d)) if (day >= cutoff) d[day] = entry;
 
     let fictions = Object.entries(src.f).filter(
-      ([, rec]) => !now || !rec.a || now - rec.a <= maxAgeS
+      ([, rec]) => !ages || !rec.a || now - rec.a <= maxAgeS
     );
     if (fictions.length > max) {
       fictions = fictions

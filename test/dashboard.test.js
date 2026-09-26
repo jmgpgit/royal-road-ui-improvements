@@ -315,6 +315,13 @@ test('a log left with only its year totals still shows them', async () => {
   assert.equal(d.getElementById('dash-year-grid').closest('section').hidden, true, 'nor last year');
   assert.deepEqual(subs(d, 'Words read'), ['22 pages', 'in 3 chapters']);
   assert.deepEqual(subs(d, 'Streak'), [], 'no "longest 0 days"');
+
+  const paused = await render({ settings: {}, log: { y: { [year - 2]: [3, 6000, 600, 2] } } });
+  assert.match(
+    paused.document.getElementById('dash-status').textContent,
+    /Paused: .*is kept until you forget it/,
+    'the year totals never age out'
+  );
 });
 
 test('a fiction only part-read shows the title kept on opening, and no “0 chapters read”', async () => {
@@ -387,5 +394,28 @@ test('the switch on the page writes the setting', async () => {
   await new Promise((resolve) => setTimeout(resolve, 60));
 
   assert.equal(w.__s.settings['history.log'], true);
-  assert.match(d.getElementById('dash-status').textContent, /Counting since you switched this on/);
+  assert.match(d.getElementById('dash-status').textContent, /Counting since you switched the log on/);
+});
+
+test('the keep switch writes its own setting, and the pause says what happens', async () => {
+  const today = dayKey(new Date());
+  const w = await render({ settings: {}, log: log({ [today]: [1, 2000] }) });
+  const d = w.document;
+  const box = d.getElementById('dash-keep');
+  const status = () => d.getElementById('dash-status').textContent;
+  assert.equal(d.getElementById('dash-keep-label').textContent, 'Keep the reading log for good');
+  assert.equal(box.checked, false);
+  assert.match(status(), /still ages out/);
+
+  box.checked = true;
+  box.dispatchEvent(new w.Event('change'));
+  await new Promise((resolve) => setTimeout(resolve, 60));
+
+  assert.equal(w.__s.settings['history.keep'], true);
+  assert.equal(w.__s.settings['history.log'], false, 'the log switch is its own');
+  assert.equal(d.getElementById('dash-on').checked, false);
+  assert.match(status(), /kept until you forget it/);
+
+  const kept = await render({ settings: { 'history.keep': true } });
+  assert.equal(kept.document.getElementById('dash-keep').checked, true, 'read back on load');
 });

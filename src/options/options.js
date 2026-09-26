@@ -612,9 +612,11 @@
 
   // Not the fiction statistics: reset returns that setting to its default, which
   // is off, and off deletes them. Promising otherwise would be a lie in a
-  // confirm dialog. The reading log is kept; reset only stops it counting.
+  // confirm dialog. The reading log is kept; reset only stops it counting, and
+  // leaves `history.keep` as it is.
   const KEPT =
-    'Your hidden fictions, dropped fictions, reading progress and reading log are kept.';
+    'Your hidden fictions, dropped fictions, reading progress and reading log are kept, ' +
+    `and “${COPY['history.keep'].label}” stays as it is.`;
 
   $('reset').addEventListener('click', async () => {
     if (!confirm(`Reset every setting to its default? ${KEPT}`)) return;
@@ -647,7 +649,12 @@
     else if (years) parts.push(`${years} year${years === 1 ? '' : 's'} of reading totals`);
     else if (titles) parts.push(`${titles} fiction title${titles === 1 ? '' : 's'} in the reading log`);
 
-    const kept = years ? " except the reading log's year totals" : '';
+    const kept =
+      state.settings['history.keep'] && logHeld()
+        ? ' except the reading log'
+        : years
+          ? " except the reading log's year totals"
+          : '';
     $('history-size').textContent = parts.length
       ? `Reading history: ${new Intl.ListFormat('en-GB').format(parts)}. ` +
         `Kept on this device, and aged out on its own${kept}.`
