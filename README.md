@@ -121,9 +121,11 @@ and coloured tags are coloured here too.
 of the options page. It counts each chapter you read to the end — its last line on screen, not
 opened from a comment link, and not before a fifth of its estimated reading time — and your time
 on chapter pages, from the gaps between your scrolls, key presses, clicks and touches while the
-tab is visible, each capped at two minutes. It shows today, this week and this month, averages,
-streaks, weekly bars, a year heatmap, month-by-month totals and the fictions you have been
-reading. It fetches nothing and stays on this device.
+tab is visible, each capped at two minutes. It shows today, this week and this month in
+chapters, words and pages, averages, streaks, weekly bars, a year heatmap, month-by-month and
+year-by-year totals and the fictions you have been reading. Days age out after two years unless
+you keep the log for good; year totals stay until you forget them. It fetches nothing and stays
+on this device.
 
 ### Defaults that change the page
 
@@ -403,12 +405,12 @@ naming what is missing; `test/fixtures/README.md` covers how to re-capture each 
 Everything is stored on the device: settings, your lists and your reading history in
 `browser.storage.local`, plus two copies in royalroad.com's own `localStorage` — the boot mirror,
 and where you are in the chapter you are reading — which a content script can read and write
-synchronously. Once you switch it on, the reading log joins them: per day, the chapters you
-finished, their words and your reading time, plus each fiction's title. No analytics, and no
-server other than royalroad.com. It makes five kinds of request, all of them things the site
-itself asks for: the `?page=N` fetch that adds the next page of a list as you scroll, the same
-for comments and reviews, plus a press of Royal Road's own review sort dropdown once you choose a
-default review order, a single request for the tag vocabulary the first time you open the filter
+synchronously. Once you switch it on, the reading log joins them: per day and per year, the
+chapters you finished, their words and your reading time, plus each fiction's title. No
+analytics, and no server other than royalroad.com. It makes five kinds of request, all of them
+things the site itself asks for: the `?page=N` fetch that adds the next page of a list as you
+scroll, the same for comments and reviews, plus a press of Royal Road's own review sort dropdown
+once you choose a default review order, a single request for the tag vocabulary the first time you open the filter
 panel, and — only once you switch them on — the chapter before the one you are reading,
 and the fiction's chapter list behind Royal Road's own "Select a chapter" dropdown. The only
 cookie it sets is Royal Road's `rr_ui_mode`, and only once you pick a layout. It never

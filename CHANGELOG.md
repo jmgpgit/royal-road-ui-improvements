@@ -4,6 +4,34 @@ Notable changes, newest first. Versions follow [semantic versioning](https://sem
 the patch number for fixes, the minor for new settings, the major for anything that changes
 what an existing setting does.
 
+## 1.6.1
+
+**New**
+
+- **Pages on the reading dashboard.** Beside every word count: the Today, This week, This month
+  and Words read tiles, and a Pages column in Month by month. A page is 275 words, the figure
+  Royal Road's own "Number of Pages" filter uses.
+- **Year by year.** Chapters, words, pages, days read and time for each calendar year. Year
+  totals are kept until you forget your reading history, so a year's count outlives its days,
+  and the Words read and Time reading tiles add them up. A 1.6.0 log works them out once from
+  the days it holds.
+- **Keep the reading log for good.** A switch on the dashboard, off by default. Off, days go
+  after two years and a fiction a year after you last finished a chapter of it; on, neither ages
+  out. Resetting the settings leaves the switch as it is. The log now holds up to 10,000
+  fictions, up from 1,000.
+
+**Fixes**
+
+- **Part-read fictions are named on the dashboard.** A fiction you had opened but not finished a
+  chapter of showed as "Fiction 191136": only a finish kept its title. Opening a chapter now keeps
+  it. One already listed that way gets its title the next time you open one of its chapters.
+- **Times from 100 hours up show hours only**, so the Time reading tile no longer wraps.
+
+**Privacy policy**
+
+- Lists the year totals, the titles kept for fictions opened but not finished, and the new
+  switch: what ages out without it and what is kept either way.
+
 ## 1.6.0
 
 **New**
