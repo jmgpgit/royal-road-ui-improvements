@@ -154,7 +154,8 @@
 
   /**
    * The log's fictions, joined with the chapters resume has a position for,
-   * most recent first.
+   * most recent first. A fiction the log holds only a title for is listed only
+   * once something of it is part-read.
    *
    * @param {object} chapters resume's records; only those with a position count
    * @param {object} names fiction id to title, for a fiction the log has not seen
@@ -177,7 +178,7 @@
     for (const fiction of out.values()) {
       fiction.title = fiction.title || (names && names[fiction.id]) || `Fiction ${fiction.id}`;
     }
-    return [...out.values()].sort((a, b) => b.last - a.last);
+    return [...out.values()].filter((f) => f.read || f.open).sort((a, b) => b.last - a.last);
   }
 
   return {

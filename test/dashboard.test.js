@@ -123,6 +123,19 @@ test('fictions join the log with chapters part-read, newest first', () => {
   );
 });
 
+test('a fiction the log holds only a title for is listed once part-read, never alone', () => {
+  const list = D.fictions(
+    log({}, {
+      f: { 1: { t: 'Opened', a: 100, c: 0 }, 2: { t: 'Opened, nothing read', a: 500, c: 0 } },
+    }),
+    { 10: { f: 1, a: 300, p: 2 } }
+  );
+  assert.deepEqual(
+    list.map((f) => [f.id, f.title, f.read, f.open, f.last]),
+    [[1, 'Opened', 0, 1, 300]]
+  );
+});
+
 // --- the page ------------------------------------------------------------------
 
 const windows = [];
@@ -186,6 +199,21 @@ test('a seeded log draws every part of the page', async () => {
   assert.equal(link.textContent, 'Mother of Learning');
   assert.equal(link.getAttribute('href'), 'https://www.royalroad.com/fiction/21220');
   assert.equal(link.getAttribute('rel'), 'noreferrer');
+});
+
+test('a fiction only part-read shows the title kept on opening, and no “0 chapters read”', async () => {
+  const now = Math.floor(Date.now() / 1000);
+  const w = await render({
+    settings: { 'history.log': true },
+    log: log({}, {
+      f: { 191136: { t: 'Kept on opening', a: now, c: 0 }, 5: { t: 'Nothing read', a: now, c: 0 } },
+    }),
+    chapters: { 3766643: { f: 191136, a: now, p: 1200 } },
+  });
+  const items = [...w.document.querySelectorAll('#dash-fictions li')].map((li) => li.textContent);
+  assert.equal(items.length, 1, items.join(' | '));
+  assert.match(items[0], /^Kept on opening1 part-read · last /);
+  assert.ok(!items[0].includes('0 chapters'), items[0]);
 });
 
 test('a clock set back past every recorded day leaves out the averages, not the page', async () => {

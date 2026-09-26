@@ -109,6 +109,12 @@
     );
   }
 
+  /** Keep a fiction's title, counting nothing. Writes only when the log lacks it
+   *  or it changed. */
+  function noteFiction(fictionId, title) {
+    return writeLog((log, now) => RRX.logTitle(log, { fictionId, title, now }));
+  }
+
   /** Seconds spent reading, added to today. */
   function addReadingTime(seconds) {
     return writeLog((log) => RRX.logTime(log, RRX.dayKey(new Date()), seconds));
@@ -512,6 +518,7 @@
     forgetStats,
     loadLog,
     markRead,
+    noteFiction,
     addReadingTime,
     forgetLog,
     tidy,

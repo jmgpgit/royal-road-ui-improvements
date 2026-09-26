@@ -409,7 +409,9 @@
   //
   //   d  per local day: chapters finished, the words in them, and seconds spent
   //      reading chapter pages (reading-log.js says what counts)
-  //   f  per fiction: its title, the last finish (unix seconds), chapters finished
+  //   f  per fiction: its title, the last finish (unix seconds), chapters finished.
+  //      A fiction opened but not finished has c 0 and `a` from when its title
+  //      was first kept, so it ages out like the rest
   //   r  the last chapters finished, oldest first. A reread of one of these is
   //      not counted again; a flag on the chapter record would keep a record per
   //      finished chapter for a year
@@ -491,6 +493,23 @@
     return src;
   }
 
+  /**
+   * Keep a fiction's title without counting anything, so the dashboard can
+   * name one that is only part-read.
+   *
+   * @returns {object} the log unchanged (the same object) when there is no
+   *   title or it is already the one kept
+   */
+  function logTitle(log, { fictionId, title, now }) {
+    const src = normalizeLog(log);
+    const fid = Number(fictionId);
+    const name = typeof title === 'string' ? title.trim().slice(0, TITLE_MAX) : '';
+    const was = src.f[fid];
+    if (!isValidId(fid) || !name || (was && was.t === name)) return log;
+    src.f[fid] = was ? { ...was, t: name } : { t: name, a: count(now), c: 0 };
+    return src;
+  }
+
   /** Add seconds spent reading to a day. */
   function logTime(log, day, seconds) {
     const src = normalizeLog(log);
@@ -499,8 +518,8 @@
     return src;
   }
 
-  /** Days past `keepDays`, fictions nothing has been finished in for a year, and
-   *  the oldest fictions past the cap. The day totals outlive the fictions: a
+  /** Days past `keepDays`, fictions whose `a` is a year old, and past the cap
+   *  the oldest, title-only ones first. The day totals outlive the fictions: a
    *  year-old week still counts without knowing what was in it. */
   function pruneLog(
     log,
@@ -521,7 +540,11 @@
     let fictions = Object.entries(src.f).filter(
       ([, rec]) => !now || !rec.a || now - rec.a <= maxAgeS
     );
-    if (fictions.length > max) fictions = fictions.sort((a, b) => b[1].a - a[1].a).slice(0, max);
+    if (fictions.length > max) {
+      fictions = fictions
+        .sort((a, b) => Math.sign(b[1].c) - Math.sign(a[1].c) || b[1].a - a[1].a)
+        .slice(0, max);
+    }
 
     // No day left means nothing to dedupe against: the ids go with the days.
     const r = Object.keys(d).length ? src.r.slice(-recent) : [];
@@ -646,6 +669,7 @@
     dayKey,
     normalizeLog,
     logFinish,
+    logTitle,
     logTime,
     pruneLog,
     LOG_KEEP_DAYS,

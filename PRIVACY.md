@@ -37,15 +37,17 @@ Eight kinds of thing, all in `browser.storage.local`, which is local to your bro
 - **A reading log**, once you switch it on. The switch is on the reading dashboard, the
   extension page that shows the log. For each day: how many chapters you read to the end, how
   many words they held, and how many seconds you spent reading chapter pages. For each fiction
-  you finished a chapter of: its id, its title as the chapter page shows it, when you last
-  finished one and how many. And the ids of the last 500 chapters finished, so a reread is not
-  counted twice. A chapter counts when its last line has been on screen, and not before a fifth
-  of its estimated reading time. Time counts only while a chapter page is the visible tab, as
-  the gaps between your scrolls, key presses, clicks and touches; a gap longer than two minutes
-  counts as two minutes. Time is a total per day, not a record of when you read. Days are kept
-  for two years; a fiction you have not finished a chapter of for a year is dropped, and at most
-  1,000 are kept; the chapter ids go once no day is left. Switching it off stops the counting
-  and keeps what is there; **Forget reading history** deletes it. Nothing is fetched for it. See
+  you opened a chapter of: its id, its title as the chapter page shows it, how many chapters of
+  it you finished, and when you last finished one, or, until you do, when its title was first
+  kept. And the ids of the last 500 chapters finished, so a reread is not counted twice. A
+  chapter counts when its last line has been on screen, and not before a fifth of its estimated
+  reading time. Time counts only while a chapter page is the visible tab, as the gaps between
+  your scrolls, key presses, clicks and touches; a gap longer than two minutes counts as two
+  minutes. Time is a total per day, not a record of when you read. Days are kept for two years;
+  a fiction is dropped a year after you last finished a chapter of it, or after its title was
+  first kept if you finished none, and at most 1,000 are kept; the chapter ids go once no day is
+  left. Switching it off stops the counting and keeps what is there; **Forget reading history**
+  deletes it. Nothing is fetched for it. See
   [`src/content/features/reading-log.js`](src/content/features/reading-log.js),
   [`src/common/model.js`](src/common/model.js) and
   [`src/dashboard/dashboard.js`](src/dashboard/dashboard.js).

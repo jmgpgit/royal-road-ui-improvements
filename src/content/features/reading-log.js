@@ -15,6 +15,9 @@
  * while the tab is visible, each capped at IDLE_MS. It needs no timer: it is
  * credited when the next input comes, or when the tab is hidden or left.
  *
+ * Opening a chapter keeps its fiction's title, counting nothing, so the
+ * dashboard can name a fiction that is only part-read.
+ *
  * Independent of `chapter.resume`: it reuses resume's measure, not its records.
  * Nothing is written while `history.log` is off.
  */
@@ -52,6 +55,7 @@
   const on = () => !!lastCtx && !!lastCtx.settings['history.log'];
 
   const wordCount = () => (RRX.chapterMeta ? RRX.chapterMeta.wordCount() : 0);
+  const fictionTitle = () => (RRX.recap ? RRX.recap.fictionTitleIn(document) : '');
   /** MIN_SHARE of the estimated reading time, in ms. */
   const shareMs = (words) => (MIN_SHARE * words * 60000) / (lastCtx.settings['chapter.wpm'] || 250);
 
@@ -71,7 +75,7 @@
       RRX.store.markRead({
         chapterId: RRX.chapterIdFromHref(location.pathname),
         fictionId: RRX.fictionIdFromHref(location.pathname),
-        title: RRX.recap ? RRX.recap.fictionTitleIn(document) : '',
+        title: fictionTitle(),
         words,
       })
     ).catch((err) => RRX.warn('could not log the chapter', err));
@@ -158,6 +162,9 @@
     lastCtx = ctx;
     if (!on() || listening) return;
     listening = true;
+    Promise.resolve(
+      RRX.store.noteFiction(RRX.fictionIdFromHref(location.pathname), fictionTitle())
+    ).catch((err) => RRX.warn('could not log the fiction', err));
     if (visible()) last = root.performance.now();
     root.addEventListener('scroll', onScroll, { passive: true });
     for (const event of ['scroll', 'keydown', 'pointerdown', 'wheel', 'touchstart']) {

@@ -585,10 +585,14 @@
         dropped ? `${dropped} dropped fiction${dropped === 1 ? '' : 's'}` : '',
         read ? `where you had got to in ${read} chapter${read === 1 ? '' : 's'}` : '',
         watched ? `the statistics you have seen for ${watched} fiction${watched === 1 ? '' : 's'}` : '',
-        logged ? `${logged} day${logged === 1 ? '' : 's'} of your reading log` : '',
+        logged
+          ? `${logged} day${logged === 1 ? '' : 's'} of your reading log`
+          : logHeld()
+            ? 'your reading log'
+            : '',
       ].filter(Boolean);
       if (
-        (current || dropped || read || watched || logged) &&
+        (current || dropped || read || watched || logHeld()) &&
         !confirm(
           `Replace your current settings, ${current} hidden fiction${current === 1 ? '' : 's'}` +
             `${also.length ? `, ${new Intl.ListFormat('en-GB').format(also)}` : ''}` +
@@ -621,6 +625,8 @@
   });
 
   const loggedDays = () => Object.keys((state.log && state.log.d) || {}).length;
+  // A chapter opened and left unread keeps its fiction's title, and no day.
+  const logHeld = () => loggedDays() || Object.keys((state.log && state.log.f) || {}).length;
 
   /** What the reader has accumulated by reading, as opposed to by choosing. The
    *  hidden and dropped lists have their own managers; this is the half nobody
@@ -629,10 +635,12 @@
     const chapters = Object.keys(state.chapters || {}).length;
     const fictions = Object.keys(state.stats || {}).length;
     const days = loggedDays();
+    const titles = Object.keys((state.log && state.log.f) || {}).length;
     const parts = [];
     if (chapters) parts.push(`${chapters} chapter${chapters === 1 ? '' : 's'}`);
     if (fictions) parts.push(`${fictions} fiction${fictions === 1 ? '' : 's'}`);
     if (days) parts.push(`${days} day${days === 1 ? '' : 's'} of reading log`);
+    else if (titles) parts.push(`${titles} fiction title${titles === 1 ? '' : 's'} in the reading log`);
 
     $('history-size').textContent = parts.length
       ? `Reading history: ${new Intl.ListFormat('en-GB').format(parts)}. ` +

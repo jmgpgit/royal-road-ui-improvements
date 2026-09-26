@@ -506,6 +506,38 @@ test('a finish with no title keeps the one already known', () => {
   assert.equal(log.f[21220].t, 'Mother of Learning');
 });
 
+test('a title is kept without counting anything, and only when it is new', () => {
+  const now = 1_788_000_000;
+  const title = (log, over = {}) =>
+    model.logTitle(log, { fictionId: 21220, title: ' Mother of Learning ', now, ...over });
+
+  const log = title(null);
+  assert.deepEqual(log.f[21220], { t: 'Mother of Learning', a: now, c: 0 });
+  assert.deepEqual(log.d, {}, 'no day');
+  assert.deepEqual(log.r, []);
+
+  assert.equal(title(log, { now: now + 50 }), log, 'already kept: the same object, so no write');
+  assert.equal(title(log, { title: '' }), log, 'no title read off the page');
+  assert.equal(title(log, { fictionId: 0 }), log);
+
+  const read = finish(finish(null, 1), 2, { title: '' });
+  const renamed = title(read, { title: 'Mother of Learning (renamed)', now: now + 50 });
+  assert.deepEqual(
+    renamed.f[21220],
+    { t: 'Mother of Learning (renamed)', a: now, c: 2 },
+    'the finishes are left alone'
+  );
+  const untitled = { d: {}, f: { 7: { t: '', a: 5, c: 1 } }, r: [] };
+  assert.equal(title(untitled, { fictionId: 7 }).f[7].t, 'Mother of Learning', 'an empty one is filled');
+});
+
+test('a fiction kept only for its title ages out a year after it was kept', () => {
+  const now = Math.floor(new Date(2026, 8, 1, 12).getTime() / 1000);
+  let log = model.logTitle(null, { fictionId: 1, title: 'Opened', now: now - 400 * 86400 });
+  log = model.logTitle(log, { fictionId: 2, title: 'Opened lately', now: now - 10 });
+  assert.deepEqual(Object.keys(model.pruneLog(log, { now }).f), ['2']);
+});
+
 test('the log prunes old days, quiet fictions and the oldest past the cap', () => {
   const now = Math.floor(new Date(2026, 8, 1, 12).getTime() / 1000);
   const log = {
@@ -523,6 +555,18 @@ test('the log prunes old days, quiet fictions and the oldest past the cap', () =
   assert.deepEqual(Object.keys(out.d), ['2024-09-10', '2026-09-01'], 'two years of days');
   assert.deepEqual(Object.keys(out.f), ['2', '3'], 'a year-quiet fiction goes, then the oldest');
   assert.deepEqual(out.r, [3, 4, 5], 'the ring keeps the newest');
+});
+
+test('past the cap, fictions only opened go before ones with a finish', () => {
+  const now = Math.floor(new Date(2026, 8, 1, 12).getTime() / 1000);
+  const log = {
+    f: {
+      1: { t: 'Finished long ago', a: now - 200 * 86400, c: 1 },
+      2: { t: 'Opened', a: now - 10, c: 0 },
+      3: { t: 'Opened lately', a: now - 5, c: 0 },
+    },
+  };
+  assert.deepEqual(Object.keys(model.pruneLog(log, { now, max: 2 }).f), ['1', '3']);
 });
 
 test('the chapter ids go once no day is left', () => {

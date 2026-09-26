@@ -440,6 +440,34 @@ test('importing names the reading log it replaces, and restores the one in the f
   assert.deepEqual(Object.keys(w.__s.log.d), ['2025-01-01']);
 });
 
+test('a log holding only titles is still history to forget, and named by an import', async () => {
+  const log = { d: {}, f: { 149588: { t: 'One Was Worthy', a: 1790437528, c: 0 } }, r: [] };
+  const w = await render({ log });
+  const d = w.document;
+  assert.match(
+    d.getElementById('history-size').textContent,
+    /^Reading history: 1 fiction title in the reading log\./
+  );
+  assert.equal(d.getElementById('forget-history').disabled, false);
+
+  let asked = '';
+  w.confirm = (text) => {
+    asked = text;
+    return false;
+  };
+  const file = new w.File(
+    [JSON.stringify({ format: 'royal-road-ui-improvements', version: 1 })],
+    'backup.json'
+  );
+  const input = d.getElementById('import-file');
+  Object.defineProperty(input, 'files', { value: [file], configurable: true });
+  input.dispatchEvent(new w.Event('change'));
+  await new Promise((resolve) => setTimeout(resolve, 60));
+
+  assert.match(asked, /your reading log/, 'replaced without asking');
+  assert.equal(w.__s.log.f[149588].t, 'One Was Worthy', 'cancelling keeps it');
+});
+
 test('reset keeps the reading log and only stops it counting', async () => {
   const w = await render({
     settings: { 'history.log': true },
