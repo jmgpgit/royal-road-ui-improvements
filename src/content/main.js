@@ -314,12 +314,33 @@
     );
   }
 
+  /** The build Royal Road says this page is. The `baggage` meta carries it on
+   *  every page; if that ever goes, the inline bootstrap script says it too, and
+   *  a content script can read the text that assigns it even though it cannot
+   *  read the variable itself. */
+  function royalRoadBuild() {
+    const meta = document.querySelector(SEL.buildMeta);
+    const fromMeta = RRX.royalRoadBuild(meta && meta.getAttribute('content'));
+    if (fromMeta) return fromMeta;
+    for (const script of document.querySelectorAll('script:not([src])')) {
+      const build = RRX.royalRoadBuild(script.textContent);
+      if (build) return build;
+    }
+    return null;
+  }
+
   async function init() {
     // Housekeeping, before anything about this page matters: it ages out the
     // stored maps whether or not the features that fill them are still on, and
     // it is one read of a single number on all but one page load a day. Runs on
     // the legacy layout too - the data is the same data.
     RRX.store.tidy().catch((err) => RRX.warn('housekeeping failed', err));
+
+    // Which build of Royal Road this is, for the options page to show beside the
+    // build the extension was made with. Read off the page already open, written
+    // only when it changes, and recorded here rather than past the probe below so
+    // the legacy layout counts too: it is the same site shipping the same builds.
+    RRX.store.noteBuild(royalRoadBuild()).catch((err) => RRX.warn('build note failed', err));
 
     // "Forget reading history" runs on the options page, which cannot reach the
     // scroll scratchpad: that lives in royalroad.com's localStorage and only a

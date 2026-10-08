@@ -150,7 +150,8 @@ The options page is six boxes, in the order a reader meets the site: which layou
 lists (each manager beside the switches that fill it, and the tag-colour editor), fiction pages,
 chapter pages, comments, and Backup — export, import, reset the settings, and forget your reading
 history. Within a box the order is down the page, so a setting sits where the thing it changes
-sits.
+sits. Its last line names the Royal Road build this version was tested against and the one you
+were last served, which is where a release that has fallen behind the site shows.
 
 ## Install
 

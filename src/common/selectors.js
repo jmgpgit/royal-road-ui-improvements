@@ -5,8 +5,8 @@
  * redesign change breaks here and nowhere else. `main.js` health-checks these on
  * list pages and warns loudly if the list stops matching.
  *
- * Verified against Royal Road build 4.1.20260923.58. Ground-truth captures of
- * every page shape live in `test/fixtures/`.
+ * Verified against the Royal Road build named by `RR_BUILD` below. Ground-truth
+ * captures of every page shape live in `test/fixtures/`.
  */
 (function (root, factory) {
   const api = factory();
@@ -14,6 +14,17 @@
   const RRX = (root.RRX = root.RRX || {});
   Object.assign(RRX, api);
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  /**
+   * The Royal Road build these selectors were verified against, which is the
+   * build the captures in `test/fixtures/` were taken from. The options page
+   * shows it beside whichever build the reader last loaded, so a release that
+   * has fallen behind the site is visible without reading any code.
+   *
+   * Royal Road ships most days, and a build number moving is not by itself a
+   * problem - this says what was checked, not what is required.
+   */
+  const RR_BUILD = '4.1.20261006.93';
+
   /**
    * The per-fiction unit on each page shape, paired with the link naming which
    * fiction it is about. Hiding a fiction is `display: none` on the card.
@@ -71,6 +82,13 @@
      */
     newUiProbe:
       '[data-rr-tooltip], [data-rr-paginate], [data-rr-carousel], [data-rr-expanded-fic-card], .fiction-card-horizontal',
+
+    /** Royal Road names its own build in this meta on every page, redesign and
+     *  legacy alike: `sentry-release=RoyalRoad.Web.Website%404.1.20261006.93`.
+     *  The same number is assigned in an inline script, which main.js falls back
+     *  to - a content script can read that script's text, though not the
+     *  variable it sets. */
+    buildMeta: 'meta[name="baggage"]',
 
     // --- list page skeleton -------------------------------------------------
     /**
@@ -377,6 +395,7 @@
   };
 
   return {
+    RR_BUILD,
     SEL,
     CARD_GROUPS,
     CARD_VARIANTS,

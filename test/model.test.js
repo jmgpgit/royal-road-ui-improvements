@@ -21,6 +21,25 @@ test('fictionIdFromHref accepts every shape of Royal Road fiction link', () => {
   }
 });
 
+test('royalRoadBuild reads the build from either place Royal Road states it', () => {
+  // The meta is URL-encoded and one string; the inline script assigns the same
+  // number in two halves. One regex covers both, so neither shape is the only
+  // one that works.
+  const meta =
+    'sentry-trace_id=e60b98, sentry-sampled=false, ' +
+    'sentry-release=RoyalRoad.Web.Website%404.1.20261006.93, sentry-environment=production';
+  const script = 'window.royalroad.version = "RoyalRoad.Web.Website@" + "4.1.20261006.93";';
+  assert.equal(model.royalRoadBuild(meta), '4.1.20261006.93');
+  assert.equal(model.royalRoadBuild(script), '4.1.20261006.93');
+  assert.equal(model.royalRoadBuild('"RoyalRoad.Web.Website@" + "4.1.20260923.58"'), '4.1.20260923.58');
+});
+
+test('royalRoadBuild answers null rather than a half-read build', () => {
+  for (const input of ['', 'no build here', 'RoyalRoad.Web.Website@', null, undefined, 42, {}]) {
+    assert.equal(model.royalRoadBuild(input), null, String(input));
+  }
+});
+
 test('fictionIdFromHref rejects list pages and other non-fiction links', () => {
   const rejected = [
     '/fictions/rising-stars',

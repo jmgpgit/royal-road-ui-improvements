@@ -552,3 +552,68 @@ test('reset updates mounted controls to their defaults', async () => {
   assert.equal(checkbox.checked, false);
   assert.equal(tagSwitch.checked, false);
 });
+/**
+ * Boot the real options page over a stubbed storage, the way popup.test.js does,
+ * and hand back its window. `stored` is what `browser.storage.local` holds.
+ */
+async function openOptions(stored = {}) {
+  const html = fs.readFileSync(path.join(ROOT, 'src', 'options', 'options.html'), 'utf8');
+  const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'https://example.invalid/options' });
+  const w = dom.window;
+  w.eval(`globalThis.__stored = ${JSON.stringify(stored)};
+    globalThis.browser = {
+      storage: { local: {
+          get: async (keys) => {
+            const names = typeof keys === 'string' ? [keys] : keys || Object.keys(globalThis.__stored);
+            const out = {};
+            for (const k of names) if (k in globalThis.__stored) out[k] = globalThis.__stored[k];
+            return out;
+          },
+          set: async (patch) => Object.assign(globalThis.__stored, patch),
+          remove: async () => {} },
+        onChanged: { addListener() {}, removeListener() {} } },
+      runtime: { getManifest: () => ({ version: '9.8.7' }), getURL: (p) => 'moz-extension://id/' + p },
+      tabs: { query: async () => [], create: async () => {} },
+    };`);
+
+  for (const src of [
+    'common/browser.js',
+    'common/selectors.js',
+    'common/schema.js',
+    'common/model.js',
+    'common/filters.js',
+    'common/css.js',
+    'common/store.js',
+    'options/settings-ui.js',
+    'options/options.js',
+  ]) {
+    w.eval(fs.readFileSync(path.join(ROOT, 'src', src), 'utf8'));
+  }
+  await new Promise((r) => setTimeout(r, 0));
+  return w;
+}
+
+test('the build notice names the build this version was made with, and the one you last loaded', async () => {
+  const { RR_BUILD } = require('../src/common/selectors.js');
+  const w = await openOptions({ rrBuild: { build: '4.1.20261108.12', at: 1760000000 } });
+  const text = w.document.getElementById('rr-build').textContent;
+  assert.match(text, /^Version 9\.8\.7 was tested against Royal Road build /);
+  assert.ok(text.includes(RR_BUILD), `names the build it was tested against: ${text}`);
+  assert.match(text, /You were served 4\.1\.20261108\.12 on \w/, `names what you got: ${text}`);
+  w.close();
+});
+
+test('the build notice says so when no Royal Road page has been opened', async () => {
+  const w = await openOptions();
+  assert.match(w.document.getElementById('rr-build').textContent, /No Royal Road page opened yet\.$/);
+  w.close();
+});
+
+test('the build notice does not say the same build number twice', async () => {
+  const { RR_BUILD } = require('../src/common/selectors.js');
+  const w = await openOptions({ rrBuild: { build: RR_BUILD, at: 1760000000 } });
+  const text = w.document.getElementById('rr-build').textContent;
+  assert.equal(text.split(RR_BUILD).length - 1, 1, `names it twice: ${text}`);
+  assert.match(text, /That is the build you were served on \w/, text);
+  w.close();
+});

@@ -554,13 +554,22 @@ html.rrx-view-compact .fiction-card-expanded > div {
   padding: 0.4rem 0.6rem !important;
 }
 
-html.rrx-view-compact .fiction-card-expanded img[data-type='cover'] {
-  height: 4.5rem !important;
-  width: auto !important;
-}
+/* The cover fills the row. Royal Road's anchor already stretches to the card's
+   height, so the box takes all of it, and their own `object-cover` on the
+   image crops rather than distorts.
 
-html.rrx-view-compact .fiction-card-expanded .md\:h-52 {
-  height: 4.5rem !important;
+   Both axes are set here because the box carries neither any more: it had
+   `aspect-[2/3] w-auto` until build 4.1.20261006 and pins its width now
+   (`w-40 md:w-[8.6667rem]`), so a height on its own left a 3rem cover adrift
+   in an 8.7rem box. The width is a fixed number rather than the ratio's,
+   because rows differ in height as tags wrap and a ratio-width cover would
+   start every card's text in a different place; 4.5rem is the uncropped width
+   at the commonest row height. `:has()` picks up the phone copy too, whose
+   container has no height to fill, so there it falls back to the picture's
+   own. */
+html.rrx-view-compact .fiction-card-expanded div:has(> img[data-type='cover']) {
+  height: 100% !important;
+  width: 4.5rem !important;
 }
 
 html.rrx-view-compact .fiction-card-expanded [class*='grid-cols-5'] {

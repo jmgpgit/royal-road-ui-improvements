@@ -66,7 +66,7 @@ Road once, not every launch. The redesign cookie is a session cookie, so it is *
 dev script re-sets it and reloads once on the first page of each run — the flicker you see —
 and never again that run, so a layout you pick afterwards holds.
 `-- --fresh` gives a throwaway profile, for first-run behaviour. Other flags pass through to
-`web-ext run`, so `npm start -- --devtools` works.
+`web-ext run` as `--flag` or `--flag=value`, so `npm start -- --devtools` works.
 
 `-- --legacy` does the opposite: it sets `rr_ui_mode=legacy`, as Royal Road's own revert does,
 so the legacy layout is served. That is the only way to test **Always the new design** from a

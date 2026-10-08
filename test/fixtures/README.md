@@ -10,8 +10,10 @@ a raw capture contains a live `__RequestVerificationToken`. `test/fixtures/` is 
 wholesale. Suites that need a missing fixture skip themselves with a message naming it, so a
 fresh clone still runs green on everything that does not need one.
 
-Captured from build `4.1.20260923.58`, except three older signed-in captures from August 2026,
-kept on purpose: `chapter-comments-lazy.new.html` and the two saved `.htm` chapter pages.
+Captured from build `4.1.20261006.93`, except three groups kept on purpose: the legacy capture,
+from `4.1.20260923.58`; the comment fragments, older still, because a fresh fetch does not
+reproduce the nesting depths they exist for; and three signed-in captures from August 2026,
+`chapter-comments-lazy.new.html` and the two saved `.htm` chapter pages.
 
 ## What each one is for
 

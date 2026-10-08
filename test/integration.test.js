@@ -1998,3 +1998,44 @@ test('a complete cache is not thrown away by a page that knows less', async () =
   assert.equal(w.RRX.tags.isFull(), true, 'a fiction page downgraded a complete cache');
   assert.equal(catalogueFetches(w).length, 0, 'it refetched a cache that was complete and fresh');
 });
+test('the Royal Road build is recorded off the page, on both layouts', async () => {
+  const shape = /^\d+\.\d+\.\d{8}\.\d+$/;
+  const { w } = await boot(
+    'fictions-rising-stars.new.html',
+    'https://www.royalroad.com/fictions/rising-stars'
+  );
+  const seen = w.__store.rrBuild;
+  assert.ok(seen, 'no build recorded');
+  assert.match(seen.build, shape);
+  assert.ok(seen.at > 0, 'the record is stamped');
+
+  // The legacy layout ends main.js early, and the build is recorded before that:
+  // it is the same site shipping the same builds, and the options page would
+  // otherwise say nothing at all to a reader who stays on the old layout.
+  const old = await boot(
+    'fictions-rising-stars.legacy.html',
+    'https://www.royalroad.com/fictions/rising-stars'
+  );
+  assert.match(old.w.__store.rrBuild.build, shape);
+});
+
+test('the build record is written only when it changes', async () => {
+  // Otherwise every page load is a storage write for a string that moves a few
+  // times a month.
+  const { w } = await boot(
+    'fictions-rising-stars.new.html',
+    'https://www.royalroad.com/fictions/rising-stars'
+  );
+  const recorded = w.__store.rrBuild.build;
+
+  w.__store.rrBuild = { build: recorded, at: 1 };
+  await w.RRX.store.noteBuild(recorded);
+  assert.equal(w.__store.rrBuild.at, 1, 'rewritten for a build that had not changed');
+
+  await w.RRX.store.noteBuild('9.9.99999999.9');
+  assert.equal(w.__store.rrBuild.build, '9.9.99999999.9');
+  assert.ok(w.__store.rrBuild.at > 1, 'a build that did change is stamped afresh');
+
+  await w.RRX.store.noteBuild(null);
+  assert.equal(w.__store.rrBuild.build, '9.9.99999999.9', 'a page with no build string wiped it');
+});

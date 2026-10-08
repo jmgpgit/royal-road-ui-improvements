@@ -21,6 +21,8 @@
   /** When housekeeping last ran. One number, and the reason it exists is below. */
   const KEY_TIDIED = 'tidiedAt';
   const KEY_FORGOT = 'forgotAt';
+  /** The Royal Road build of the last page we ran on, and when. See `noteBuild`. */
+  const KEY_BUILD = 'rrBuild';
   const TIDY_EVERY_MS = 24 * 60 * 60 * 1000;
 
   /** Scroll scratchpad, in royalroad.com's own localStorage. See `writePosition`. */
@@ -156,6 +158,31 @@
    *
    * @returns {boolean} whether housekeeping actually ran
    */
+  /**
+   * Remember which build of Royal Road the page we are on says it is, so the
+   * options page can show it beside the build this version was made with.
+   *
+   * Written only when it changes: every page load would otherwise be a write for
+   * a string that moves a few times a month. Nothing is fetched for it - the
+   * number is read off the page already open.
+   */
+  async function noteBuild(build) {
+    if (typeof build !== 'string' || !build) return null;
+    const seen = await loadBuild();
+    if (seen && seen.build === build) return seen;
+    const next = { build, at: Math.floor(Date.now() / 1000) };
+    await ext.storage.local.set({ [KEY_BUILD]: next });
+    return next;
+  }
+
+  /** `{build, at}` or null. `at` is seconds, like every other stamp here. */
+  async function loadBuild() {
+    const raw = await ext.storage.local.get(KEY_BUILD);
+    const seen = raw[KEY_BUILD];
+    if (!seen || typeof seen.build !== 'string') return null;
+    return { build: seen.build, at: Number(seen.at) || 0 };
+  }
+
   async function tidy() {
     const raw = await ext.storage.local.get(KEY_TIDIED);
     // A negative elapsed means the stamp is in the future - a clock that jumped
@@ -526,6 +553,8 @@
     addReadingTime,
     forgetLog,
     tidy,
+    noteBuild,
+    loadBuild,
     markChapter,
     forgetPosition,
     forgetChapter,

@@ -659,6 +659,8 @@ function cardBlocks(card) {
   const blocks = {
     column,
     cover: row && row.querySelector(':scope > a'),
+    // The box the picture sits in, and what every view has to size.
+    coverBox: row && row.querySelector(':scope > a > div'),
     phoneCover: column && column.querySelector(':scope > a'),
     titleRow,
     title: titleRow && titleRow.querySelector(':scope > a[data-vt-trigger]'),
@@ -673,6 +675,13 @@ function cardBlocks(card) {
     phoneButtons: column && column.querySelector(':scope > div.md\\:hidden'),
   };
   for (const [name, el] of Object.entries(blocks)) {
+    // A fiction with no tags at all has no tag row, and search turns one up
+    // every so often. Only a row missing while its tag links are there means
+    // the card was rebuilt.
+    if (name === 'tags' && !el && !card.querySelector('a[href*="tagsAdd="]')) {
+      delete blocks.tags;
+      continue;
+    }
     assert.ok(el, `a card has no ${name}: Royal Road rebuilt the card again`);
   }
   return blocks;
@@ -733,6 +742,7 @@ test('each list view gives every block of a real card the layout it was written 
         const blocks = cardBlocks(card);
         for (const prop of ['display', 'order']) {
           for (const [name, want] of Object.entries(expect[prop])) {
+            if (!blocks[name]) continue;
             assert.equal(
               ourValue(blocks[name], prop),
               want,
@@ -740,6 +750,23 @@ test('each list view gives every block of a real card the layout it was written 
             );
           }
         }
+      }
+      dom.window.close();
+    }
+  }
+});
+
+test('a view that resizes the cover settles both of its axes', () => {
+  // The box carried `aspect-[2/3]` until build 4.1.20261006 and pins its own
+  // width now - `w-40 md:w-[8.6667rem]` - so a height on its own leaves a 3rem
+  // picture adrift in an 8.7rem box, which is what compact view did.
+  for (const fixture of LIST_CAPTURES) {
+    for (const mode of ['compact', 'two-col', 'grid']) {
+      const dom = docFor(fixture, `rrx-view-${mode}`);
+      for (const card of dom.window.document.querySelectorAll('.fiction-card-expanded')) {
+        const box = cardBlocks(card).coverBox;
+        assert.ok(ourValue(box, 'height'), `${fixture}, ${mode}: cover box height`);
+        assert.ok(ourValue(box, 'width'), `${fixture}, ${mode}: cover box width`);
       }
       dom.window.close();
     }
