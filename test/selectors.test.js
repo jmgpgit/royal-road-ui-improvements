@@ -13,7 +13,14 @@
 const nodeTest = require('node:test');
 const assert = require('node:assert/strict');
 
-const { SEL, CARD_VARIANTS, CARD_GROUPS, FICTION_STATS } = require('../src/common/selectors.js');
+const {
+  SEL,
+  RR_BUILD,
+  CARD_VARIANTS,
+  CARD_GROUPS,
+  FICTION_STATS,
+} = require('../src/common/selectors.js');
+const { royalRoadBuild } = require('../src/common/model.js');
 const { read, need } = require('./helpers/fixtures.js');
 
 const FIXTURES = [
@@ -225,5 +232,32 @@ test('the new-UI probe matches every redesign page we support', () => {
   for (const [name, html] of Object.entries({ listPage, home, fictionPage })) {
     const hit = probes.some((p) => html.includes(asSubstring(p)));
     assert.ok(hit, `${name}: no probe matched`);
+  }
+});
+test('every capture names its Royal Road build, in both places we read it', () => {
+  // The options page shows the build off the last page you loaded beside the one
+  // this release was checked against, so a hook Royal Road stopped emitting would
+  // leave it blank rather than wrong, and silently. The legacy layout says it too,
+  // which is why the build is recorded before main.js gives up on that layout.
+  const captures = {
+    'rising-stars': listPage,
+    'latest-updates': latestUpdates,
+    search: searchPage,
+    'weekly-popular': weeklyPopular,
+    home,
+    fiction: fictionPage,
+    legacy,
+  };
+  const shape = /^\d+\.\d+\.\d{8}\.\d+$/;
+  assert.match(RR_BUILD, shape, 'RR_BUILD in selectors.js');
+
+  for (const [name, html] of Object.entries(captures)) {
+    const meta = new RegExp(`<meta name="baggage" content="([^"]*)"`).exec(html);
+    assert.ok(meta, `${name}: no ${SEL.buildMeta}`);
+    const fromMeta = royalRoadBuild(meta[1]);
+    assert.match(String(fromMeta), shape, `${name}: build from the meta`);
+    const script = /window\.royalroad\.version[^;]*/.exec(html);
+    assert.ok(script, `${name}: no inline build script to fall back to`);
+    assert.equal(royalRoadBuild(script[0]), fromMeta, `${name}: the two sources disagree`);
   }
 });

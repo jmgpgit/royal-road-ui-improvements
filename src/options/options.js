@@ -720,13 +720,33 @@
   renderNav();
   wireTagColors();
 
+  /** Which Royal Road the extension was checked against, and which one you are
+   *  actually being served. Royal Road ships most days, so a release that has
+   *  fallen behind the site shows here rather than only in a bug report. What
+   *  you were served is whatever the last Royal Road page you opened said it
+   *  was; nothing is fetched to find out. */
+  function renderBuild(seen) {
+    const version = RRX.ext.runtime.getManifest().version;
+    const tested = `Version ${version} was tested against Royal Road build ${RRX.RR_BUILD}.`;
+    // Naming the same build twice in one sentence reads like a mistake, so when
+    // they agree the second half points back rather than repeating it.
+    const served = !seen
+      ? 'No Royal Road page opened yet.'
+      : seen.build === RRX.RR_BUILD
+        ? `That is the build you were served on ${formatDate(seen.at * 1000)}.`
+        : `You were served ${seen.build} on ${formatDate(seen.at * 1000)}.`;
+    $('rr-build').textContent = `${tested} ${served}`;
+  }
+
   Promise.all([
     RRX.store.load(),
     RRX.store.loadChapters(),
     RRX.store.loadStats(),
     RRX.store.loadLog(),
-  ]).then(([next, chapters, stats, log]) => {
+    RRX.store.loadBuild(),
+  ]).then(([next, chapters, stats, log, build]) => {
     state = { ...next, chapters, stats, log };
     render();
+    renderBuild(build);
   });
 })();

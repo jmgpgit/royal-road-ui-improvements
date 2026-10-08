@@ -35,6 +35,18 @@
   }
 
   /**
+   * The Royal Road build named in a string that carries it. Two shapes, one
+   * regex: the `baggage` meta says `...Website%404.1.20261006.93`, and the
+   * inline bootstrap script assigns the same number in halves,
+   * `"RoyalRoad.Web.Website@" + "4.1.20261006.93"`.
+   */
+  function royalRoadBuild(text) {
+    if (typeof text !== 'string') return null;
+    const m = /Website(?:@|%40)"?\s*(?:\+\s*")?(\d+(?:\.\d+)+)/.exec(text);
+    return m ? m[1] : null;
+  }
+
+  /**
    * Extract a chapter id from any Royal Road URL: /chapter/3766643 and
    * /chapter/3766643/slug, relative or absolute. A full
    * /fiction/149588/slug/chapter/3766643/x answers this and `fictionIdFromHref`,
@@ -676,6 +688,7 @@
     normalizeSettings,
     fictionIdFromHref,
     chapterIdFromHref,
+    royalRoadBuild,
     fictionIdFromBlurbId,
     pageFromPath,
     normalizeIds,

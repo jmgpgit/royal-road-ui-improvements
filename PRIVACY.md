@@ -7,7 +7,7 @@ below names the file that implements it.
 
 ## What is stored, and where
 
-Eight kinds of thing, all in `browser.storage.local`, which is local to your browser profile:
+Nine kinds of thing, all in `browser.storage.local`, which is local to your browser profile:
 
 - **Your settings.** The list in [`src/common/schema.js`](src/common/schema.js) is exhaustive.
 - **Your hidden fictions.** For each one: its Royal Road id, title, cover URL and the time you
@@ -66,6 +66,11 @@ Eight kinds of thing, all in `browser.storage.local`, which is local to your bro
   it, so on a cold cache a tag colour is stored under its slug alone. This is Royal Road's own
   public vocabulary — "LitRPG", "Progression", and the rest — and says nothing about you.
   See [`src/content/tags.js`](src/content/tags.js).
+- **Which build of Royal Road you were last served**, and when — a version string like
+  `4.1.20261006.93` and a date. Royal Road states it on every page, and the options page shows
+  it beside the build this release was checked against, so a version that has fallen behind the
+  site is visible without reading any code. It describes Royal Road, not you, and nothing is
+  fetched for it. See [`src/common/store.js`](src/common/store.js).
 
 A compact copy of your settings and the ids of your hidden and dropped fictions is mirrored into
 `localStorage` on royalroad.com. This exists only so the extension can apply them before the page
