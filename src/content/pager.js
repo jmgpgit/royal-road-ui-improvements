@@ -195,6 +195,15 @@
         const seen = new Set(
           [...host.querySelectorAll('[data-rr-paginate-item]')].map(markerOf).filter(Boolean)
         );
+        // Rows only, deliberately. Since build 4.1.20261006.93 a fetched page also
+        // carries Royal Road's own ad units between the rows - `Review_List_*`,
+        // `Comment_List_*` - and every page reuses the SAME element ids, so
+        // adopting them would duplicate the ids NitroPay keys an ad on. Minting
+        // fresh ones instead would mean us asking their ad script for slots they
+        // did not place. Neither is ours to do: what they rendered stays and keeps
+        // running, and this only ever adds rows. Both auto-loaders are off by
+        // default, so a reader who never turns them on sees Royal Road's own
+        // pagination and all of its ad placements.
         let added = 0;
         for (const item of doc.querySelectorAll('[data-rr-paginate-item]')) {
           const marker = markerOf(item);
