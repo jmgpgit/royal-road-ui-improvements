@@ -4,6 +4,33 @@ Notable changes, newest first. Versions follow [semantic versioning](https://sem
 the patch number for fixes, the minor for new settings, the major for anything that changes
 what an existing setting does.
 
+## 1.6.2
+
+**New**
+
+- **The Royal Road build is named on the options page.** Its last line says which build this
+  version was tested against and which one Royal Road last served you. Royal Road ships most
+  days, and when it moves past what a release was checked on nothing fails loudly - a card
+  quietly stops matching - so this is where that shows. The build is read off the page you
+  already opened; nothing is fetched for it.
+
+**Fixes**
+
+- **Compact view's cover fills its row again.** Royal Road's build of 6 October stopped giving
+  the cover box its 2:3 shape and pinned its width instead, which left the picture shrunk into
+  the corner of a box nearly three times its width, the blurred placeholder stretched across the
+  rest. The cover now runs the full height of the row.
+
+**Under the hood**
+
+- **`npm start` comes back when you close Firefox.** web-ext stops waiting for a browser the
+  moment it is up, so closing the window left the script running with no browser and no prompt,
+  and the next `npm start` had nowhere to go. Ctrl-C now closes Firefox rather than orphaning it.
+
+**Privacy policy**
+
+- Lists the Royal Road build you were last served, and the date, as a ninth kind of stored thing.
+
 ## 1.6.1
 
 **New**
