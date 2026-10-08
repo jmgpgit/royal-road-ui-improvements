@@ -6,7 +6,8 @@
  *   npm start -- --legacy      open on the OLD layout instead, to test the
  *                              design switch in the popup
  *   npm start -- --fresh       throwaway profile, what plain `web-ext run` gives
- *   npm start -- --devtools    anything else is handed straight to web-ext
+ *   npm start -- --devtools    anything else goes to web-ext, as --flag or
+ *                              --flag=value
  *
  * Why this exists: Royal Road serves the redesign only when the `rr_ui_mode`
  * cookie asks for it, and this extension is deliberately inert on the legacy
@@ -31,16 +32,15 @@
  * removes it first, so web-ext can never catch it without a manifest.
  */
 
-import { spawn } from 'node:child_process';
 import { existsSync, watch } from 'node:fs';
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import webExt from 'web-ext';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DEV = path.join(ROOT, 'dist', 'dev');
 const PROFILE = path.join(ROOT, '.dev-profile');
-const WEB_EXT = path.join(ROOT, 'node_modules', 'web-ext', 'bin', 'web-ext.js');
 
 const START_URL = 'https://www.royalroad.com/';
 
@@ -255,10 +255,6 @@ const fresh = argv.includes('--fresh');
 const legacy = argv.includes('--legacy');
 const passthrough = argv.filter((arg) => arg !== '--fresh' && arg !== '--legacy');
 
-if (!existsSync(WEB_EXT)) {
-  throw new Error(`${WEB_EXT} is missing. Run \`npm install\` first.`);
-}
-
 const manifest = JSON.parse(await readFile(path.join(ROOT, 'manifest.json'), 'utf8'));
 console.log(`Launching ${manifest.name} ${manifest.version}`);
 
@@ -289,44 +285,77 @@ console.log(`  ${START_URL}`);
 
 const stopWatching = watchSources(legacy);
 
-const child = spawn(
-  process.execPath,
-  [
-    WEB_EXT,
-    'run',
-    // A CLI --source-dir beats package.json's webExt.sourceDir, so the config
-    // block there still serves a bare `npx web-ext run` on the repo root.
-    '--source-dir',
-    DEV,
-    '--start-url',
-    START_URL,
-    // --fresh has to drop --firefox-profile as well, not just the two flags
-    // after it: a profile *without* --keep-profile-changes makes web-ext run
-    // from a throwaway copy of .dev-profile, which is a third mode nobody
-    // asked for.
-    ...(fresh
-      ? []
-      : ['--firefox-profile', PROFILE, '--keep-profile-changes', '--profile-create-if-missing']),
-    ...passthrough,
-  ],
-  { cwd: ROOT, stdio: 'inherit' }
-);
-
-// A console delivers Ctrl-C to every attached process, so this one gets it too.
-// Leaving it to the default handler would hand the prompt back while Firefox is
-// still up, so the first one is web-ext's business: on a TTY it reads Ctrl-C as
-// a keypress and shuts the browser down in order, and without one it takes the
-// signal itself. Either way the child's exit is what ends us. A second Ctrl-C
-// means neither happened, so stop waiting.
-let interrupts = 0;
-process.on('SIGINT', () => {
-  if ((interrupts += 1) > 1) {
-    stopWatching();
-    process.exit(130);
+/**
+ * Anything left after --fresh and --legacy, as `cmd.run` parameters:
+ * `--devtools` becomes `{devtools: true}`, `--firefox=nightly` becomes
+ * `{firefox: 'nightly'}`. web-ext's own CLI parser cannot do this job here,
+ * because `main()` throws away the value its command returns and that value is
+ * the runner this file needs.
+ */
+function paramsFrom(flags) {
+  const out = {};
+  for (const flag of flags) {
+    const m = /^--([a-z][\w-]*)(?:=(.*))?$/i.exec(flag);
+    if (!m) {
+      throw new Error(`cannot hand ${flag} to web-ext: write it as --flag or --flag=value`);
+    }
+    out[m[1].replace(/-(\w)/g, (_, c) => c.toUpperCase())] = m[2] === undefined ? true : m[2];
   }
-});
+  return out;
+}
 
-child.on('exit', (code, signal) => {
+const end = (code) => {
   stopWatching();
-  process.exit(code ?? (signal ? 1 : 0));
+  process.exit(code);
+};
+
+let runner;
+try {
+  runner = await webExt.cmd.run(
+    {
+      sourceDir: DEV,
+      startUrl: START_URL,
+      artifactsDir: path.join(ROOT, 'web-ext-artifacts'),
+      // web-ext's reload keys would put the terminal in raw mode for as long as
+      // the browser is up. Nothing here needs them: the watcher above re-syncs
+      // on save and Ctrl-C is handled below.
+      noInput: true,
+      // --fresh has to drop the profile as well, not just the two flags after
+      // it: a profile *without* keepProfileChanges makes web-ext run from a
+      // throwaway copy of .dev-profile, which is a third mode nobody asked for.
+      ...(fresh
+        ? {}
+        : { firefoxProfile: PROFILE, keepProfileChanges: true, profileCreateIfMissing: true }),
+      ...paramsFrom(passthrough),
+    },
+    // Throw rather than exiting the process out from under us, so the watcher
+    // is stopped and the reason is printed once.
+    { shouldExitProgram: false }
+  );
+} catch (err) {
+  console.error(`  ${err.message}`);
+  end(1);
+}
+
+/**
+ * Closing the browser ends the run.
+ *
+ * This is the hook the whole in-process launch is for. `cmd.run` returns as soon
+ * as Firefox is up and never waits for it, so nothing is watching the browser's
+ * lifetime; its own open sockets then hold the event loop after the window is
+ * closed. Run as a child process that meant `npm start` sat there with no
+ * browser and no prompt back, and the next `npm start` had nowhere to go.
+ */
+let interrupted = false;
+runner.registerCleanup(() => end(interrupted ? 130 : 0));
+
+// A console delivers Ctrl-C to every attached process, and web-ext installs no
+// handler of its own: left alone it would kill this process and leave Firefox
+// running, orphaned, still holding .dev-profile. `exit()` closes the browser,
+// which brings us back through the cleanup above. A second Ctrl-C means that did
+// not happen, so stop waiting.
+process.on('SIGINT', () => {
+  if (interrupted) end(130);
+  interrupted = true;
+  runner.exit().catch(() => end(130));
 });
